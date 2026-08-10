@@ -6,10 +6,11 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
-import { euro, num, libelleMois, decalerMois, ecartMois } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, libelleDate, decalerMois, ecartMois } from "../utiles.js";
 
 export default function Projets({ etat, mois, executer, modifier }) {
   const [f, setF] = useState({ libelle: "", objectif: "", echeance: decalerMois(mois, 12), versement: "" });
+  const [historique, setHistorique] = useState(null);
 
   const ajouter = () => {
     if (!f.libelle.trim() || num(f.objectif) <= 0) return;
@@ -73,7 +74,13 @@ export default function Projets({ etat, mois, executer, modifier }) {
                         Caler sur l'objectif
                       </button>
                     )}
+                    {p.versements.length > 0 && (
+                      <button className="btn fant mini" onClick={() => setHistorique(historique === p.id ? null : p.id)}>
+                        {historique === p.id ? "Masquer" : `Historique (${p.versements.length})`}
+                      </button>
+                    )}
                   </div>
+                  {historique === p.id && <Historique versements={p.versements} />}
                 </div>
               );
             })}
@@ -94,5 +101,24 @@ export default function Projets({ etat, mois, executer, modifier }) {
         </div>
       </Carte>
     </>
+  );
+}
+
+// Mouvements de l'enveloppe, du plus récent au plus ancien (ordre servi par l'API).
+function Historique({ versements }) {
+  const total = versements.reduce((s, v) => s + v.montant, 0);
+  return (
+    <div style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--trait)" }}>
+      {versements.map((v) => (
+        <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+          <span className="ligne-meta">{libelleDate(v.date)}</span>
+          <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>
+        </div>
+      ))}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 4, paddingTop: 6, borderTop: "1px solid #EDF1F3" }}>
+        <span className="ligne-meta">{versements.length} versement{versements.length > 1 ? "s" : ""}</span>
+        <span className="chiffre" style={{ fontSize: 13, fontWeight: 600 }}>{euroPrecis(total)}</span>
+      </div>
+    </div>
   );
 }

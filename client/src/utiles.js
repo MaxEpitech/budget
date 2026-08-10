@@ -44,6 +44,10 @@ export const libelleMois = (cle) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+// Date d'un versement : « 10 août 2026 ».
+export const libelleDate = (iso) =>
+  new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
 export const CATEGORIES = ["Logement", "Courses", "Transport", "Énergie", "Abonnements", "Santé", "Loisirs", "Enfants", "Assurances", "Impôts", "Autre"];
 
 export const POSTES = {
