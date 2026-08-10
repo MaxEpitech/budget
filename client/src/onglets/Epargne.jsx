@@ -1,0 +1,128 @@
+// Onglet Épargne — logique du prototype ; seules les écritures passent par l'API.
+import { useState, useMemo } from "react";
+import { api } from "../api.js";
+import Champ from "../composants/Champ.jsx";
+import Carte from "../composants/Carte.jsx";
+import { euro, num } from "../utiles.js";
+import { projeter } from "../finance.js";
+
+export default function Epargne({ etat, executer, modifier }) {
+  const [horizon, setHorizon] = useState(10);
+  const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "" });
+
+  const ajouter = () => {
+    if (!f.libelle.trim()) return;
+    executer(() =>
+      api.creerPlacement({
+        libelle: f.libelle.trim(),
+        valeur: num(f.valeur),
+        versement: num(f.versement),
+        rendement: num(f.rendement),
+      })
+    );
+    setF({ libelle: "", valeur: "", versement: "", rendement: "" });
+  };
+
+  const valeurTotale = etat.placements.reduce((s, p) => s + p.valeur, 0);
+  const versementTotal = etat.placements.reduce((s, p) => s + p.versement, 0);
+
+  const courbe = useMemo(() => {
+    const pts = [];
+    for (let annee = 0; annee <= horizon; annee++) {
+      const m = annee * 12;
+      const valeur = etat.placements.reduce((s, p) => s + projeter(p.valeur, p.versement, p.rendement, m), 0);
+      pts.push({ annee, valeur, verse: valeurTotale + versementTotal * m });
+    }
+    return pts;
+  }, [etat.placements, horizon, valeurTotale, versementTotal]);
+
+  const final = courbe[courbe.length - 1];
+
+  return (
+    <>
+      <Carte
+        titre="Projection"
+        note={`Épargne du foyer sur ${horizon} ans`}
+        action={
+          <div style={{ display: "flex", gap: 4 }}>
+            {[5, 10, 20].map((h) => (
+              <button key={h} className={`btn mini ${horizon === h ? "" : "fant"}`} onClick={() => setHorizon(h)}>{h} ans</button>
+            ))}
+          </div>
+        }
+      >
+        <div className="corps">
+          <Courbe points={courbe} />
+          <div className="duo" style={{ marginTop: 14 }}>
+            <div>
+              <div className="stat-lib">Valeur projetée</div>
+              <div className="stat-val chiffre" style={{ color: "var(--indigo)" }}>{euro(final.valeur)}</div>
+            </div>
+            <div>
+              <div className="stat-lib">Dont intérêts</div>
+              <div className="stat-val chiffre" style={{ color: "var(--caisse)" }}>{euro(final.valeur - final.verse)}</div>
+            </div>
+          </div>
+          <div className="carte-note" style={{ marginTop: 8 }}>
+            Hypothèse : rendement constant, versements maintenus. Une projection n'est pas une garantie.
+          </div>
+        </div>
+      </Carte>
+
+      <Carte titre="Supports" note={`${euro(valeurTotale)} placés · ${euro(versementTotal)} versés chaque mois`}>
+        {etat.placements.length === 0 && <div className="vide">Aucun support d'épargne enregistré.</div>}
+        {etat.placements.map((p) => (
+          <div className="ligne" key={p.id}>
+            <div style={{ minWidth: 140 }}>
+              <div className="ligne-lib">{p.libelle}</div>
+              <div className="ligne-meta">{p.rendement}% par an · {euro(projeter(p.valeur, p.versement, p.rendement, horizon * 12))} dans {horizon} ans</div>
+            </div>
+            <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
+              <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />
+              <Champ libelle="/mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur={85} />
+              <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
+            </div>
+            <button className="suppr" onClick={() => executer(() => api.supprimerPlacement(p.id))} aria-label={`Supprimer ${p.libelle}`}>×</button>
+          </div>
+        ))}
+      </Carte>
+
+      <Carte titre="Ajouter un support">
+        <div className="corps">
+          <div className="forme">
+            <Champ libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur={170} placeholder="Ex. Assurance vie" onEntree={ajouter} />
+            <Champ libelle="Valeur actuelle" valeur={f.valeur} onChange={(v) => setF({ ...f, valeur: v })} largeur={130} placeholder="0" onEntree={ajouter} />
+            <Champ libelle="Versement /mois" valeur={f.versement} onChange={(v) => setF({ ...f, versement: v })} largeur={130} placeholder="0" onEntree={ajouter} />
+            <Champ libelle="Rendement %" valeur={f.rendement} onChange={(v) => setF({ ...f, rendement: v })} largeur={110} placeholder="0" onEntree={ajouter} />
+            <button className="btn" onClick={ajouter}>Ajouter</button>
+          </div>
+        </div>
+      </Carte>
+    </>
+  );
+}
+
+function Courbe({ points }) {
+  const L = 620, H = 190, mg = { g: 8, d: 8, h: 12, b: 22 };
+  const max = Math.max(...points.map((p) => p.valeur), 1);
+  const x = (i) => mg.g + (i / Math.max(1, points.length - 1)) * (L - mg.g - mg.d);
+  const y = (v) => mg.h + (1 - v / max) * (H - mg.h - mg.b);
+
+  const traceur = (cle) => points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p[cle]).toFixed(1)}`).join(" ");
+  const aire = `${traceur("valeur")} L ${x(points.length - 1).toFixed(1)} ${y(0)} L ${x(0).toFixed(1)} ${y(0)} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${L} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="Projection de l'épargne">
+      <path d={aire} fill="var(--indigo)" opacity="0.09" />
+      <path d={traceur("verse")} fill="none" stroke="var(--doux)" strokeWidth="1.5" strokeDasharray="4 4" />
+      <path d={traceur("valeur")} fill="none" stroke="var(--indigo)" strokeWidth="2.5" strokeLinejoin="round" />
+      {points.map((p, i) =>
+        i % Math.ceil(points.length / 6) === 0 || i === points.length - 1 ? (
+          <text key={i} x={x(i)} y={H - 6} fontSize="10" fill="var(--doux)" textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"} fontFamily="var(--mono)">
+            {p.annee === 0 ? "auj." : `+${p.annee} an${p.annee > 1 ? "s" : ""}`}
+          </text>
+        ) : null
+      )}
+    </svg>
+  );
+}
