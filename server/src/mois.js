@@ -1,0 +1,13 @@
+// Aides sur les clés de mois « YYYY-MM » — mêmes conventions que le prototype.
+
+export const moisCourant = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+// Nombre de mois entre deux clés (positif si `vers` est après `de`).
+export const ecartMois = (de, vers) => {
+  const [a1, m1] = de.split("-").map(Number);
+  const [a2, m2] = vers.split("-").map(Number);
+  return (a2 - a1) * 12 + (m2 - m1);
+};

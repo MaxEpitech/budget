@@ -31,16 +31,19 @@ async function main() {
   const alex = await prisma.membre.create({ data: { nom: "Alex", revenuMensuel: 245000 } });
   const camille = await prisma.membre.create({ data: { nom: "Camille", revenuMensuel: 198000 } });
 
+  // Ordre inversé par rapport à ETAT_DEMO : l'API sert les transactions de la
+  // plus récente à la plus ancienne (le prototype ajoute en tête de liste),
+  // l'affichage initial reste donc celui du prototype.
   await prisma.transaction.createMany({
     data: [
-      { type: "depense", libelle: "Loyer", montant: 98000, categorie: "Logement", recurrent: true },
-      { type: "depense", libelle: "Courses", montant: 52000, categorie: "Courses", recurrent: true },
-      { type: "depense", libelle: "Électricité", montant: 9500, categorie: "Énergie", recurrent: true },
-      { type: "depense", libelle: "Assurance habitation", montant: 2800, categorie: "Assurances", recurrent: true },
-      { type: "depense", libelle: "Forfait mobile", montant: 1500, categorie: "Abonnements", recurrent: true, membreId: alex.id },
-      { type: "depense", libelle: "Salle de sport", montant: 3200, categorie: "Loisirs", recurrent: true, membreId: camille.id },
-      { type: "depense", libelle: "Essence", montant: 14000, categorie: "Transport", recurrent: true },
       { type: "revenu", libelle: "Freelance", montant: 30000, categorie: "Autre", recurrent: false, mois: moisCle(0), membreId: alex.id },
+      { type: "depense", libelle: "Essence", montant: 14000, categorie: "Transport", recurrent: true },
+      { type: "depense", libelle: "Salle de sport", montant: 3200, categorie: "Loisirs", recurrent: true, membreId: camille.id },
+      { type: "depense", libelle: "Forfait mobile", montant: 1500, categorie: "Abonnements", recurrent: true, membreId: alex.id },
+      { type: "depense", libelle: "Assurance habitation", montant: 2800, categorie: "Assurances", recurrent: true },
+      { type: "depense", libelle: "Électricité", montant: 9500, categorie: "Énergie", recurrent: true },
+      { type: "depense", libelle: "Courses", montant: 52000, categorie: "Courses", recurrent: true },
+      { type: "depense", libelle: "Loyer", montant: 98000, categorie: "Logement", recurrent: true },
     ],
   });
 
