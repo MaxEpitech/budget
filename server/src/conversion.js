@@ -64,10 +64,12 @@ export const creditVersDb = (d) => ({
 });
 
 /* ─── Projet — l'épargne est la somme des versements, jamais un champ stocké ─── */
+// `pour` : "foyer" ou l'id du membre qui a mis au pot (membreId en base).
 export const versementVersApi = (v) => ({
   id: v.id,
   montant: enEuros(v.montant),
   date: v.date,
+  pour: v.membreId ?? "foyer",
 });
 
 export const projetVersApi = (p) => ({

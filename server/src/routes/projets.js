@@ -39,8 +39,19 @@ routeur.delete("/:id", attraper(async (req, res) => {
 routeur.post("/:id/versements", valider(VersementSchema), attraper(async (req, res) => {
   const projet = await prisma.projet.findUnique({ where: { id: req.params.id } });
   if (!projet) return res.status(404).json({ erreur: "Projet introuvable" });
+
+  // `pour` doit désigner un membre existant (ou "foyer").
+  const { pour } = req.donnees;
+  if (pour !== "foyer" && !(await prisma.membre.findUnique({ where: { id: pour } }))) {
+    return res.status(400).json({ erreur: "pour : membre inconnu" });
+  }
+
   const versement = await prisma.versement.create({
-    data: { projetId: projet.id, montant: enCentimes(req.donnees.montant) },
+    data: {
+      projetId: projet.id,
+      montant: enCentimes(req.donnees.montant),
+      membreId: pour === "foyer" ? null : pour,
+    },
   });
   res.status(201).json(versementVersApi(versement));
 }));

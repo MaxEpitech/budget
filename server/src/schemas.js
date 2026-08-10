@@ -51,6 +51,8 @@ export const ProjetPartielSchema = ProjetSchema.partial();
 
 export const VersementSchema = z.object({
   montant: montantPositif("montant"),
+  // Qui a mis au pot : "foyer" par défaut, ou l'id d'un membre.
+  pour: chaine("pour").default("foyer"),
 });
 
 export const PlacementSchema = z.object({

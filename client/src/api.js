@@ -41,7 +41,7 @@ export const api = {
   creerProjet: (p) => requete("/projets", "POST", p),
   modifierProjet: (id, patch) => requete(`/projets/${id}`, "PUT", patch),
   supprimerProjet: (id) => requete(`/projets/${id}`, "DELETE"),
-  verser: (id, montant) => requete(`/projets/${id}/versements`, "POST", { montant }),
+  verser: (id, montant, pour = "foyer") => requete(`/projets/${id}/versements`, "POST", { montant, pour }),
 
   placements: () => requete("/placements"),
   creerPlacement: (p) => requete("/placements", "POST", p),

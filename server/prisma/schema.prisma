@@ -32,6 +32,7 @@ model Membre {
   nom           String
   revenuMensuel Int // centimes
   transactions  Transaction[]
+  versements    Versement[]
 }
 
 model Transaction {
@@ -73,6 +74,9 @@ model Versement {
   projetId String
   montant  Int // centimes
   date     DateTime @default(now())
+  // Qui a mis au pot : null = versement du foyer, sinon le membre concerné.
+  membre   Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId String?
 }
 
 model Placement {
