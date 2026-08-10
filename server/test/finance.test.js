@@ -1,0 +1,156 @@
+// Tests unitaires des formules financières (node:test, sans dépendance).
+// Vérification de référence du brief : 14 000 € à 3,9 % sur 60 mois
+// → 257,20 €/mois et 1 432 € d'intérêts au total.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  mensualite,
+  capitalRestant,
+  projeter,
+  quotePart,
+  resteAVivre,
+  versementRequis,
+} from "../src/finance.js";
+
+const proche = (obtenu, attendu, tolerance, message) =>
+  assert.ok(
+    Math.abs(obtenu - attendu) <= tolerance,
+    `${message} : obtenu ${obtenu}, attendu ${attendu} (±${tolerance})`
+  );
+
+/* ─── Mensualité ─── */
+
+test("mensualité de référence : 14 000 € à 3,9 % sur 60 mois → 257,20 €/mois", () => {
+  proche(mensualite(14000, 3.9, 60), 257.2, 0.005, "mensualité");
+});
+
+test("intérêts totaux de référence : 60 × 257,20 − 14 000 → 1 432 €", () => {
+  const interets = mensualite(14000, 3.9, 60) * 60 - 14000;
+  proche(interets, 1432, 1, "intérêts totaux");
+});
+
+test("mensualité à taux zéro : capital / durée", () => {
+  assert.equal(mensualite(1200, 0, 12), 100);
+});
+
+test("mensualité nulle si capital ou durée absents", () => {
+  assert.equal(mensualite(0, 3.9, 60), 0);
+  assert.equal(mensualite(14000, 3.9, 0), 0);
+});
+
+test("mensualité en centimes : linéaire, ×100 par rapport aux euros", () => {
+  proche(mensualite(1400000, 3.9, 60), mensualite(14000, 3.9, 60) * 100, 1e-6, "linéarité");
+});
+
+/* ─── Capital restant dû ─── */
+
+test("capital restant avant la première échéance : le capital emprunté", () => {
+  assert.equal(capitalRestant(14000, 3.9, 60, 0), 14000);
+  assert.equal(capitalRestant(14000, 3.9, 60, -3), 14000);
+});
+
+test("capital restant après la dernière échéance : zéro", () => {
+  assert.equal(capitalRestant(14000, 3.9, 60, 60), 0);
+  assert.equal(capitalRestant(14000, 3.9, 60, 72), 0);
+});
+
+test("capital restant à taux zéro : capital − k mensualités", () => {
+  assert.equal(capitalRestant(1200, 0, 12, 5), 700);
+});
+
+test("capital restant : cohérent avec l'amortissement simulé mois par mois", () => {
+  const [C, taux, n] = [14000, 3.9, 60];
+  const r = taux / 100 / 12;
+  const M = mensualite(C, taux, n);
+  let solde = C;
+  for (let k = 1; k < n; k++) {
+    solde = solde * (1 + r) - M;
+    proche(capitalRestant(C, taux, n, k), solde, 0.01, `échéance ${k}`);
+  }
+});
+
+test("capital restant : décroissant et borné à [0, capital]", () => {
+  let precedent = capitalRestant(9000, 2.4, 48, 0);
+  for (let k = 1; k <= 48; k++) {
+    const restant = capitalRestant(9000, 2.4, 48, k);
+    assert.ok(restant <= precedent, `croissance inattendue à k=${k}`);
+    assert.ok(restant >= 0 && restant <= 9000, `hors bornes à k=${k}`);
+    precedent = restant;
+  }
+});
+
+/* ─── Projection d'épargne ─── */
+
+test("projection à rendement nul : valeur + versement × mois", () => {
+  assert.equal(projeter(1000, 100, 0, 12), 2200);
+});
+
+test("projection sur 0 mois : la valeur actuelle", () => {
+  assert.equal(projeter(8400, 150, 2.4, 0), 8400);
+});
+
+test("projection : cohérente avec la capitalisation simulée mois par mois", () => {
+  const [V, P, rdt] = [8400, 150, 2.4];
+  const r = rdt / 100 / 12;
+  let valeur = V;
+  for (let m = 1; m <= 120; m++) {
+    valeur = valeur * (1 + r) + P;
+    proche(projeter(V, P, rdt, m), valeur, 0.01, `mois ${m}`);
+  }
+});
+
+/* ─── Quote-part ─── */
+
+test("quote-part au prorata des revenus", () => {
+  proche(quotePart(2450, 4430, 2, "prorata"), 2450 / 4430, 1e-12, "prorata");
+});
+
+test("quote-parts au prorata : la somme fait 1", () => {
+  const total = quotePart(2450, 4430, 2, "prorata") + quotePart(1980, 4430, 2, "prorata");
+  proche(total, 1, 1e-12, "somme des parts");
+});
+
+test("quote-part moitié-moitié : 1/nb membres, quel que soit le revenu", () => {
+  assert.equal(quotePart(2450, 4430, 2, "moitie"), 0.5);
+  assert.equal(quotePart(0, 4430, 4, "moitie"), 0.25);
+});
+
+test("quote-part au prorata avec revenus totaux nuls : zéro", () => {
+  assert.equal(quotePart(0, 0, 2, "prorata"), 0);
+});
+
+/* ─── Reste à vivre ─── */
+
+test("reste à vivre : revenus moins toutes les sorties", () => {
+  assert.equal(
+    resteAVivre({
+      revenus: 4730,
+      depenses: 1810,
+      mensualitesCredits: 454,
+      versementsProjets: 550,
+      versementsPlacements: 350,
+    }),
+    4730 - 1810 - 454 - 550 - 350
+  );
+});
+
+test("reste à vivre : peut être négatif", () => {
+  assert.ok(
+    resteAVivre({ revenus: 1000, depenses: 1500, mensualitesCredits: 0, versementsProjets: 0, versementsPlacements: 0 }) < 0
+  );
+});
+
+/* ─── Versement requis ─── */
+
+test("versement requis : (objectif − épargné) / mois restants", () => {
+  proche(versementRequis(6000, 1850, 14), (6000 - 1850) / 14, 1e-12, "versement requis");
+});
+
+test("versement requis : échéance passée ou courante → tout sur un mois", () => {
+  assert.equal(versementRequis(1000, 0, 0), 1000);
+  assert.equal(versementRequis(1000, 0, -5), 1000);
+});
+
+test("versement requis : objectif déjà atteint → zéro", () => {
+  assert.equal(versementRequis(1000, 1200, 6), 0);
+});
