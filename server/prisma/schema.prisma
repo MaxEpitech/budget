@@ -1,0 +1,84 @@
+// Modèle de données du budget familial.
+// Convention : tous les montants sont des entiers en CENTIMES ;
+// la conversion en euros se fait à la frontière de l'API.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Repartition {
+  prorata
+  moitie
+}
+
+enum TypeTransaction {
+  revenu
+  depense
+}
+
+// Un seul enregistrement (id = 1) : les réglages du foyer.
+model Foyer {
+  id          Int         @id @default(1)
+  repartition Repartition @default(prorata)
+}
+
+model Membre {
+  id            String        @id @default(cuid())
+  nom           String
+  revenuMensuel Int // centimes
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id        String          @id @default(cuid())
+  type      TypeTransaction
+  libelle   String
+  montant   Int // centimes
+  categorie String
+  recurrent Boolean         @default(false)
+  mois      String? // YYYY-MM, null si récurrente
+  // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
+  membre    Membre?         @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId  String?
+}
+
+model Credit {
+  id        String @id @default(cuid())
+  libelle   String
+  capital   Int // centimes
+  taux      Float // taux annuel, en %
+  dureeMois Int
+  moisDebut String // YYYY-MM de la première échéance
+}
+
+model Projet {
+  id               String      @id @default(cuid())
+  libelle          String
+  objectif         Int // centimes
+  echeance         String // YYYY-MM
+  versementMensuel Int // centimes
+  versements       Versement[]
+}
+
+// Historique des mouvements d'enveloppe : le montant épargné d'un projet
+// est la somme de ses versements, jamais un champ figé.
+model Versement {
+  id       String   @id @default(cuid())
+  projet   Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  projetId String
+  montant  Int // centimes
+  date     DateTime @default(now())
+}
+
+model Placement {
+  id               String @id @default(cuid())
+  libelle          String
+  valeur           Int // centimes
+  versementMensuel Int // centimes
+  rendement        Float // rendement annuel, en %
+}
