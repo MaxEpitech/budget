@@ -77,7 +77,8 @@ async function main() {
 
   await prisma.placement.createMany({
     data: [
-      { libelle: "Livret A", valeur: 840000, versementMensuel: 15000, rendement: 2.4 },
+      // Le Livret A est plafonné à 22 950 € de versements ; le PEA ne l'est pas ici.
+      { libelle: "Livret A", valeur: 840000, versementMensuel: 15000, rendement: 2.4, plafond: 2295000 },
       { libelle: "PEA", valeur: 520000, versementMensuel: 20000, rendement: 5.5 },
     ],
   });

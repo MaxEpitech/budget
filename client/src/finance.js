@@ -28,3 +28,30 @@ export function projeter(valeur, versement, rendement, mois) {
   const f = Math.pow(1 + r, mois);
   return valeur * f + versement * ((f - 1) / r);
 }
+
+// Support plafonné (livret réglementé) : les versements s'arrêtent au plafond,
+// les intérêts continuent de courir et peuvent le dépasser.
+function simulerPlafonne(valeur, versement, rendement, mois, plafond) {
+  const r = rendement / 100 / 12;
+  let v = valeur;
+  let verse = valeur;
+  for (let i = 0; i < mois; i++) {
+    const apresInterets = v * (1 + r);
+    const depot = Math.max(0, Math.min(versement, plafond - apresInterets));
+    verse += depot;
+    v = apresInterets + depot;
+  }
+  return { valeur: v, verse };
+}
+
+// Sans plafond, strictement identique à projeter().
+export function projeterPlafonne(valeur, versement, rendement, mois, plafond) {
+  if (plafond == null) return projeter(valeur, versement, rendement, mois);
+  return simulerPlafonne(valeur, versement, rendement, mois, plafond).valeur;
+}
+
+// Total réellement placé : valeur de départ + versements effectués.
+export function verseAvecPlafond(valeur, versement, rendement, mois, plafond) {
+  if (plafond == null) return valeur + versement * mois;
+  return simulerPlafonne(valeur, versement, rendement, mois, plafond).verse;
+}

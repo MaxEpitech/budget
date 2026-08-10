@@ -98,6 +98,7 @@ export const placementVersApi = (p) => ({
   valeur: enEuros(p.valeur),
   versement: enEuros(p.versementMensuel),
   rendement: p.rendement,
+  plafond: p.plafond == null ? null : enEuros(p.plafond),
 });
 
 export const placementVersDb = (d) => {
@@ -106,5 +107,7 @@ export const placementVersDb = (d) => {
   if (d.valeur !== undefined) patch.valeur = enCentimes(d.valeur);
   if (d.versement !== undefined) patch.versementMensuel = enCentimes(d.versement);
   if (d.rendement !== undefined) patch.rendement = d.rendement;
+  // null efface le plafond, une valeur le pose.
+  if (d.plafond !== undefined) patch.plafond = d.plafond == null ? null : enCentimes(d.plafond);
   return patch;
 };

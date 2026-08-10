@@ -85,4 +85,6 @@ model Placement {
   valeur           Int // centimes
   versementMensuel Int // centimes
   rendement        Float // rendement annuel, en %
+  // Plafond de versements (livrets réglementés) ; null = pas de plafond.
+  plafond          Int? // centimes
 }

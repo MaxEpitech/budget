@@ -42,6 +42,43 @@ export function projeter(valeur, versement, rendement, mois) {
 }
 
 /**
+ * Simulation mois par mois d'un support plafonné (livret réglementé…).
+ * Règle retenue, celle des livrets : les versements s'arrêtent au plafond,
+ * mais les intérêts continuent de courir et peuvent le dépasser.
+ * Renvoie la valeur atteinte et le total réellement placé.
+ */
+function simulerPlafonne(valeur, versement, rendement, mois, plafond) {
+  const r = rendement / 100 / 12;
+  let v = valeur;
+  let verse = valeur;
+  for (let i = 0; i < mois; i++) {
+    const apresInterets = v * (1 + r);
+    const depot = Math.max(0, Math.min(versement, plafond - apresInterets));
+    verse += depot;
+    v = apresInterets + depot;
+  }
+  return { valeur: v, verse };
+}
+
+/**
+ * Projection d'épargne tenant compte d'un plafond de versements.
+ * Sans plafond (null/undefined), strictement identique à projeter().
+ */
+export function projeterPlafonne(valeur, versement, rendement, mois, plafond) {
+  if (plafond == null) return projeter(valeur, versement, rendement, mois);
+  return simulerPlafonne(valeur, versement, rendement, mois, plafond).valeur;
+}
+
+/**
+ * Total réellement placé au bout de n mois (valeur de départ + versements
+ * effectués), les versements étant interrompus au plafond.
+ */
+export function verseAvecPlafond(valeur, versement, rendement, mois, plafond) {
+  if (plafond == null) return valeur + versement * mois;
+  return simulerPlafonne(valeur, versement, rendement, mois, plafond).verse;
+}
+
+/**
  * Quote-part d'un membre dans les charges communes :
  * au prorata de son revenu, ou 1/nb membres si repartition = "moitie".
  * Si le total des revenus est nul en mode prorata, la part est 0.

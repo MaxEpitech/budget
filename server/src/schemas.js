@@ -60,6 +60,8 @@ export const PlacementSchema = z.object({
   valeur: positifOuNul("valeur"),
   versement: positifOuNul("versement"),
   rendement: nombre("rendement"),
+  // Plafond de versements ; null ou absent = pas de plafond.
+  plafond: montantPositif("plafond").nullish(),
 });
 export const PlacementPartielSchema = PlacementSchema.partial();
 

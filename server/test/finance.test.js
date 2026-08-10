@@ -7,6 +7,8 @@ import {
   mensualite,
   capitalRestant,
   projeter,
+  projeterPlafonne,
+  verseAvecPlafond,
   quotePart,
   resteAVivre,
   versementRequis,
@@ -96,6 +98,56 @@ test("projection : cohérente avec la capitalisation simulée mois par mois", ()
   for (let m = 1; m <= 120; m++) {
     valeur = valeur * (1 + r) + P;
     proche(projeter(V, P, rdt, m), valeur, 0.01, `mois ${m}`);
+  }
+});
+
+/* ─── Projection plafonnée (livrets réglementés) ─── */
+
+test("projection plafonnée sans plafond : identique à projeter", () => {
+  for (const mois of [0, 1, 12, 120]) {
+    assert.equal(projeterPlafonne(8400, 150, 2.4, mois, null), projeter(8400, 150, 2.4, mois));
+    assert.equal(projeterPlafonne(8400, 150, 2.4, mois, undefined), projeter(8400, 150, 2.4, mois));
+  }
+});
+
+test("projection plafonnée sans intérêts : la valeur s'arrête au plafond", () => {
+  // 1 000 € + 100 €/mois, plafond 1 500 € : atteint en 5 mois, puis plus rien.
+  assert.equal(projeterPlafonne(1000, 100, 0, 5, 1500), 1500);
+  assert.equal(projeterPlafonne(1000, 100, 0, 60, 1500), 1500);
+});
+
+test("projection plafonnée : les intérêts continuent au-delà du plafond", () => {
+  // Une fois le plafond atteint, les versements cessent mais pas la capitalisation.
+  const apres = projeterPlafonne(1500, 100, 3, 120, 1500);
+  assert.ok(apres > 1500, `attendu au-dessus du plafond, obtenu ${apres}`);
+  proche(apres, projeter(1500, 0, 3, 120), 1e-9, "capitalisation seule");
+});
+
+test("projection plafonnée : versements ignorés si le plafond est déjà dépassé", () => {
+  proche(projeterPlafonne(30000, 150, 0, 24, 22950), 30000, 1e-9, "aucun versement");
+});
+
+test("projection plafonnée : identique à projeter tant que le plafond n'est pas atteint", () => {
+  // 8 400 € + 150 €/mois à 2,4 % reste loin des 22 950 € du Livret A sur 2 ans.
+  proche(projeterPlafonne(8400, 150, 2.4, 24, 22950), projeter(8400, 150, 2.4, 24), 0.01, "avant plafond");
+});
+
+test("projection plafonnée : Livret A, le plafond borne bien les versements", () => {
+  // 20 000 € + 500 €/mois, plafond 22 950 € : le cumul versé se fige près du plafond.
+  const verse = verseAvecPlafond(20000, 500, 3, 120, 22950);
+  assert.ok(verse >= 22950 - 500 && verse <= 22950, `cumul versé hors bornes : ${verse}`);
+});
+
+test("cumul versé sans plafond : valeur de départ + versements", () => {
+  assert.equal(verseAvecPlafond(8400, 150, 2.4, 12, null), 8400 + 150 * 12);
+});
+
+test("cumul versé : jamais supérieur à la valeur projetée à rendement positif", () => {
+  const [V, P, rdt, plafond] = [1000, 200, 2, 22950];
+  for (const mois of [1, 12, 60, 240]) {
+    const valeur = projeterPlafonne(V, P, rdt, mois, plafond);
+    const verse = verseAvecPlafond(V, P, rdt, mois, plafond);
+    assert.ok(valeur >= verse, `mois ${mois} : valeur ${valeur} < versé ${verse}`);
   }
 });
 

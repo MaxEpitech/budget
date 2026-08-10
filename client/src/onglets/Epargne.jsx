@@ -4,11 +4,14 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import { euro, num } from "../utiles.js";
-import { projeter } from "../finance.js";
+import { projeterPlafonne, verseAvecPlafond } from "../finance.js";
+
+// Un plafond vide ou nul signifie « pas de plafond ».
+const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
 
 export default function Epargne({ etat, executer, modifier }) {
   const [horizon, setHorizon] = useState(10);
-  const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "" });
+  const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
 
   const ajouter = () => {
     if (!f.libelle.trim()) return;
@@ -18,9 +21,10 @@ export default function Epargne({ etat, executer, modifier }) {
         valeur: num(f.valeur),
         versement: num(f.versement),
         rendement: num(f.rendement),
+        plafond: plafondSaisi(f.plafond),
       })
     );
-    setF({ libelle: "", valeur: "", versement: "", rendement: "" });
+    setF({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
   };
 
   const valeurTotale = etat.placements.reduce((s, p) => s + p.valeur, 0);
@@ -30,11 +34,13 @@ export default function Epargne({ etat, executer, modifier }) {
     const pts = [];
     for (let annee = 0; annee <= horizon; annee++) {
       const m = annee * 12;
-      const valeur = etat.placements.reduce((s, p) => s + projeter(p.valeur, p.versement, p.rendement, m), 0);
-      pts.push({ annee, valeur, verse: valeurTotale + versementTotal * m });
+      const valeur = etat.placements.reduce((s, p) => s + projeterPlafonne(p.valeur, p.versement, p.rendement, m, p.plafond), 0);
+      // Le cumul versé s'arrête lui aussi aux plafonds atteints.
+      const verse = etat.placements.reduce((s, p) => s + verseAvecPlafond(p.valeur, p.versement, p.rendement, m, p.plafond), 0);
+      pts.push({ annee, valeur, verse });
     }
     return pts;
-  }, [etat.placements, horizon, valeurTotale, versementTotal]);
+  }, [etat.placements, horizon]);
 
   const final = courbe[courbe.length - 1];
 
@@ -71,20 +77,30 @@ export default function Epargne({ etat, executer, modifier }) {
 
       <Carte titre="Supports" note={`${euro(valeurTotale)} placés · ${euro(versementTotal)} versés chaque mois`}>
         {etat.placements.length === 0 && <div className="vide">Aucun support d'épargne enregistré.</div>}
-        {etat.placements.map((p) => (
-          <div className="ligne" key={p.id}>
-            <div style={{ minWidth: 140 }}>
-              <div className="ligne-lib">{p.libelle}</div>
-              <div className="ligne-meta">{p.rendement}% par an · {euro(projeter(p.valeur, p.versement, p.rendement, horizon * 12))} dans {horizon} ans</div>
+        {etat.placements.map((p) => {
+          const atteint = p.plafond != null && p.valeur >= p.plafond;
+          return (
+            <div className="ligne" key={p.id}>
+              <div style={{ minWidth: 140 }}>
+                <div className="ligne-lib">
+                  {p.libelle}{" "}
+                  {atteint && <span className="etiq" style={{ background: "#E7F2EE", color: "var(--caisse)" }}>Plafond atteint</span>}
+                </div>
+                <div className="ligne-meta">
+                  {p.rendement}% par an · {euro(projeterPlafonne(p.valeur, p.versement, p.rendement, horizon * 12, p.plafond))} dans {horizon} ans
+                  {p.plafond != null && ` · plafond ${euro(p.plafond)}`}
+                </div>
+              </div>
+              <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
+                <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />
+                <Champ libelle="/mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur={85} />
+                <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
+                <Champ libelle="Plafond" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur={100} placeholder="aucun" />
+              </div>
+              <button className="suppr" onClick={() => executer(() => api.supprimerPlacement(p.id))} aria-label={`Supprimer ${p.libelle}`}>×</button>
             </div>
-            <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
-              <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />
-              <Champ libelle="/mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur={85} />
-              <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
-            </div>
-            <button className="suppr" onClick={() => executer(() => api.supprimerPlacement(p.id))} aria-label={`Supprimer ${p.libelle}`}>×</button>
-          </div>
-        ))}
+          );
+        })}
       </Carte>
 
       <Carte titre="Ajouter un support">
@@ -94,6 +110,7 @@ export default function Epargne({ etat, executer, modifier }) {
             <Champ libelle="Valeur actuelle" valeur={f.valeur} onChange={(v) => setF({ ...f, valeur: v })} largeur={130} placeholder="0" onEntree={ajouter} />
             <Champ libelle="Versement /mois" valeur={f.versement} onChange={(v) => setF({ ...f, versement: v })} largeur={130} placeholder="0" onEntree={ajouter} />
             <Champ libelle="Rendement %" valeur={f.rendement} onChange={(v) => setF({ ...f, rendement: v })} largeur={110} placeholder="0" onEntree={ajouter} />
+            <Champ libelle="Plafond" valeur={f.plafond} onChange={(v) => setF({ ...f, plafond: v })} largeur={110} placeholder="aucun" onEntree={ajouter} />
             <button className="btn" onClick={ajouter}>Ajouter</button>
           </div>
         </div>
