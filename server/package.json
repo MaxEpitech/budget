@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "test": "node --test",
-    "sauvegarder": "node scripts/sauvegarder.js"
+    "sauvegarder": "node scripts/sauvegarder.js",
+    "rattacher": "node scripts/rattacher-foyer.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.6.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -68,3 +68,45 @@ export const PlacementPartielSchema = PlacementSchema.partial();
 export const FoyerSchema = z.object({
   repartition: z.enum(["prorata", "moitie"], "repartition : « prorata » ou « moitie » attendu"),
 });
+
+/* ─── Authentification ─────────────────────────────────────────────────────
+   L'adresse est normalisée dès la validation (espaces retirés, minuscules) :
+   c'est la seule forme qui atteint la base, ce qui garantit qu'on ne peut pas
+   créer deux comptes pour « Alex@… » et « alex@… ». */
+
+export const EmailSchema = z
+  .string("email : adresse requise")
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("email : adresse invalide"))
+  .refine((v) => v.length <= 254, "email : adresse trop longue");
+
+// Longueur plutôt que règles de composition : une phrase de passe vaut mieux
+// qu'un « P@ssw0rd ». Le maximum protège du déni de service par hachage.
+export const MotDePasseSchema = z
+  .string("mot de passe requis")
+  .min(12, "mot de passe : 12 caractères minimum")
+  .max(200, "mot de passe : 200 caractères maximum");
+
+export const InscriptionSchema = z.object({
+  email: EmailSchema,
+  motDePasse: MotDePasseSchema,
+});
+
+export const ConnexionSchema = z.object({
+  email: EmailSchema,
+  // Pas de contrainte de longueur ici : un mot de passe trop court est
+  // simplement faux, l'annoncer autrement renseignerait sur la politique.
+  motDePasse: z.string("mot de passe requis").max(200),
+});
+
+export const EmailSeulSchema = z.object({ email: EmailSchema });
+
+export const JetonSchema = z.object({
+  jeton: z.string("jeton requis").min(1, "jeton requis"),
+});
+
+export const ReinitialisationSchema = z.object({
+  jeton: z.string("jeton requis").min(1, "jeton requis"),
+  motDePasse: MotDePasseSchema,
+});

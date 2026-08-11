@@ -15,6 +15,7 @@
     "dev:server": "npm run dev --workspace server",
     "test": "npm test --workspace server",
     "sauvegarder": "npm run sauvegarder --workspace server",
+    "rattacher": "npm run rattacher --workspace server --",
     "postinstall": "prisma generate"
   },
   "prisma": {

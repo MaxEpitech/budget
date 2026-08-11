@@ -4,6 +4,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { chargerSession } from "./auth/garde.js";
 import { annoncerModeEnvoi } from "./email/envoyer.js";
+import auth from "./routes/auth.js";
 import etat from "./routes/etat.js";
 import membres from "./routes/membres.js";
 import transactions from "./routes/transactions.js";
@@ -20,6 +21,7 @@ app.use(cookieParser());
 app.use(chargerSession);
 
 app.get("/api/ping", (_req, res) => res.json({ ok: true }));
+app.use("/api/auth", auth);
 app.use("/api/etat", etat);
 app.use("/api/membres", membres);
 app.use("/api/transactions", transactions);
