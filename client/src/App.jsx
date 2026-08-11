@@ -14,13 +14,19 @@ import BoiteMail from "./ecrans/BoiteMail.jsx";
 import Validation from "./ecrans/Validation.jsx";
 import MotDePasseOublie from "./ecrans/MotDePasseOublie.jsx";
 import NouveauMotDePasse from "./ecrans/NouveauMotDePasse.jsx";
+import { Confidentialite, MentionsLegales } from "./ecrans/PagesLegales.jsx";
 import "./styles.css";
+
+// Pages atteignables directement par leur adresse : les liens reçus par email,
+// et les pages légales — qu'on doit pouvoir lire, et partager, sans compte.
+const PAGES_PUBLIQUES = { "/confidentialite": "confidentialite", "/mentions-legales": "mentions-legales" };
 
 function ecranInitial() {
   const jeton = new URLSearchParams(window.location.search).get("jeton");
   const chemin = window.location.pathname.replace(/\/+$/, "");
   if (jeton && chemin === "/valider") return { nom: "validation", jeton };
   if (jeton && chemin === "/reinitialiser") return { nom: "nouveau-mot-de-passe", jeton };
+  if (PAGES_PUBLIQUES[chemin]) return { nom: PAGES_PUBLIQUES[chemin] };
   return { nom: "connexion" };
 }
 
@@ -85,6 +91,10 @@ export default function App() {
   if (ecran.nom === "nouveau-mot-de-passe") {
     return <NouveauMotDePasse jeton={ecran.jeton} onConnecte={connecter} allerVers={allerVers} />;
   }
+  // Les pages légales s'affichent qu'on soit connecté ou non : on doit pouvoir
+  // les consulter avant de créer un compte, comme après.
+  if (ecran.nom === "confidentialite") return <Confidentialite allerVers={allerVers} />;
+  if (ecran.nom === "mentions-legales") return <MentionsLegales allerVers={allerVers} />;
 
   if (compte === undefined) {
     return (
@@ -95,7 +105,7 @@ export default function App() {
   }
 
   if (compte) {
-    return <Budget compte={compte} onDeconnexion={deconnecter} onSessionExpiree={sessionExpiree} />;
+    return <Budget compte={compte} onDeconnexion={deconnecter} onSessionExpiree={sessionExpiree} ouvrirPage={allerVers} />;
   }
 
   if (ecran.nom === "inscription") {

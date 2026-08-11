@@ -48,6 +48,7 @@ export default function Connexion({ onConnecte, allerVers }) {
       note="Retrouvez le budget de votre foyer"
       erreur={erreur}
       message={message}
+      liens={allerVers}
       bas={<Lien onClick={() => allerVers("inscription")}>Pas encore de compte ? En créer un</Lien>}
     >
       <Colonne>

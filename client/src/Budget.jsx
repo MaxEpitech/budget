@@ -36,7 +36,7 @@ const SUPPRESSIONS = {
 // Temps laissé pour se raviser avant que la suppression ne parte vraiment.
 const DELAI_ANNULATION = 6000;
 
-export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
+export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrirPage }) {
   const [etat, setEtat] = useState(null);
   const [mois, setMois] = useState(moisCle());
   const [onglet, setOnglet] = useState("flux");
@@ -367,7 +367,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
         {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
         {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} supprimer={supprimer} />}
-        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} onCompteSupprime={onSessionExpiree} />}
+        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} onCompteSupprime={onSessionExpiree} ouvrirPage={ouvrirPage} />}
       </div>
     </div>
   );

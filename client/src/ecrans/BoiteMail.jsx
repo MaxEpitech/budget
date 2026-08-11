@@ -25,6 +25,7 @@ export default function BoiteMail({ email, allerVers }) {
       titre="Vérifiez votre boîte mail"
       erreur={erreur}
       message={message}
+      liens={allerVers}
       bas={<Lien onClick={() => allerVers("connexion")}>Retour à la connexion</Lien>}
     >
       <p style={{ margin: 0 }}>

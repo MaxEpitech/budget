@@ -28,6 +28,7 @@ export default function MotDePasseOublie({ allerVers }) {
       note="Nous vous envoyons un lien pour en choisir un nouveau"
       erreur={erreur}
       message={message}
+      liens={allerVers}
       bas={<Lien onClick={() => allerVers("connexion")}>Retour à la connexion</Lien>}
     >
       {!message && (

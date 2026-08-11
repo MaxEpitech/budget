@@ -37,6 +37,7 @@ export default function Inscription({ allerVers, onEmailEnvoye, onConnecte }) {
       titre="Créer un compte"
       note="Un compte, un foyer, un budget"
       erreur={erreur}
+      liens={allerVers}
       bas={<Lien onClick={() => allerVers("connexion")}>Déjà un compte ? Se connecter</Lien>}
     >
       <Colonne>

@@ -151,7 +151,7 @@ function SupprimerCompte({ onSupprime }) {
   );
 }
 
-export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion, onCompteSupprime }) {
+export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion, onCompteSupprime, ouvrirPage }) {
   const [occupe, setOccupe] = useState(false);
 
   const modifierMembre = (id, patch) => modifier("membres", id, patch);
@@ -221,6 +221,14 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
             <BoutonTelecharger />
             <SupprimerCompte onSupprime={onCompteSupprime} />
+          </div>
+          <div className="carte-note" style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button style={{ color: "var(--indigo)", textDecoration: "underline", fontSize: 12 }} onClick={() => ouvrirPage("confidentialite")}>
+              Politique de confidentialité
+            </button>
+            <button style={{ color: "var(--indigo)", textDecoration: "underline", fontSize: 12 }} onClick={() => ouvrirPage("mentions-legales")}>
+              Mentions légales
+            </button>
           </div>
         </div>
       </Carte>
