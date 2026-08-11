@@ -3,6 +3,7 @@ import "./env.js";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { chargerSession } from "./auth/garde.js";
+import { annoncerModeEnvoi } from "./email/envoyer.js";
 import etat from "./routes/etat.js";
 import membres from "./routes/membres.js";
 import transactions from "./routes/transactions.js";
@@ -42,4 +43,5 @@ app.use((err, _req, res, _next) => {
 const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => {
   console.log(`API budget démarrée sur http://localhost:${PORT}`);
+  annoncerModeEnvoi();
 });
