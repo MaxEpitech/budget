@@ -151,6 +151,19 @@ model Versement {
   membreId String?
 }
 
+// Compteurs de la limitation de cadence.
+//
+// En base plutôt qu'en mémoire : l'API tourne en fonctions sans état, dont les
+// instances naissent et meurent en permanence. Un compteur en mémoire repartirait
+// de zéro sans cesse et ne freinerait plus rien.
+model LimiteCadence {
+  cle      String   @id
+  compteur Int
+  expireLe DateTime
+
+  @@index([expireLe])
+}
+
 model Placement {
   id               String @id @default(cuid())
   libelle          String

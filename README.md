@@ -55,6 +55,40 @@ le comportement :
   le parcours en local. Avec une clé ([resend.com](https://resend.com)), ils sont
   réellement envoyés.
 
+## Déploiement sur Vercel
+
+La même application Express sert de deux façons : un processus qui écoute un
+port en développement (`server/src/index.js`), et une fonction sans état en
+production (`api/index.js`). Les deux importent `server/src/app.js`.
+
+`vercel.json` s'occupe du reste : construction du client dans `client/dist`,
+acheminement de `/api/*` vers la fonction, et réécriture vers `index.html` pour
+tout le reste — sans quoi les liens reçus par email (`/valider`,
+`/reinitialiser`) tomberaient sur un 404.
+
+La commande de build applique les migrations avant de construire le client :
+`prisma migrate deploy && npm run build --workspace client`.
+
+### Variables à créer sur Vercel
+
+| Variable | Rôle |
+|---|---|
+| `DATABASE_URL` | La base de production |
+| `APP_URL` | Adresse publique, base des liens envoyés par email. À défaut, l'adresse du déploiement en cours est utilisée |
+| `CONFIRMATION_EMAIL_REQUISE` | `0` ou `1`, voir plus haut |
+| `RESEND_API_KEY` | Seulement si les emails doivent réellement partir |
+
+**Ne pas définir `PORT` ni `PORT_CLIENT`** : ces variables ne servent qu'au
+lanceur de développement et n'auraient là-bas que des effets parasites.
+
+`NODE_ENV` est positionné à `production` par Vercel, ce qui fait passer le
+cookie de session en `Secure`.
+
+### Ce qui reste manuel
+
+`npm run sauvegarder` et `npm run rattacher` sont des commandes locales : les
+lancer depuis sa machine avec le `DATABASE_URL` de production dans `.env`.
+
 ## Structure
 
 ```
@@ -68,7 +102,11 @@ client/src/
   finance.js         copie des formules pour l'affichage (le serveur fait foi)
   styles.css         CSS d'origine, inchangé
 
+api/index.js         point d'entrée en production (fonction Vercel)
+
 server/src/
+  app.js             construction de l'application Express, sans écoute
+  index.js           serveur de développement, met app.js à l'écoute d'un port
   routes/            etat, transactions, credits, projets, placements, membres, foyer, auth
   auth/              mot de passe (scrypt), jetons, sessions, cadence, garde
   email/             transport et gabarits

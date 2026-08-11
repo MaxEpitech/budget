@@ -12,8 +12,18 @@ const ENCRE = "#101A24";
 const ARDOISE = "#46596B";
 const DOUX = "#7A8B98";
 
-// L'URL publique de l'application, base des liens envoyés par email.
-export const urlApplication = () => (process.env.APP_URL || "http://localhost:5173").replace(/\/+$/, "");
+/**
+ * L'URL publique de l'application, base des liens envoyés par email.
+ *
+ * APP_URL fait foi. À défaut, VERCEL_URL donne l'adresse du déploiement en
+ * cours, ce qui rend les liens corrects sur les déploiements de
+ * prévisualisation, dont l'adresse n'est pas connue à l'avance. En dernier
+ * recours, le client local.
+ */
+export const urlApplication = () => {
+  const brute = process.env.APP_URL || (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`) || "http://localhost:5173";
+  return brute.replace(/\/+$/, "");
+};
 
 // Toute donnée venant de l'utilisateur (son adresse) traverse cette fonction
 // avant d'entrer dans le HTML.

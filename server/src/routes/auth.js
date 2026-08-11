@@ -35,18 +35,22 @@ const REPONSE_EMAIL_ENVOYE = {
 const IDENTIFIANTS_REFUSES = "Adresse email ou mot de passe incorrect.";
 
 /**
- * Envoie sans faire attendre la réponse HTTP, et sans jamais la faire échouer.
+ * Envoie l'email sans jamais faire échouer la requête : le compte existe, et
+ * l'utilisateur peut toujours redemander un envoi.
  *
- * Ne pas attendre tient à deux raisons. D'abord un échec d'envoi ne doit pas
- * faire échouer l'inscription : le compte existe, l'utilisateur peut redemander
- * un email. Ensuite le temps de réponse ne doit rien trahir — attendre un appel
- * réseau dont la durée dépend du chemin emprunté rendrait mesurable la
- * différence entre une adresse connue et une adresse libre.
+ * L'envoi est ATTENDU. Il ne l'était pas auparavant, pour que la durée de la
+ * réponse ne trahisse pas l'existence d'un compte ; mais l'API tourne en
+ * fonctions sans état, qui peuvent être gelées dès la réponse émise — un envoi
+ * lancé sans être attendu risquerait de ne jamais partir. Un email de
+ * confirmation perdu coûte plus cher que le canal temporel qu'on referme
+ * ailleurs (voir le commentaire de la route d'inscription).
  */
-function envoyerSansAttendre(destinataire, gabarit) {
-  envoyerEmail({ destinataire, ...gabarit }).catch((e) => {
+async function envoyerSansEchouer(destinataire, gabarit) {
+  try {
+    await envoyerEmail({ destinataire, ...gabarit });
+  } catch (e) {
     console.error(`Échec d'envoi à ${destinataire} :`, e.message);
-  });
+  }
 }
 
 /**
@@ -76,11 +80,13 @@ routeur.post("/inscription", cadenceEmailIp, cadenceEmail, valider(InscriptionSc
   // le dit de toute façon. On répond alors franchement plutôt que de laisser
   // quelqu'un croire qu'un email est parti. La connexion, elle, garde son
   // message unique quelle que soit l'adresse.
-  const adresseDejaPrise = () =>
-    confirmationRequise
-      ? (envoyerSansAttendre(email, gabaritInscriptionExistante({ email })),
-        res.status(201).json(REPONSE_EMAIL_ENVOYE))
-      : res.status(409).json({ erreur: "Cette adresse a déjà un compte. Connectez-vous." });
+  async function adresseDejaPrise() {
+    if (!confirmationRequise) {
+      return res.status(409).json({ erreur: "Cette adresse a déjà un compte. Connectez-vous." });
+    }
+    await envoyerSansEchouer(email, gabaritInscriptionExistante({ email }));
+    return res.status(201).json(REPONSE_EMAIL_ENVOYE);
+  }
 
   const existant = await prisma.utilisateur.findUnique({ where: { email } });
   if (existant) return adresseDejaPrise();
@@ -114,7 +120,7 @@ routeur.post("/inscription", cadenceEmailIp, cadenceEmail, valider(InscriptionSc
   }
 
   const jeton = await emettreJeton(utilisateur.id, "validation");
-  envoyerSansAttendre(email, gabaritValidation({ email, jeton }));
+  await envoyerSansEchouer(email, gabaritValidation({ email, jeton }));
   res.status(201).json(REPONSE_EMAIL_ENVOYE);
 }));
 
@@ -143,7 +149,7 @@ routeur.post("/renvoyer-validation", cadenceEmailIp, cadenceEmail, valider(Email
   const utilisateur = await prisma.utilisateur.findUnique({ where: { email } });
   if (utilisateur && !utilisateur.emailValideLe) {
     const jeton = await emettreJeton(utilisateur.id, "validation");
-    envoyerSansAttendre(email, gabaritValidation({ email, jeton }));
+    await envoyerSansEchouer(email, gabaritValidation({ email, jeton }));
   }
   res.json(REPONSE_EMAIL_ENVOYE);
 }));
@@ -188,11 +194,11 @@ routeur.post("/mot-de-passe-oublie", cadenceEmailIp, cadenceEmail, valider(Email
 
   if (utilisateur) {
     const jeton = await emettreJeton(utilisateur.id, "reinitialisation");
-    envoyerSansAttendre(email, gabaritReinitialisation({ email, jeton }));
+    await envoyerSansEchouer(email, gabaritReinitialisation({ email, jeton }));
   } else {
     // L'écran répond la même chose dans les deux cas ; ce message évite en
     // contrepartie de laisser quelqu'un guetter un courrier qui ne viendra pas.
-    envoyerSansAttendre(email, gabaritReinitialisationSansCompte({ email }));
+    await envoyerSansEchouer(email, gabaritReinitialisationSansCompte({ email }));
   }
   res.json(REPONSE_EMAIL_ENVOYE);
 }));
