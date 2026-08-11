@@ -35,6 +35,7 @@ Il crée un compte de démonstration : `demo@budget.local` / `budget-demonstrati
 | `npm run dev` | Client et API ensemble ; les ports occupés sont contournés automatiquement |
 | `npm test` | Tests. Les tests d'intégration sont ignorés faute de `DATABASE_URL_TEST` |
 | `npm run sauvegarder` | Export JSON complet de la base dans `sauvegardes/` (ignoré par Git) |
+| `npm run restaurer -- <fichier> [--essai]` | Recharge un export ; `--essai` le rejoue puis annule tout |
 | `npm run rattacher -- mon@adresse.fr` | Rattache un compte à un foyer contenant déjà des données |
 
 `rattacher` sert à la reprise : à l'inscription, chaque compte reçoit un foyer
@@ -42,6 +43,20 @@ neuf et vide. Si des données existaient avant les comptes, ce script désigne l
 propriétaire et supprime le foyer vide libéré. Il refuse d'agir si le foyer visé
 appartient déjà à quelqu'un, si plusieurs foyers sont candidats, ou si le compte
 abandonnerait des données au passage.
+
+## Sauvegardes
+
+[`.github/workflows/sauvegarde.yml`](.github/workflows/sauvegarde.yml) exporte la
+base chaque nuit et dépose le fichier en pièce jointe du workflow — hors de la
+base, car une sauvegarde rangée dans ce qu'elle sauvegarde ne protège de rien.
+Il se déclenche aussi à la main. **Réglage à faire une fois** : ajouter
+`DATABASE_URL` aux secrets du dépôt.
+
+Une sauvegarde jamais restaurée n'est pas une sauvegarde, c'est une hypothèse.
+`npm run restaurer -- <fichier> --essai` lève le doute sans risque : la
+restauration est réellement rejouée, les effectifs sont comparés à l'export,
+puis tout est annulé et la base ressort intacte. Sans `--essai`, le script
+refuse d'écrire dans une base déjà peuplée.
 
 ## Configuration
 

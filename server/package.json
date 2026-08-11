@@ -6,7 +6,8 @@
     "dev": "node --watch src/index.js",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
     "sauvegarder": "node scripts/sauvegarder.js",
-    "rattacher": "node scripts/rattacher-foyer.js"
+    "rattacher": "node scripts/rattacher-foyer.js",
+    "restaurer": "node scripts/restaurer.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

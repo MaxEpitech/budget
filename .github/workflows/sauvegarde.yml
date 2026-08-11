@@ -1,0 +1,38 @@
+name: Sauvegarde
+
+# Tous les jours au petit matin, plus un déclenchement manuel quand on en a
+# besoin. L'export est déposé en pièce jointe du workflow, hors de la base :
+# une sauvegarde rangée dans ce qu'elle sauvegarde ne protège de rien.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  sauvegarder:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Exporter la base
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run sauvegarder
+
+      - name: Conserver l'export
+        uses: actions/upload-artifact@v4
+        with:
+          name: budget-${{ github.run_id }}
+          path: sauvegardes/*.json
+          # Au-delà, les exports plus anciens n'ont plus grand intérêt et
+          # continueraient d'accumuler des données personnelles.
+          retention-days: 30
