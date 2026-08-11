@@ -99,7 +99,13 @@ export default function App() {
   }
 
   if (ecran.nom === "inscription") {
-    return <Inscription allerVers={allerVers} onEmailEnvoye={(email) => setEcran({ nom: "boite-mail", email })} />;
+    return (
+      <Inscription
+        allerVers={allerVers}
+        onConnecte={connecter}
+        onEmailEnvoye={(email) => setEcran({ nom: "boite-mail", email })}
+      />
+    );
   }
   if (ecran.nom === "boite-mail") {
     return <BoiteMail email={ecran.email} allerVers={allerVers} />;

@@ -6,6 +6,7 @@ import { hacherMotDePasse, verifierMotDePasse } from "../auth/motDePasse.js";
 import { emettreJeton, consommerJeton } from "../auth/jetons.js";
 import { ouvrirSession, fermerSession, fermerToutesLesSessions, poserCookieSession, effacerCookieSession, lireCookieSession } from "../auth/sessions.js";
 import { fabriquerSecret } from "../auth/secrets.js";
+import { confirmationEmailRequise } from "../auth/reglages.js";
 import { cadenceConnexion, cadenceConnexionIp, cadenceEmail, cadenceEmailIp, cadenceJeton } from "../auth/cadence.js";
 import { envoyerEmail } from "../email/envoyer.js";
 import {
@@ -63,17 +64,26 @@ async function brulerLeTempsDeVerification(motDePasse) {
 
 routeur.post("/inscription", cadenceEmailIp, cadenceEmail, valider(InscriptionSchema), attraper(async (req, res) => {
   const { email, motDePasse } = req.donnees;
+  const confirmationRequise = confirmationEmailRequise();
 
   // Le hachage a lieu AVANT de savoir si l'adresse existe : les deux chemins
   // coûtent alors le même temps, sans quoi la durée de la réponse suffirait à
   // distinguer une adresse connue d'une adresse libre.
   const motDePasseHash = await hacherMotDePasse(motDePasse);
 
+  // Sans confirmation par email, l'inscription ouvre la session immédiatement.
+  // Elle ne peut donc plus taire l'existence d'un compte : réussir ou échouer
+  // le dit de toute façon. On répond alors franchement plutôt que de laisser
+  // quelqu'un croire qu'un email est parti. La connexion, elle, garde son
+  // message unique quelle que soit l'adresse.
+  const adresseDejaPrise = () =>
+    confirmationRequise
+      ? (envoyerSansAttendre(email, gabaritInscriptionExistante({ email })),
+        res.status(201).json(REPONSE_EMAIL_ENVOYE))
+      : res.status(409).json({ erreur: "Cette adresse a déjà un compte. Connectez-vous." });
+
   const existant = await prisma.utilisateur.findUnique({ where: { email } });
-  if (existant) {
-    envoyerSansAttendre(email, gabaritInscriptionExistante({ email }));
-    return res.status(201).json(REPONSE_EMAIL_ENVOYE);
-  }
+  if (existant) return adresseDejaPrise();
 
   let utilisateur;
   try {
@@ -81,16 +91,26 @@ routeur.post("/inscription", cadenceEmailIp, cadenceEmail, valider(InscriptionSc
     // inutilisable, un foyer sans compte, inaccessible.
     utilisateur = await prisma.$transaction(async (tx) => {
       const foyer = await tx.foyer.create({ data: {} });
-      return tx.utilisateur.create({ data: { email, motDePasseHash, foyerId: foyer.id } });
+      return tx.utilisateur.create({
+        data: {
+          email,
+          motDePasseHash,
+          foyerId: foyer.id,
+          // Rien à confirmer quand la confirmation n'est pas exigée.
+          emailValideLe: confirmationRequise ? null : new Date(),
+        },
+      });
     });
   } catch (e) {
     // Deux inscriptions simultanées sur la même adresse : la seconde retombe
     // sur le cas « adresse déjà connue ».
-    if (e?.code === "P2002") {
-      envoyerSansAttendre(email, gabaritInscriptionExistante({ email }));
-      return res.status(201).json(REPONSE_EMAIL_ENVOYE);
-    }
+    if (e?.code === "P2002") return adresseDejaPrise();
     throw e;
+  }
+
+  if (!confirmationRequise) {
+    poserCookieSession(res, await ouvrirSession(utilisateur.id));
+    return res.status(201).json(profil(utilisateur));
   }
 
   const jeton = await emettreJeton(utilisateur.id, "validation");
@@ -143,7 +163,7 @@ routeur.post("/connexion", cadenceConnexionIp, cadenceConnexion, valider(Connexi
   }
   // Le mot de passe est bon : dire que l'adresse n'est pas confirmée n'apprend
   // rien à qui le connaît déjà, et évite un échec incompréhensible.
-  if (!utilisateur.emailValideLe) {
+  if (confirmationEmailRequise() && !utilisateur.emailValideLe) {
     return res.status(403).json({
       erreur: "Adresse email non confirmée. Ouvrez le lien reçu par email, ou demandez-en un nouveau.",
       motif: "email_non_valide",

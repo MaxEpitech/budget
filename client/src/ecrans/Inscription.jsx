@@ -5,7 +5,7 @@ import Cadre, { Colonne, Lien } from "./Cadre.jsx";
 
 const LONGUEUR_MINIMALE = 12;
 
-export default function Inscription({ allerVers, onEmailEnvoye }) {
+export default function Inscription({ allerVers, onEmailEnvoye, onConnecte }) {
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [erreur, setErreur] = useState(null);
@@ -20,8 +20,11 @@ export default function Inscription({ allerVers, onEmailEnvoye }) {
     setOccupe(true);
     setErreur(null);
     try {
-      await api.inscription(email, motDePasse);
-      onEmailEnvoye(email);
+      const reponse = await api.inscription(email, motDePasse);
+      // Selon le réglage du serveur : soit le compte est ouvert tout de suite
+      // (la réponse est un profil), soit il faut confirmer son adresse.
+      if (reponse?.email) onConnecte(reponse);
+      else onEmailEnvoye(email);
     } catch (e) {
       setErreur(e.message);
     } finally {
