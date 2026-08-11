@@ -1,6 +1,8 @@
 // Point d'entrée de l'API Express.
 import "./env.js";
 import express from "express";
+import cookieParser from "cookie-parser";
+import { chargerSession } from "./auth/garde.js";
 import etat from "./routes/etat.js";
 import membres from "./routes/membres.js";
 import transactions from "./routes/transactions.js";
@@ -11,6 +13,10 @@ import foyer from "./routes/foyer.js";
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
+// Renseigne l'utilisateur connecté quand un cookie de session valide est
+// présent, sans bloquer : le verrou (exigerAuth) sera monté à la dernière étape.
+app.use(chargerSession);
 
 app.get("/api/ping", (_req, res) => res.json({ ok: true }));
 app.use("/api/etat", etat);
