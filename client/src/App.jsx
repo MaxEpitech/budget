@@ -14,6 +14,7 @@ import BoiteMail from "./ecrans/BoiteMail.jsx";
 import Validation from "./ecrans/Validation.jsx";
 import MotDePasseOublie from "./ecrans/MotDePasseOublie.jsx";
 import NouveauMotDePasse from "./ecrans/NouveauMotDePasse.jsx";
+import Invitation from "./ecrans/Invitation.jsx";
 import { Confidentialite, MentionsLegales } from "./ecrans/PagesLegales.jsx";
 import "./styles.css";
 
@@ -26,6 +27,7 @@ function ecranInitial() {
   const chemin = window.location.pathname.replace(/\/+$/, "");
   if (jeton && chemin === "/valider") return { nom: "validation", jeton };
   if (jeton && chemin === "/reinitialiser") return { nom: "nouveau-mot-de-passe", jeton };
+  if (jeton && chemin === "/invitation") return { nom: "invitation", jeton };
   if (PAGES_PUBLIQUES[chemin]) return { nom: PAGES_PUBLIQUES[chemin] };
   return { nom: "connexion" };
 }
@@ -90,6 +92,11 @@ export default function App() {
   }
   if (ecran.nom === "nouveau-mot-de-passe") {
     return <NouveauMotDePasse jeton={ecran.jeton} onConnecte={connecter} allerVers={allerVers} />;
+  }
+  // Une invitation s'ouvre aussi quand on est déjà connecté : c'est justement
+  // le cas où un compte existant rejoint un autre foyer.
+  if (ecran.nom === "invitation") {
+    return <Invitation jeton={ecran.jeton} onConnecte={connecter} allerVers={allerVers} />;
   }
   // Les pages légales s'affichent qu'on soit connecté ou non : on doit pouvoir
   // les consulter avant de créer un compte, comme après.

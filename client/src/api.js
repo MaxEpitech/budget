@@ -82,4 +82,13 @@ export const api = {
   supprimerMembre: (id) => requete(`/membres/${id}`, "DELETE"),
 
   modifierFoyer: (repartition) => requete("/foyer", "PUT", { repartition }),
+
+  /* ─── Foyer partagé ─── */
+  acces: () => requete("/foyer/acces"),
+  inviter: (email, role, membreId) => requete("/foyer/invitations", "POST", { email, role, membreId }),
+  revoquerInvitation: (id) => requete(`/foyer/invitations/${id}`, "DELETE"),
+  changerRole: (id, role) => requete(`/foyer/acces/${id}`, "PUT", { role }),
+  retirerAcces: (id) => requete(`/foyer/acces/${id}`, "DELETE"),
+  lireInvitation: (jeton) => requete(`/auth/invitation?jeton=${encodeURIComponent(jeton)}`),
+  accepterInvitation: (jeton, motDePasse) => requete("/auth/invitation", "POST", { jeton, motDePasse }),
 };

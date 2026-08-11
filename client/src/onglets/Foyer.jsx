@@ -6,6 +6,7 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
+import Acces from "../composants/Acces.jsx";
 import { euro, num, moisCle, decalerMois } from "../utiles.js";
 
 // Supprime transactions, crédits, projets et placements (les membres restent).
@@ -202,6 +203,8 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
           </div>
         </div>
       </Carte>
+
+      <Acces membres={etat.membres} />
 
       <Carte titre="Compte">
         <div className="corps">

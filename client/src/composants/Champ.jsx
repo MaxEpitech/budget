@@ -4,13 +4,14 @@
 // dont les formulaires de connexion ont besoin (autocomplete, autofocus…).
 const CLAVIER_ORDINAIRE = new Set(["text", "email", "password", "month"]);
 
-export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs }) {
+export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs, disabled }) {
   const commun = {
     className: "saisie",
     style: { width: largeur },
     value: valeur,
     onChange: (e) => onChange(e.target.value),
     onKeyDown: (e) => e.key === "Enter" && onEntree && onEntree(),
+    disabled,
   };
   return (
     <label className="champ">
