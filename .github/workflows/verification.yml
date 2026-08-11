@@ -1,0 +1,72 @@
+name: Vérification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une nouvelle poussée annule la vérification en cours sur la même branche :
+# inutile de payer pour un état déjà dépassé.
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+
+    # Postgres jetable, créé et détruit avec le job : les tests d'intégration
+    # ont une vraie base sans jamais approcher celle de production.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: essai
+          POSTGRES_DB: budget_essai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:essai@localhost:5432/budget_essai
+      # Le harnais dirige les tests d'intégration vers cette base. Sans cette
+      # variable ils seraient ignorés — et la vérification ne vérifierait plus
+      # grand-chose.
+      DATABASE_URL_TEST: postgresql://postgres:essai@localhost:5432/budget_essai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` déclenche la génération du client Prisma (postinstall).
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Appliquer les migrations
+        run: npx prisma migrate deploy
+
+      # Garde-fou : après les migrations, la base doit correspondre exactement au
+      # schéma. Si elle en diffère, c'est qu'une modification du schéma n'a pas
+      # sa migration — le déploiement passerait sans erreur et le client
+      # réclamerait ensuite des colonnes absentes, une panne qui n'apparaîtrait
+      # qu'en production.
+      - name: Vérifier que les migrations couvrent le schéma
+        run: |
+          npx prisma migrate diff \
+            --from-schema-datasource server/prisma/schema.prisma \
+            --to-schema-datamodel server/prisma/schema.prisma \
+            --exit-code
+
+      - name: Tests
+        run: npm test
+
+      - name: Construire le client
+        run: npm run build

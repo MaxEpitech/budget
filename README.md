@@ -8,7 +8,8 @@ Front React (Vite), API Express, base Postgres via Prisma. Un compte = un foyer.
 
 ## Prérequis
 
-- Node 20 ou plus
+- Node 22 ou plus — le lanceur de tests s'appuie sur des options apparues après
+  Node 20, dont le support a pris fin en avril 2026
 - Une base Postgres (Neon, Prisma Postgres, ou un Postgres local)
 
 ## Installation
@@ -32,7 +33,7 @@ Il crée un compte de démonstration : `demo@budget.local` / `budget-demonstrati
 | Commande | Effet |
 |---|---|
 | `npm run dev` | Client et API ensemble ; les ports occupés sont contournés automatiquement |
-| `npm test` | Tests unitaires des formules financières et des primitives d'authentification |
+| `npm test` | Tests. Les tests d'intégration sont ignorés faute de `DATABASE_URL_TEST` |
 | `npm run sauvegarder` | Export JSON complet de la base dans `sauvegardes/` (ignoré par Git) |
 | `npm run rattacher -- mon@adresse.fr` | Rattache un compte à un foyer contenant déjà des données |
 
@@ -54,6 +55,43 @@ le comportement :
   leur lien s'affichent dans le journal du serveur, ce qui suffit à essayer tout
   le parcours en local. Avec une clé ([resend.com](https://resend.com)), ils sont
   réellement envoyés.
+
+## Tests
+
+Deux familles cohabitent. Les **tests unitaires** — formules financières,
+hachage, gabarits d'emails — ne demandent rien et tournent toujours. Les **tests
+d'intégration** parlent à l'API par le réseau et ont besoin d'une base : ils
+couvrent le cloisonnement entre foyers, le parcours d'authentification et la
+limitation de cadence.
+
+Sans `DATABASE_URL_TEST`, ces derniers sont **ignorés** et `npm test` passe
+quand même : on doit pouvoir travailler sans base sous la main. Avec, ils
+créent leurs propres foyers sur des adresses en `.invalid` et les suppriment,
+même quand un test échoue en cours de route.
+
+Deux règles à connaître avant d'en écrire d'autres :
+
+- **Les tests importent `test/aide/harnais.js`, jamais `src/` directement.** Le
+  harnais substitue l'URL de la base avant de charger le serveur ; un import
+  direct ferait tourner les tests sur la base de travail.
+- **Les fichiers s'exécutent l'un après l'autre.** Ils partagent une base et des
+  compteurs de cadence ; en parallèle, la purge de l'un remet à zéro ceux que
+  l'autre est en train de compter.
+
+## Intégration continue
+
+[`.github/workflows/verification.yml`](.github/workflows/verification.yml) monte
+un Postgres jetable, applique les migrations, lance les tests puis construit le
+client — à chaque poussée et sur chaque pull request.
+
+Il vérifie aussi que **la base migrée correspond exactement au schéma**. Une
+modification du schéma sans sa migration passerait sans erreur au déploiement,
+puis ferait réclamer au client des colonnes absentes : une panne qui
+n'apparaîtrait qu'en production.
+
+**Réglage à faire une fois, côté Vercel** : activer le blocage du déploiement
+tant que les vérifications n'ont pas abouti. Sans lui, un commit rouge part en
+production tout seul.
 
 ## Déploiement sur Vercel
 
