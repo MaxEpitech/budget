@@ -1,6 +1,10 @@
 // Modèle de données du budget familial.
 // Convention : tous les montants sont des entiers en CENTIMES ;
 // la conversion en euros se fait à la frontière de l'API.
+//
+// Cloisonnement : un compte = un foyer. Toutes les tables métier portent un
+// foyerId ; Versement est le seul à en être dépourvu, il est atteint via son
+// Projet dont l'appartenance au foyer est vérifiée à chaque accès.
 
 generator client {
   provider = "prisma-client-js"
@@ -21,18 +25,74 @@ enum TypeTransaction {
   depense
 }
 
-// Un seul enregistrement (id = 1) : les réglages du foyer.
+enum TypeJeton {
+  validation
+  reinitialisation
+}
+
+// Les réglages d'un foyer, et la racine de son cloisonnement.
 model Foyer {
-  id          Int         @id @default(1)
-  repartition Repartition @default(prorata)
+  id           Int           @id @default(autoincrement())
+  repartition  Repartition   @default(prorata)
+  utilisateur  Utilisateur?
+  membres      Membre[]
+  transactions Transaction[]
+  credits      Credit[]
+  projets      Projet[]
+  placements   Placement[]
+}
+
+// Un compte = un foyer. L'email est stocké normalisé en minuscules.
+model Utilisateur {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  motDePasseHash String
+  // Null tant que l'adresse n'a pas été confirmée : la connexion est refusée.
+  emailValideLe  DateTime?
+  foyer          Foyer       @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId        Int         @unique
+  creeLe         DateTime    @default(now())
+  jetons         Jeton[]
+  sessions       Session[]
+}
+
+// Jetons à usage unique envoyés par email (validation d'adresse, réinitialisation).
+// Seule l'empreinte est stockée : une fuite de la base ne donne aucun lien valide.
+model Jeton {
+  id            String      @id @default(cuid())
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  utilisateurId String
+  type          TypeJeton
+  jetonHache    String      @unique
+  expireLe      DateTime
+  utiliseLe     DateTime?
+  creeLe        DateTime    @default(now())
+
+  @@index([utilisateurId])
+}
+
+// Sessions en base plutôt que JWT : révocables (déconnexion, changement de mot de passe).
+model Session {
+  id            String      @id @default(cuid())
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  utilisateurId String
+  jetonHache    String      @unique
+  expireLe      DateTime
+  creeLe        DateTime    @default(now())
+
+  @@index([utilisateurId])
 }
 
 model Membre {
   id            String        @id @default(cuid())
   nom           String
   revenuMensuel Int // centimes
+  foyer         Foyer         @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId       Int
   transactions  Transaction[]
   versements    Versement[]
+
+  @@index([foyerId])
 }
 
 model Transaction {
@@ -46,6 +106,10 @@ model Transaction {
   // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
   membre    Membre?         @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId  String?
+  foyer     Foyer           @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId   Int
+
+  @@index([foyerId])
 }
 
 model Credit {
@@ -55,6 +119,10 @@ model Credit {
   taux      Float // taux annuel, en %
   dureeMois Int
   moisDebut String // YYYY-MM de la première échéance
+  foyer     Foyer  @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId   Int
+
+  @@index([foyerId])
 }
 
 model Projet {
@@ -64,6 +132,10 @@ model Projet {
   echeance         String // YYYY-MM
   versementMensuel Int // centimes
   versements       Versement[]
+  foyer            Foyer       @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId          Int
+
+  @@index([foyerId])
 }
 
 // Historique des mouvements d'enveloppe : le montant épargné d'un projet
@@ -87,4 +159,8 @@ model Placement {
   rendement        Float // rendement annuel, en %
   // Plafond de versements (livrets réglementés) ; null = pas de plafond.
   plafond          Int? // centimes
+  foyer            Foyer  @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId          Int
+
+  @@index([foyerId])
 }

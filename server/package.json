@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "sauvegarder": "node scripts/sauvegarder.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

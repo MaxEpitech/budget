@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper } from "../middleware.js";
+import { foyerCourant } from "../foyerCourant.js";
 import { MoisSchema } from "../schemas.js";
 import { mensualite, capitalRestant, quotePart } from "../finance.js";
 import { moisCourant, ecartMois } from "../mois.js";
@@ -21,15 +22,16 @@ routeur.get("/", attraper(async (req, res) => {
     return res.status(400).json({ erreur: "mois : format YYYY-MM attendu" });
   }
 
+  const foyerId = await foyerCourant(req);
   const [foyer, membresDb, transactionsDb, creditsDb, projetsDb, placementsDb] = await Promise.all([
-    prisma.foyer.findUnique({ where: { id: 1 } }),
-    prisma.membre.findMany({ orderBy: { id: "asc" } }),
+    prisma.foyer.findUnique({ where: { id: foyerId } }),
+    prisma.membre.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     // Transactions actives du mois : les récurrentes + les ponctuelles du mois,
     // de la plus récente à la plus ancienne (le prototype ajoute en tête).
-    prisma.transaction.findMany({ where: { OR: [{ recurrent: true }, { mois }] }, orderBy: { id: "desc" } }),
-    prisma.credit.findMany({ orderBy: { id: "asc" } }),
-    prisma.projet.findMany({ include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
-    prisma.placement.findMany({ orderBy: { id: "asc" } }),
+    prisma.transaction.findMany({ where: { foyerId, OR: [{ recurrent: true }, { mois }] }, orderBy: { id: "desc" } }),
+    prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
+    prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
   ]);
 
   const repartition = foyer?.repartition ?? "prorata";

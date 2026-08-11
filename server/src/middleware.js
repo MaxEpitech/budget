@@ -15,16 +15,38 @@ export const valider = (schema) => (req, res, next) => {
   next();
 };
 
-// Exécute une action Prisma ; un enregistrement introuvable (P2025) → 404.
-// Renvoie null dans ce cas pour que l'appelant court-circuite sa réponse.
-export async function ou404(res, nom, action) {
-  try {
-    return await action();
-  } catch (e) {
-    if (e?.code === "P2025") {
+/* ─── Accès bornés au foyer ───────────────────────────────────────────────
+   Toutes les écritures passent par updateMany/deleteMany avec le foyer dans
+   le filtre : un identifiant appartenant à un autre foyer ne correspond à
+   aucune ligne et se comporte exactement comme un identifiant inexistant
+   (404), sans jamais divulguer son existence. */
+
+// Modifie un enregistrement du foyer ; renvoie null et répond 404 si l'objet
+// n'existe pas ou appartient à un autre foyer.
+export async function modifierDansFoyer(res, nom, modele, id, foyerId, data) {
+  if (Object.keys(data).length === 0) {
+    // Rien à modifier : on vérifie seulement que l'objet est bien dans le foyer.
+    const existant = await modele.findFirst({ where: { id, foyerId } });
+    if (!existant) {
       res.status(404).json({ erreur: `${nom} introuvable` });
       return null;
     }
-    throw e;
+    return existant;
   }
+  const { count } = await modele.updateMany({ where: { id, foyerId }, data });
+  if (count === 0) {
+    res.status(404).json({ erreur: `${nom} introuvable` });
+    return null;
+  }
+  return modele.findUnique({ where: { id } });
+}
+
+// Supprime un enregistrement du foyer ; renvoie false et répond 404 sinon.
+export async function supprimerDansFoyer(res, nom, modele, id, foyerId) {
+  const { count } = await modele.deleteMany({ where: { id, foyerId } });
+  if (count === 0) {
+    res.status(404).json({ erreur: `${nom} introuvable` });
+    return false;
+  }
+  return true;
 }
