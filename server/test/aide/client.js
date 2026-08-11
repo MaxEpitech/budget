@@ -5,7 +5,16 @@
 // réellement dans la chaîne — middlewares, garde d'authentification, cookies,
 // codes de statut.
 
-export function creerClient(base) {
+/**
+ * @param base    racine de l'API, par exemple http://127.0.0.1:1234/api
+ * @param entetes en-têtes ajoutés à chaque appel. Sert surtout à poser un
+ *                X-Forwarded-For : l'application fait confiance à un
+ *                intermédiaire, donc chaque client peut se présenter comme une
+ *                machine distincte. C'est ainsi qu'on éprouve la limitation de
+ *                cadence sans jamais toucher aux compteurs de la boucle locale,
+ *                partagés avec l'application de développement.
+ */
+export function creerClient(base, entetes = {}) {
   let cookie = null;
 
   return {
@@ -27,6 +36,7 @@ export function creerClient(base) {
       const reponse = await fetch(base + chemin, {
         method: methode,
         headers: {
+          ...entetes,
           ...(corps !== undefined ? { "Content-Type": "application/json" } : {}),
           ...(cookie ? { Cookie: cookie } : {}),
         },

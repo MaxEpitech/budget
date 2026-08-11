@@ -48,6 +48,40 @@ export const testIntegration = (nom, fn) =>
 /* ─── Accès aux modules du serveur ───────────────────────────────────────── */
 
 export const chargerPrisma = async () => (await import("../../src/db.js")).prisma;
+export const chargerJetons = async () => import("../../src/auth/jetons.js");
+export const chargerSecrets = async () => import("../../src/auth/secrets.js");
+
+/**
+ * Une adresse de machine différente à chaque appel.
+ *
+ * Les tests de cadence s'en servent pour que chaque scénario dispose de ses
+ * propres compteurs : sans cela ils se bloqueraient les uns les autres, et
+ * saturer la boucle locale gênerait aussi l'application de développement, dont
+ * les requêtes arrivent par le même chemin.
+ */
+// Plage réservée à la documentation par la RFC 5737 : jamais routable.
+export const PREFIXE_MACHINE = "203.0.113.";
+
+let numeroMachine = 0;
+export const machineDEssai = () => {
+  numeroMachine += 1;
+  return { "X-Forwarded-For": `${PREFIXE_MACHINE}${(numeroMachine % 250) + 1}` };
+};
+
+/**
+ * Fait taire l'affichage des emails pendant un test.
+ *
+ * Sans clé d'envoi, chaque email est écrit en entier dans le journal — ce qui
+ * noierait la sortie des tests d'authentification. Les erreurs, elles, passent
+ * toujours.
+ */
+export function silencieux() {
+  const original = console.log;
+  console.log = () => {};
+  return () => {
+    console.log = original;
+  };
+}
 
 /**
  * Met l'application à l'écoute d'un port libre choisi par le système : aucun
@@ -120,11 +154,17 @@ export async function creerFoyerJetable() {
 
 /**
  * Remet à zéro les compteurs de cadence que les tests produisent : ceux des
- * adresses d'essai, et ceux de la boucle locale d'où partent les requêtes.
+ * adresses d'essai, des machines simulées, et de la boucle locale d'où partent
+ * les requêtes.
  *
- * Nécessaire dès qu'un fichier enchaîne les connexions : sans cela, la
- * dixième ferait tomber le plafond et le test échouerait pour la mauvaise
- * raison. Les compteurs des vraies adresses ne sont jamais touchés.
+ * Nécessaire dès qu'un fichier enchaîne les connexions : sans cela, la dixième
+ * ferait tomber le plafond et le test échouerait pour la mauvaise raison. Les
+ * compteurs des vraies adresses ne sont jamais touchés.
+ *
+ * Cette purge n'est sûre que parce que les fichiers de tests s'exécutent l'un
+ * après l'autre (voir --test-concurrency dans le script npm) : en parallèle,
+ * elle remettrait à zéro les compteurs qu'un autre fichier est en train de
+ * compter.
  */
 export async function reinitialiserCadenceEssais() {
   const prisma = await chargerPrisma();
@@ -132,6 +172,7 @@ export async function reinitialiserCadenceEssais() {
     where: {
       OR: [
         { cle: { contains: "@essai.invalid" } },
+        { cle: { contains: PREFIXE_MACHINE } },
         { cle: { endsWith: ":127.0.0.1" } },
         // Forme normalisée de la boucle locale IPv6 par express-rate-limit.
         { cle: { endsWith: "::/56" } },
