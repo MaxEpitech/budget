@@ -1,6 +1,6 @@
 // Application budget du foyer — structure et calculs du prototype,
 // données servies par l'API (/api/etat) au lieu du stockage navigateur.
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
 import { mensualite, capitalRestant } from "./finance.js";
 import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
@@ -81,7 +81,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
   const modifier = (type, id, patch) => {
     setEtat((e) => ({ ...e, [type]: e[type].map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
     const cle = `${type}:${id}`;
-    const envoi = enAttente.current[cle] ?? { patch: {} };
+    const envoi = enAttente.current[cle] ?? { type, id, patch: {} };
     envoi.patch = { ...envoi.patch, ...patch };
     clearTimeout(envoi.minuterie);
     envoi.minuterie = setTimeout(async () => {
@@ -94,6 +94,48 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
       }
     }, 400);
     enAttente.current[cle] = envoi;
+  };
+
+  /**
+   * Envoie sans attendre tout ce qui dort encore dans le délai de 400 ms.
+   *
+   * Sans cela, une modification affichée à l'écran disparaît si l'on ferme
+   * l'onglet, se déconnecte ou navigue avant l'échéance : l'utilisateur a vu sa
+   * valeur changer, et elle n'a jamais existé.
+   *
+   * `persistant` demande au navigateur de mener la requête à son terme même si
+   * la page s'en va — un fetch ordinaire serait abandonné à la fermeture.
+   */
+  const viderEnAttente = useCallback(({ persistant = false } = {}) => {
+    const envois = Object.values(enAttente.current);
+    enAttente.current = {};
+    return envois.map((envoi) => {
+      clearTimeout(envoi.minuterie);
+      // L'erreur est ignorée : à ce moment-là il n'y a souvent plus personne
+      // pour la lire, et l'état local sera de toute façon rechargé.
+      return MODIFICATEURS[envoi.type](envoi.id, envoi.patch, { persistant }).catch(() => {});
+    });
+  }, []);
+
+  // Fermeture de l'onglet, mise en arrière-plan, ou démontage du composant.
+  // `visibilitychange` couvre les mobiles, où `pagehide` n'est pas garanti.
+  useEffect(() => {
+    const surDepart = () => viderEnAttente({ persistant: true });
+    const surMasquage = () => document.visibilityState === "hidden" && surDepart();
+    window.addEventListener("pagehide", surDepart);
+    document.addEventListener("visibilitychange", surMasquage);
+    return () => {
+      window.removeEventListener("pagehide", surDepart);
+      document.removeEventListener("visibilitychange", surMasquage);
+      viderEnAttente();
+    };
+  }, [viderEnAttente]);
+
+  // Se déconnecter ferme la session : ce qui n'est pas parti avant ne partira
+  // plus. On vide donc d'abord, et on attend que ce soit fait.
+  const deconnexionApresVidage = async () => {
+    await Promise.allSettled(viderEnAttente());
+    onDeconnexion();
   };
 
   // Le mode de répartition s'applique immédiatement à l'écran, puis en base.
@@ -242,7 +284,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
         {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} />}
         {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} />}
         {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} />}
-        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={onDeconnexion} />}
+        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} />}
       </div>
     </div>
   );

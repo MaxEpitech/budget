@@ -2,7 +2,12 @@
 // Remplace l'objet `source` du prototype : mêmes données, mais servies par
 // Express/Postgres au lieu du stockage navigateur.
 
-async function requete(chemin, methode = "GET", corps) {
+/**
+ * @param options.persistant  Demande au navigateur de mener la requête à son
+ *   terme même si la page se ferme. Sert aux envois de dernière seconde : un
+ *   fetch ordinaire serait abandonné avec l'onglet, et la saisie perdue.
+ */
+async function requete(chemin, methode = "GET", corps, options = {}) {
   let reponse;
   try {
     reponse = await fetch(`/api${chemin}`, {
@@ -11,6 +16,7 @@ async function requete(chemin, methode = "GET", corps) {
       body: corps !== undefined ? JSON.stringify(corps) : undefined,
       // Le cookie de session accompagne chaque appel.
       credentials: "same-origin",
+      keepalive: options.persistant === true,
     });
   } catch {
     throw new Error("Serveur injoignable — l'API est-elle démarrée ?");
@@ -59,18 +65,18 @@ export const api = {
 
   projets: () => requete("/projets"),
   creerProjet: (p) => requete("/projets", "POST", p),
-  modifierProjet: (id, patch) => requete(`/projets/${id}`, "PUT", patch),
+  modifierProjet: (id, patch, options) => requete(`/projets/${id}`, "PUT", patch, options),
   supprimerProjet: (id) => requete(`/projets/${id}`, "DELETE"),
   verser: (id, montant, pour = "foyer") => requete(`/projets/${id}/versements`, "POST", { montant, pour }),
 
   placements: () => requete("/placements"),
   creerPlacement: (p) => requete("/placements", "POST", p),
-  modifierPlacement: (id, patch) => requete(`/placements/${id}`, "PUT", patch),
+  modifierPlacement: (id, patch, options) => requete(`/placements/${id}`, "PUT", patch, options),
   supprimerPlacement: (id) => requete(`/placements/${id}`, "DELETE"),
 
   membres: () => requete("/membres"),
   creerMembre: (m) => requete("/membres", "POST", m),
-  modifierMembre: (id, patch) => requete(`/membres/${id}`, "PUT", patch),
+  modifierMembre: (id, patch, options) => requete(`/membres/${id}`, "PUT", patch, options),
   supprimerMembre: (id) => requete(`/membres/${id}`, "DELETE"),
 
   modifierFoyer: (repartition) => requete("/foyer", "PUT", { repartition }),
