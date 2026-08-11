@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
+import BoutonConfirme from "../composants/BoutonConfirme.jsx";
 import { euro, num, moisCle, decalerMois } from "../utiles.js";
 
 // Supprime transactions, crédits, projets et placements (les membres restent).
@@ -128,11 +129,22 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
           <div className="carte-note">
             Tout est enregistré dans la base du foyer, rien n'est gardé dans le navigateur. Le jeu de départ est fictif : remplacez-le par vos chiffres.
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            <button className="btn fant mini" disabled={occupe} onClick={() => lancer(recreerDemo)}>Recharger les données d'exemple</button>
-            <button className="btn fant mini" disabled={occupe} onClick={() => lancer(toutSupprimer)}>
-              Repartir de zéro
-            </button>
+          {/* Ces deux boutons effacent tout le foyer. Ils demandent donc
+              confirmation sur place, et rien ne les rend annulables ensuite —
+              contrairement à la suppression d'une ligne. */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <BoutonConfirme
+              libelle="Recharger les données d'exemple"
+              confirmation="Remplacer tout le budget"
+              disabled={occupe}
+              onConfirme={() => lancer(recreerDemo)}
+            />
+            <BoutonConfirme
+              libelle="Repartir de zéro"
+              confirmation="Tout effacer"
+              disabled={occupe}
+              onConfirme={() => lancer(toutSupprimer)}
+            />
           </div>
         </div>
       </Carte>

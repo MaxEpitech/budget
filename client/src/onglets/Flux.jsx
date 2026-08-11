@@ -6,7 +6,7 @@ import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import { euro, num, libelleMois, CATEGORIES } from "../utiles.js";
 
-export default function Flux({ etat, calc, mois, executer }) {
+export default function Flux({ etat, calc, mois, executer, supprimer }) {
   const [f, setF] = useState({ libelle: "", montant: "", categorie: "Courses", pour: "foyer", type: "depense", recurrent: true });
 
   const ajouter = () => {
@@ -25,7 +25,7 @@ export default function Flux({ etat, calc, mois, executer }) {
     setF({ ...f, libelle: "", montant: "" });
   };
 
-  const retirer = (id) => executer(() => api.supprimerTransaction(id));
+  const retirer = (t) => supprimer("transactions", t.id, t.libelle);
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
 
   const recurrents = calc.actifs.filter((t) => t.recurrent);
@@ -65,7 +65,7 @@ export default function Flux({ etat, calc, mois, executer }) {
             <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
               {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
             </div>
-            <button className="suppr" onClick={() => retirer(t.id)} aria-label={`Supprimer ${t.libelle}`}>×</button>
+            <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>×</button>
           </div>
         ))}
       </Carte>
@@ -83,7 +83,7 @@ export default function Flux({ etat, calc, mois, executer }) {
             <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
               {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
             </div>
-            <button className="suppr" onClick={() => retirer(t.id)} aria-label={`Supprimer ${t.libelle}`}>×</button>
+            <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>×</button>
           </div>
         ))}
       </Carte>

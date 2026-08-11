@@ -57,22 +57,22 @@ export const api = {
 
   transactions: () => requete("/transactions"),
   creerTransaction: (t) => requete("/transactions", "POST", t),
-  supprimerTransaction: (id) => requete(`/transactions/${id}`, "DELETE"),
+  supprimerTransaction: (id, options) => requete(`/transactions/${id}`, "DELETE", undefined, options),
 
   credits: () => requete("/credits"),
   creerCredit: (c) => requete("/credits", "POST", c),
-  supprimerCredit: (id) => requete(`/credits/${id}`, "DELETE"),
+  supprimerCredit: (id, options) => requete(`/credits/${id}`, "DELETE", undefined, options),
 
   projets: () => requete("/projets"),
   creerProjet: (p) => requete("/projets", "POST", p),
   modifierProjet: (id, patch, options) => requete(`/projets/${id}`, "PUT", patch, options),
-  supprimerProjet: (id) => requete(`/projets/${id}`, "DELETE"),
+  supprimerProjet: (id, options) => requete(`/projets/${id}`, "DELETE", undefined, options),
   verser: (id, montant, pour = "foyer") => requete(`/projets/${id}/versements`, "POST", { montant, pour }),
 
   placements: () => requete("/placements"),
   creerPlacement: (p) => requete("/placements", "POST", p),
   modifierPlacement: (id, patch, options) => requete(`/placements/${id}`, "PUT", patch, options),
-  supprimerPlacement: (id) => requete(`/placements/${id}`, "DELETE"),
+  supprimerPlacement: (id, options) => requete(`/placements/${id}`, "DELETE", undefined, options),
 
   membres: () => requete("/membres"),
   creerMembre: (m) => requete("/membres", "POST", m),

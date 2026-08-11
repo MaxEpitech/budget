@@ -8,7 +8,7 @@ import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import { euro, euroPrecis, num, libelleMois, libelleDate, decalerMois, ecartMois } from "../utiles.js";
 
-export default function Projets({ etat, mois, executer, modifier }) {
+export default function Projets({ etat, mois, executer, modifier, supprimer }) {
   const [f, setF] = useState({ libelle: "", objectif: "", echeance: decalerMois(mois, 12), versement: "" });
   const [historique, setHistorique] = useState(null);
   // Qui met au pot, choisi projet par projet ; « foyer » par défaut.
@@ -51,7 +51,7 @@ export default function Projets({ etat, mois, executer, modifier }) {
                 <div key={p.id} style={{ border: "1px solid var(--trait)", borderRadius: 6, padding: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <div className="ligne-lib">{p.libelle}</div>
-                    <button className="suppr" style={{ opacity: 1 }} onClick={() => executer(() => api.supprimerProjet(p.id))} aria-label={`Supprimer ${p.libelle}`}>×</button>
+                    <button className="suppr" style={{ opacity: 1 }} onClick={() => supprimer("projets", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
                   </div>
                   <div className="chiffre" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>
                     {euro(p.epargne)} <span style={{ color: "var(--doux)", fontSize: 14, fontWeight: 400 }}>/ {euro(p.objectif)}</span>

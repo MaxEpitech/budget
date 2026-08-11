@@ -9,7 +9,7 @@ import { projeterPlafonne, verseAvecPlafond } from "../finance.js";
 // Un plafond vide ou nul signifie « pas de plafond ».
 const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
 
-export default function Epargne({ etat, executer, modifier }) {
+export default function Epargne({ etat, executer, modifier, supprimer }) {
   const [horizon, setHorizon] = useState(10);
   const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
 
@@ -97,7 +97,7 @@ export default function Epargne({ etat, executer, modifier }) {
                 <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
                 <Champ libelle="Plafond" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur={100} placeholder="aucun" />
               </div>
-              <button className="suppr" onClick={() => executer(() => api.supprimerPlacement(p.id))} aria-label={`Supprimer ${p.libelle}`}>×</button>
+              <button className="suppr" onClick={() => supprimer("placements", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
             </div>
           );
         })}

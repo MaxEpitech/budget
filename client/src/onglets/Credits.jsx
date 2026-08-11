@@ -7,7 +7,7 @@ import Jauge from "../composants/Jauge.jsx";
 import { euro, euroPrecis, num, libelleMois, decalerMois } from "../utiles.js";
 import { capitalRestant } from "../finance.js";
 
-export default function Credits({ etat, calc, mois, executer }) {
+export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois });
   const [ouvert, setOuvert] = useState(null);
 
@@ -81,7 +81,7 @@ export default function Credits({ etat, calc, mois, executer }) {
                 <button className="btn fant mini" onClick={() => setOuvert(ouvert === c.id ? null : c.id)}>
                   {ouvert === c.id ? "Masquer" : "Détail"}
                 </button>
-                <button className="suppr" onClick={() => executer(() => api.supprimerCredit(c.id))} aria-label={`Supprimer ${c.libelle}`}>×</button>
+                <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}>×</button>
               </div>
               {ouvert === c.id && <Amortissement credit={c} mois={mois} />}
             </div>

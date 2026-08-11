@@ -25,6 +25,17 @@ const MODIFICATEURS = {
   membres: api.modifierMembre,
 };
 
+// Route API de suppression, et nom affiché dans le bandeau d'annulation.
+const SUPPRESSIONS = {
+  transactions: { appeler: api.supprimerTransaction, nom: "La ligne" },
+  credits: { appeler: api.supprimerCredit, nom: "Le crédit" },
+  projets: { appeler: api.supprimerProjet, nom: "Le projet" },
+  placements: { appeler: api.supprimerPlacement, nom: "Le support" },
+};
+
+// Temps laissé pour se raviser avant que la suppression ne parte vraiment.
+const DELAI_ANNULATION = 6000;
+
 export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
   const [etat, setEtat] = useState(null);
   const [mois, setMois] = useState(moisCle());
@@ -32,8 +43,10 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
   const [posteActif, setPosteActif] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(false);
+  const [annulable, setAnnulable] = useState(null); // suppression rétractable en cours
   const jetonChargement = useRef(0);
   const enAttente = useRef({}); // envois différés des champs éditables, par "type:id"
+  const suppressionEnAttente = useRef(null);
   const moisAffiche = useRef(mois);
   moisAffiche.current = mois;
 
@@ -119,22 +132,82 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
 
   // Fermeture de l'onglet, mise en arrière-plan, ou démontage du composant.
   // `visibilitychange` couvre les mobiles, où `pagehide` n'est pas garanti.
+  // Une suppression laissée en attente au départ est confirmée : l'utilisateur
+  // l'a demandée et l'a vue disparaître de l'écran. La reprendre en douce serait
+  // plus surprenant que de la mener à son terme.
+  const viderTout = useRef(null);
   useEffect(() => {
-    const surDepart = () => viderEnAttente({ persistant: true });
+    const surDepart = () => viderTout.current({ persistant: true });
     const surMasquage = () => document.visibilityState === "hidden" && surDepart();
     window.addEventListener("pagehide", surDepart);
     document.addEventListener("visibilitychange", surMasquage);
     return () => {
       window.removeEventListener("pagehide", surDepart);
       document.removeEventListener("visibilitychange", surMasquage);
-      viderEnAttente();
+      viderTout.current();
     };
-  }, [viderEnAttente]);
+  }, []);
+
+  /* ─── Suppression avec délai de rétractation ─────────────────────────────
+     La ligne disparaît de l'écran tout de suite, mais l'appel à l'API n'est
+     émis qu'au bout de quelques secondes. Se raviser ne demande donc aucune
+     restauration : rien n'a encore été supprimé. */
+
+  const envoyerSuppression = useCallback((suppression, { persistant = false } = {}) => {
+    clearTimeout(suppression.minuterie);
+    return SUPPRESSIONS[suppression.type].appeler(suppression.id, { persistant });
+  }, []);
+
+  // Fait partir la suppression en attente, s'il y en a une.
+  const validerSuppression = useCallback(
+    (options) => {
+      const suppression = suppressionEnAttente.current;
+      if (!suppression) return null;
+      suppressionEnAttente.current = null;
+      setAnnulable(null);
+      return envoyerSuppression(suppression, options);
+    },
+    [envoyerSuppression],
+  );
+
+  const supprimer = (type, id, libelle) => {
+    // Une suppression déjà en attente part immédiatement : garder plusieurs
+    // rétractations ouvertes rendrait le bandeau ambigu.
+    const precedente = validerSuppression();
+    if (precedente) precedente.catch(signaler);
+
+    setEtat((e) => ({ ...e, [type]: e[type].filter((x) => x.id !== id) }));
+
+    const suppression = { type, id, libelle };
+    suppression.minuterie = setTimeout(() => {
+      suppressionEnAttente.current = null;
+      setAnnulable(null);
+      envoyerSuppression(suppression).catch(signaler);
+    }, DELAI_ANNULATION);
+
+    suppressionEnAttente.current = suppression;
+    setAnnulable({ type, libelle });
+  };
+
+  // Tout ce qui dort — saisies comme suppression — part d'un coup au départ.
+  viderTout.current = (options) =>
+    [...viderEnAttente(options), validerSuppression(options)].filter(Boolean);
+
+  // Se raviser : la minuterie tombe, et l'écran retrouve la vérité de la base —
+  // que rien n'a jamais quittée.
+  const annulerSuppression = () => {
+    const suppression = suppressionEnAttente.current;
+    if (!suppression) return;
+    clearTimeout(suppression.minuterie);
+    suppressionEnAttente.current = null;
+    setAnnulable(null);
+    charger(moisAffiche.current);
+  };
 
   // Se déconnecter ferme la session : ce qui n'est pas parti avant ne partira
   // plus. On vide donc d'abord, et on attend que ce soit fait.
   const deconnexionApresVidage = async () => {
-    await Promise.allSettled(viderEnAttente());
+    await Promise.allSettled(viderTout.current());
     onDeconnexion();
   };
 
@@ -280,10 +353,20 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree }) {
             <button className="btn fant mini" onClick={() => charger(mois)}>Réessayer</button>
           </div>
         )}
-        {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} />}
-        {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} />}
-        {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} />}
-        {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} />}
+        {annulable && (
+          <div
+            className="avis"
+            role="status"
+            style={{ marginTop: 0, marginBottom: 14, background: "#EDF1F3", color: "var(--ardoise)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+          >
+            <span>{SUPPRESSIONS[annulable.type].nom} « {annulable.libelle} » a été supprimé.</span>
+            <button className="btn fant mini" onClick={annulerSuppression}>Annuler</button>
+          </div>
+        )}
+        {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
+        {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
+        {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
+        {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} />}
       </div>
     </div>
