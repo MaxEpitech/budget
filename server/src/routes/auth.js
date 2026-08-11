@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
-import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema, ReinitialisationSchema } from "../schemas.js";
+import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema, ReinitialisationSchema, SuppressionCompteSchema } from "../schemas.js";
+import { membreVersApi, transactionVersApi, creditVersApi, projetVersApi, placementVersApi } from "../conversion.js";
 import { hacherMotDePasse, verifierMotDePasse } from "../auth/motDePasse.js";
 import { emettreJeton, consommerJeton } from "../auth/jetons.js";
 import { ouvrirSession, fermerSession, fermerToutesLesSessions, poserCookieSession, effacerCookieSession, lireCookieSession } from "../auth/sessions.js";
@@ -241,5 +242,61 @@ routeur.get("/moi", (req, res) => {
   if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
   res.json(profil(req.utilisateur));
 });
+
+/**
+ * Export de toutes les données du foyer, à l'usage de son propriétaire.
+ *
+ * Un script d'administration existait déjà, mais en ligne de commande : la
+ * portabilité suppose que l'utilisateur puisse récupérer ses données seul. Le
+ * fichier reprend les montants en euros et les noms de champs de l'API — on
+ * doit pouvoir l'ouvrir et le comprendre, pas seulement le réimporter.
+ */
+routeur.get("/mes-donnees", attraper(async (req, res) => {
+  if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
+  const foyerId = req.utilisateur.foyerId;
+
+  const [foyer, membres, transactions, credits, projets, placements] = await Promise.all([
+    prisma.foyer.findUnique({ where: { id: foyerId } }),
+    prisma.membre.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.transaction.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "asc" } } }, orderBy: { id: "asc" } }),
+    prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+  ]);
+
+  res.json({
+    exporteLe: new Date().toISOString(),
+    compte: { email: req.utilisateur.email, creeLe: req.utilisateur.creeLe },
+    foyer: { repartition: foyer.repartition },
+    membres: membres.map(membreVersApi),
+    transactions: transactions.map(transactionVersApi),
+    credits: credits.map(creditVersApi),
+    projets: projets.map(projetVersApi),
+    placements: placements.map(placementVersApi),
+  });
+}));
+
+/**
+ * Suppression du compte et de toutes ses données.
+ *
+ * C'est le foyer qui est supprimé, pas l'utilisateur : les cascades partent de
+ * lui. Supprimer le compte seul laisserait derrière un foyer que plus personne
+ * ne pourrait ni consulter ni effacer — l'inverse de ce qui est demandé.
+ *
+ * Le mot de passe est redemandé : c'est le geste le plus irréversible de
+ * l'application, et une session laissée ouverte sur un poste partagé ne doit
+ * pas suffire à l'accomplir.
+ */
+routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), attraper(async (req, res) => {
+  if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
+
+  if (!(await verifierMotDePasse(req.donnees.motDePasse, req.utilisateur.motDePasseHash))) {
+    return res.status(403).json({ erreur: "Mot de passe incorrect." });
+  }
+
+  await prisma.foyer.delete({ where: { id: req.utilisateur.foyerId } });
+  effacerCookieSession(res);
+  res.status(204).end();
+}));
 
 export default routeur;

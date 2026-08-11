@@ -60,7 +60,98 @@ async function recreerDemo() {
   await api.creerPlacement({ libelle: "PEA", valeur: 5200, versement: 200, rendement: 5.5 });
 }
 
-export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion }) {
+/** Télécharge l'ensemble des données du foyer, dans un fichier lisible. */
+function BoutonTelecharger() {
+  const [occupe, setOccupe] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  const telecharger = async () => {
+    setOccupe(true);
+    setErreur(null);
+    try {
+      const donnees = await api.mesDonnees();
+      const adresse = URL.createObjectURL(
+        new Blob([JSON.stringify(donnees, null, 2)], { type: "application/json" }),
+      );
+      const lien = document.createElement("a");
+      lien.href = adresse;
+      lien.download = `budget-${new Date().toISOString().slice(0, 10)}.json`;
+      lien.click();
+      URL.revokeObjectURL(adresse);
+    } catch (e) {
+      setErreur(e.message);
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  return (
+    <>
+      <button className="btn fant mini" onClick={telecharger} disabled={occupe}>
+        {occupe ? "Préparation…" : "Télécharger mes données"}
+      </button>
+      {erreur && <span className="carte-note" style={{ color: "var(--brique)" }}>{erreur}</span>}
+    </>
+  );
+}
+
+/**
+ * Suppression du compte : dépliée en deux temps, et le mot de passe est
+ * redemandé. C'est le geste le plus irréversible de l'application ; une session
+ * restée ouverte sur un poste partagé ne doit pas suffire à l'accomplir.
+ */
+function SupprimerCompte({ onSupprime }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [motDePasse, setMotDePasse] = useState("");
+  const [erreur, setErreur] = useState(null);
+  const [occupe, setOccupe] = useState(false);
+
+  const supprimer = async () => {
+    if (occupe || !motDePasse) return;
+    setOccupe(true);
+    setErreur(null);
+    try {
+      await api.supprimerCompte(motDePasse);
+      onSupprime();
+    } catch (e) {
+      setErreur(e.message);
+      setOccupe(false);
+    }
+  };
+
+  if (!ouvert) {
+    return (
+      <button className="btn fant mini" onClick={() => setOuvert(true)}>
+        Supprimer mon compte
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ width: "100%", marginTop: 6, padding: 14, border: "1px solid var(--brique)", borderRadius: 6 }}>
+      <div className="ligne-lib" style={{ color: "var(--brique)" }}>Supprimer définitivement ce compte</div>
+      <div className="carte-note" style={{ marginTop: 4 }}>
+        Le foyer entier disparaît : membres, transactions, crédits, projets, épargne. Rien n'est
+        conservé et rien ne pourra être récupéré. Pensez à télécharger vos données avant.
+      </div>
+      {erreur && <div className="avis alerte" role="alert">{erreur}</div>}
+      <div className="forme" style={{ marginTop: 12 }}>
+        <Champ
+          libelle="Votre mot de passe" type="password" valeur={motDePasse} onChange={setMotDePasse}
+          largeur={220} onEntree={supprimer} attributs={{ autoComplete: "current-password" }}
+        />
+        <button className="btn mini" style={{ background: "var(--brique)" }} onClick={supprimer} disabled={occupe || !motDePasse}>
+          {occupe ? "Suppression…" : "Supprimer définitivement"}
+        </button>
+        <button className="btn fant mini" onClick={() => { setOuvert(false); setMotDePasse(""); setErreur(null); }}>
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion, onCompteSupprime }) {
   const [occupe, setOccupe] = useState(false);
 
   const modifierMembre = (id, patch) => modifier("membres", id, patch);
@@ -120,6 +211,16 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
               <div className="ligne-lib">{compte?.email}</div>
             </div>
             <button className="btn fant mini" onClick={onDeconnexion}>Se déconnecter</button>
+          </div>
+        </div>
+        <div className="corps" style={{ borderTop: "1px solid var(--trait-pale, #EDF1F3)" }}>
+          <div className="carte-note">
+            Vos données vous appartiennent : vous pouvez les emporter, et faire disparaître ce compte
+            quand vous voulez.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <BoutonTelecharger />
+            <SupprimerCompte onSupprime={onCompteSupprime} />
           </div>
         </div>
       </Carte>

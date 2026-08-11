@@ -106,6 +106,12 @@ export const JetonSchema = z.object({
   jeton: z.string("jeton requis").min(1, "jeton requis"),
 });
 
+// Le mot de passe est redemandé avant de supprimer le compte. Aucune contrainte
+// de longueur : un mot de passe trop court est simplement faux.
+export const SuppressionCompteSchema = z.object({
+  motDePasse: z.string("mot de passe requis").max(200),
+});
+
 export const ReinitialisationSchema = z.object({
   jeton: z.string("jeton requis").min(1, "jeton requis"),
   motDePasse: MotDePasseSchema,

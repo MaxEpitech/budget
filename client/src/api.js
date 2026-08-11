@@ -51,6 +51,8 @@ export const api = {
   renvoyerValidation: (email) => requete("/auth/renvoyer-validation", "POST", { email }),
   motDePasseOublie: (email) => requete("/auth/mot-de-passe-oublie", "POST", { email }),
   reinitialiser: (jeton, motDePasse) => requete("/auth/reinitialiser", "POST", { jeton, motDePasse }),
+  mesDonnees: () => requete("/auth/mes-donnees"),
+  supprimerCompte: (motDePasse) => requete("/auth/moi", "DELETE", { motDePasse }),
 
   /* ─── Budget ─── */
   etat: (mois) => requete(`/etat?mois=${encodeURIComponent(mois)}`),
