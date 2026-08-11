@@ -1,14 +1,19 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
-import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema } from "../schemas.js";
+import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema, ReinitialisationSchema } from "../schemas.js";
 import { hacherMotDePasse, verifierMotDePasse } from "../auth/motDePasse.js";
 import { emettreJeton, consommerJeton } from "../auth/jetons.js";
-import { ouvrirSession, fermerSession, poserCookieSession, effacerCookieSession, lireCookieSession } from "../auth/sessions.js";
+import { ouvrirSession, fermerSession, fermerToutesLesSessions, poserCookieSession, effacerCookieSession, lireCookieSession } from "../auth/sessions.js";
 import { fabriquerSecret } from "../auth/secrets.js";
 import { cadenceConnexion, cadenceConnexionIp, cadenceEmail, cadenceEmailIp, cadenceJeton } from "../auth/cadence.js";
 import { envoyerEmail } from "../email/envoyer.js";
-import { gabaritValidation, gabaritInscriptionExistante } from "../email/gabarits.js";
+import {
+  gabaritValidation,
+  gabaritInscriptionExistante,
+  gabaritReinitialisation,
+  gabaritReinitialisationSansCompte,
+} from "../email/gabarits.js";
 
 const routeur = Router();
 
@@ -153,6 +158,55 @@ routeur.post("/deconnexion", attraper(async (req, res) => {
   await fermerSession(lireCookieSession(req));
   effacerCookieSession(res);
   res.status(204).end();
+}));
+
+/* ─── Mot de passe oublié ────────────────────────────────────────────────── */
+
+routeur.post("/mot-de-passe-oublie", cadenceEmailIp, cadenceEmail, valider(EmailSeulSchema), attraper(async (req, res) => {
+  const { email } = req.donnees;
+  const utilisateur = await prisma.utilisateur.findUnique({ where: { email } });
+
+  if (utilisateur) {
+    const jeton = await emettreJeton(utilisateur.id, "reinitialisation");
+    envoyerSansAttendre(email, gabaritReinitialisation({ email, jeton }));
+  } else {
+    // L'écran répond la même chose dans les deux cas ; ce message évite en
+    // contrepartie de laisser quelqu'un guetter un courrier qui ne viendra pas.
+    envoyerSansAttendre(email, gabaritReinitialisationSansCompte({ email }));
+  }
+  res.json(REPONSE_EMAIL_ENVOYE);
+}));
+
+routeur.post("/reinitialiser", cadenceJeton, valider(ReinitialisationSchema), attraper(async (req, res) => {
+  const { jeton, motDePasse } = req.donnees;
+
+  // Hachage avant consommation : si le calcul échouait après coup, le lien
+  // serait brûlé sans que le mot de passe ait changé.
+  const motDePasseHash = await hacherMotDePasse(motDePasse);
+
+  const utilisateurId = await consommerJeton(jeton, "reinitialisation");
+  if (!utilisateurId) {
+    return res.status(400).json({ erreur: "Lien invalide ou expiré. Demandez une nouvelle réinitialisation." });
+  }
+
+  const avant = await prisma.utilisateur.findUnique({ where: { id: utilisateurId } });
+  const utilisateur = await prisma.utilisateur.update({
+    where: { id: utilisateurId },
+    data: {
+      motDePasseHash,
+      // Avoir suivi ce lien prouve l'accès à la boîte mail : autant valider
+      // l'adresse si ce n'était pas déjà fait, sinon un compte dont le lien de
+      // confirmation a été perdu resterait inutilisable pour toujours.
+      // La date de première validation, elle, n'est jamais réécrite.
+      emailValideLe: avant?.emailValideLe ?? new Date(),
+    },
+  });
+
+  // Un mot de passe change souvent parce qu'on le croit compromis : toutes les
+  // sessions ouvertes ailleurs tombent, y compris celles d'un éventuel intrus.
+  await fermerToutesLesSessions(utilisateur.id);
+  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  res.json(profil(utilisateur));
 }));
 
 /* ─── Compte courant ─────────────────────────────────────────────────────── */

@@ -42,7 +42,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ erreur: "Erreur serveur inattendue" });
 });
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3011;
 app.listen(PORT, () => {
   console.log(`API budget démarrée sur http://localhost:${PORT}`);
   annoncerModeEnvoi();
