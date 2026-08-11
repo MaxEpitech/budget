@@ -83,6 +83,23 @@ export const cadenceEmailIp = limiteur({
   message: "Trop de demandes. Réessayez plus tard.",
 });
 
+/**
+ * Routes métier : un plafond large, par compte.
+ *
+ * Une fois connecté, rien ne bornait le rythme des appels. Sur une facturation
+ * à l'usage, une boucle emballée se paie littéralement. Le compteur est classé
+ * par compte et non par machine : deux personnes derrière la même connexion ne
+ * doivent pas se gêner. Le plafond est assez haut pour qu'un usage soutenu ne
+ * le voie jamais — c'est un garde-fou, pas une politique d'usage.
+ */
+export const cadenceMetier = limiteur({
+  prefixe: "metier-compte",
+  fenetreMs: QUART_HEURE,
+  plafond: 600,
+  cle: (req) => req.utilisateur?.id ?? parIp(req),
+  message: "Trop de requêtes. Patientez quelques minutes.",
+});
+
 /** Consommation de jeton : freine la recherche d'un lien valide par tâtonnement. */
 export const cadenceJeton = limiteur({
   prefixe: "jeton-ip",

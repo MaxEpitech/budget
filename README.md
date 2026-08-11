@@ -108,6 +108,28 @@ n'apparaîtrait qu'en production.
 tant que les vérifications n'ont pas abouti. Sans lui, un commit rouge part en
 production tout seul.
 
+## Sécurité et exploitation
+
+Les en-têtes de sécurité sont déclarés dans
+[`vercel.json`](vercel.json) : politique de sécurité du contenu, HSTS,
+`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`,
+`Permissions-Policy`.
+
+Une limite à connaître avant de durcir la politique : l'interface utilise
+abondamment les styles en ligne, hérités du prototype, donc `style-src` doit les
+autoriser. Les scripts, eux, sont verrouillés strictement — c'est là que se
+situe le vrai risque.
+
+Chaque requête reçoit un identifiant, renvoyé dans l'en-tête `X-Request-Id` et
+présent dans la réponse en cas d'erreur serveur : c'est lui qui permet de
+retrouver la trace correspondante quand quelqu'un signale un incident. Les
+journaux sont écrits en JSON sur la sortie standard, et **les champs sensibles y
+sont masqués** — mot de passe, empreinte, jeton, cookie. C'est par les journaux
+que ces valeurs fuitent le plus souvent.
+
+`GET /api/ping` interroge la base et répond 503 si elle est injoignable : une
+sonde qui ne peut pas échouer ne surveille rien.
+
 ## Déploiement sur Vercel
 
 La même application Express sert de deux façons : un processus qui écoute un

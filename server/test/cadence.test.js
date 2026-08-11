@@ -185,6 +185,40 @@ testIntegration("les compteurs des différents limiteurs ne se mélangent pas", 
   });
 });
 
+testIntegration("les routes métier sont elles aussi comptées, par compte", async () => {
+  await avecFoyer(async (contexte) => {
+    const prisma = await chargerPrisma();
+    const client = nouveauClient();
+    await client.appel("/auth/connexion", "POST", { email: contexte.email, motDePasse: contexte.motDePasse });
+
+    await client.appel("/etat");
+    await client.appel("/membres");
+
+    // Le plafond est trop haut pour être atteint dans un test ; ce qui compte
+    // est que le compteur existe et soit classé par compte, non par machine :
+    // deux personnes derrière la même connexion ne doivent pas se gêner.
+    const compteur = await prisma.limiteCadence.findFirst({
+      where: { cle: `metier-compte:${contexte.utilisateur.id}` },
+    });
+    assert.ok(compteur, "les routes métier doivent alimenter un compteur");
+    assert.ok(compteur.compteur >= 2, `deux appels au moins attendus, vu ${compteur?.compteur}`);
+
+    await prisma.limiteCadence.deleteMany({ where: { cle: { contains: contexte.utilisateur.id } } });
+  });
+});
+
+testIntegration("la sonde de santé interroge vraiment la base", async () => {
+  const client = nouveauClient();
+  const r = await client.appel("/ping");
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.corps, { ok: true });
+});
+
+testIntegration("chaque réponse porte un identifiant de requête", async () => {
+  const reponse = await fetch(`${serveur.base}/ping`);
+  assert.ok(reponse.headers.get("x-request-id"), "sans lui, impossible de relier une trace à un incident");
+});
+
 testIntegration("les demandes d'email sont plafonnées séparément", async () => {
   await avecFoyer(async (contexte) => {
     const client = nouveauClient();
