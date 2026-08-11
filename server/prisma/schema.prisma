@@ -42,6 +42,7 @@ model Foyer {
   id           Int           @id @default(autoincrement())
   repartition  Repartition   @default(prorata)
   utilisateurs Utilisateur[]
+  invitations  Invitation[]
   membres      Membre[]
   transactions Transaction[]
   credits      Credit[]
@@ -98,6 +99,28 @@ model Session {
   @@index([utilisateurId])
 }
 
+// Invitation à rejoindre un foyer.
+//
+// Table séparée des jetons ordinaires : ceux-ci visent un utilisateur existant,
+// alors qu'une invitation vise une adresse qui n'a peut-être pas encore de
+// compte. Comme pour eux, seule l'empreinte du lien est conservée.
+model Invitation {
+  id         String    @id @default(cuid())
+  foyer      Foyer     @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId    Int
+  email      String
+  role       RoleFoyer @default(membre)
+  // Le membre du budget que la personne incarnera, si on le désigne d'avance.
+  membre     Membre?   @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId   String?
+  jetonHache String    @unique
+  expireLe   DateTime
+  utiliseLe  DateTime?
+  creeLe     DateTime  @default(now())
+
+  @@index([foyerId])
+}
+
 model Membre {
   id            String        @id @default(cuid())
   nom           String
@@ -106,6 +129,7 @@ model Membre {
   foyerId       Int
   transactions  Transaction[]
   versements    Versement[]
+  invitations   Invitation[]
   // Le compte qui incarne ce membre, s'il en a un. Supprimer le compte ne
   // supprime pas le membre : ses transactions et son revenu restent au budget.
   utilisateur   Utilisateur?  @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)

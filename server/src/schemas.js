@@ -69,6 +69,10 @@ export const FoyerSchema = z.object({
   repartition: z.enum(["prorata", "moitie"], "repartition : « prorata » ou « moitie » attendu"),
 });
 
+const RoleValeur = z.enum(["proprietaire", "membre"], "rôle : « proprietaire » ou « membre » attendu");
+
+export const RoleSchema = z.object({ role: RoleValeur });
+
 /* ─── Authentification ─────────────────────────────────────────────────────
    L'adresse est normalisée dès la validation (espaces retirés, minuscules) :
    c'est la seule forme qui atteint la base, ce qui garantit qu'on ne peut pas
@@ -101,6 +105,20 @@ export const ConnexionSchema = z.object({
 });
 
 export const EmailSeulSchema = z.object({ email: EmailSchema });
+
+export const InvitationSchema = z.object({
+  email: EmailSchema,
+  // Membre par défaut : on n'accorde pas les pleins pouvoirs sans le vouloir.
+  role: RoleValeur.default("membre"),
+  // Le membre du budget que la personne incarnera, si on le désigne d'avance.
+  membreId: z.string().nullish(),
+});
+
+export const AccepterInvitationSchema = z.object({
+  jeton: z.string("jeton requis").min(1, "jeton requis"),
+  // Absent quand un compte existe déjà : on rattache alors le compte connecté.
+  motDePasse: MotDePasseSchema.optional(),
+});
 
 export const JetonSchema = z.object({
   jeton: z.string("jeton requis").min(1, "jeton requis"),

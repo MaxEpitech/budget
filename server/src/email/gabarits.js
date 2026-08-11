@@ -111,6 +111,33 @@ ${bouton(lien, "Aller à la connexion")}
   };
 }
 
+/** Invitation à rejoindre un foyer. */
+export function gabaritInvitation({ email, jeton, invitePar }) {
+  const lien = `${urlApplication()}/invitation?jeton=${encodeURIComponent(jeton)}`;
+  return {
+    lien,
+    sujet: "Vous êtes invité à rejoindre un budget — Budget du foyer",
+    html: enveloppe(
+      "Rejoindre le budget",
+      `      <p style="margin:0;">${echapper(invitePar)} vous invite à partager la gestion de son budget. Vous y verrez les mêmes chiffres, et pourrez les modifier.</p>
+${bouton(lien, "Rejoindre le foyer")}
+      <p style="margin:22px 0 0;font-size:12px;color:${DOUX};">Ce lien est valable 7 jours et ne fonctionne qu'une fois. Si vous ne connaissez pas cette personne, ignorez ce message : sans votre action, rien ne se passe et votre adresse n'est utilisée pour rien d'autre.</p>`
+    ),
+    texte: [
+      "Rejoindre le budget — Budget du foyer",
+      "",
+      `${invitePar} vous invite à partager la gestion de son budget.`,
+      "Vous y verrez les mêmes chiffres, et pourrez les modifier.",
+      "",
+      lien,
+      "",
+      "Ce lien est valable 7 jours et ne fonctionne qu'une fois.",
+      "Si vous ne connaissez pas cette personne, ignorez ce message :",
+      "sans votre action, rien ne se passe.",
+    ].join("\n"),
+  };
+}
+
 /** Email de réinitialisation du mot de passe. */
 export function gabaritReinitialisation({ email, jeton }) {
   const lien = `${urlApplication()}/reinitialiser?jeton=${encodeURIComponent(jeton)}`;

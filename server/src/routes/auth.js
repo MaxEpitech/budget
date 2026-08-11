@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
-import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema, ReinitialisationSchema, SuppressionCompteSchema } from "../schemas.js";
+import { InscriptionSchema, ConnexionSchema, EmailSeulSchema, JetonSchema, ReinitialisationSchema, SuppressionCompteSchema, AccepterInvitationSchema } from "../schemas.js";
 import { membreVersApi, transactionVersApi, creditVersApi, projetVersApi, placementVersApi } from "../conversion.js";
 import { hacherMotDePasse, verifierMotDePasse } from "../auth/motDePasse.js";
 import { emettreJeton, consommerJeton } from "../auth/jetons.js";
 import { ouvrirSession, fermerSession, fermerToutesLesSessions, poserCookieSession, effacerCookieSession, lireCookieSession } from "../auth/sessions.js";
 import { fabriquerSecret } from "../auth/secrets.js";
 import { confirmationEmailRequise } from "../auth/reglages.js";
+import { lireInvitation, consommerInvitation } from "../auth/invitations.js";
 import { cadenceConnexion, cadenceConnexionIp, cadenceEmail, cadenceEmailIp, cadenceJeton } from "../auth/cadence.js";
 import { envoyerEmail } from "../email/envoyer.js";
 import {
@@ -15,6 +16,7 @@ import {
   gabaritInscriptionExistante,
   gabaritReinitialisation,
   gabaritReinitialisationSansCompte,
+  gabaritInvitation,
 } from "../email/gabarits.js";
 
 const routeur = Router();
@@ -234,6 +236,124 @@ routeur.post("/reinitialiser", cadenceJeton, valider(ReinitialisationSchema), at
   await fermerToutesLesSessions(utilisateur.id);
   poserCookieSession(res, await ouvrirSession(utilisateur.id));
   res.json(profil(utilisateur));
+}));
+
+/** Nombre d'enregistrements métier d'un foyer : sert à savoir s'il est vide. */
+async function contenuFoyer(foyerId) {
+  const compteurs = await Promise.all([
+    prisma.membre.count({ where: { foyerId } }),
+    prisma.transaction.count({ where: { foyerId } }),
+    prisma.credit.count({ where: { foyerId } }),
+    prisma.projet.count({ where: { foyerId } }),
+    prisma.placement.count({ where: { foyerId } }),
+  ]);
+  return compteurs.reduce((s, n) => s + n, 0);
+}
+
+/* ─── Invitations ────────────────────────────────────────────────────────── */
+
+/** De quoi présenter l'écran d'accueil, sans consommer le lien. */
+routeur.get("/invitation", cadenceJeton, attraper(async (req, res) => {
+  const invitation = await lireInvitation(req.query.jeton);
+  if (!invitation) {
+    return res.status(400).json({ erreur: "Invitation invalide ou expirée. Demandez-en une nouvelle." });
+  }
+  const compteExistant = await prisma.utilisateur.findUnique({ where: { email: invitation.email } });
+  res.json({
+    email: invitation.email,
+    role: invitation.role,
+    membre: invitation.membre ? { id: invitation.membre.id, nom: invitation.membre.nom } : null,
+    // L'écran doit savoir s'il faut demander un mot de passe ou une connexion.
+    compteExistant: Boolean(compteExistant),
+  });
+}));
+
+/**
+ * Acceptation. Deux chemins, et le second est celui qu'on oublie :
+ *
+ * — Aucun compte à cette adresse : on en crée un, directement dans le foyer.
+ *   Avoir suivi le lien prouve l'accès à la boîte mail, l'adresse est donc
+ *   confirmée du même coup.
+ *
+ * — Un compte existe déjà : il faut être connecté avec lui. On le rattache
+ *   alors au foyer, à condition que le sien soit vide — sinon ses propres
+ *   données seraient abandonnées derrière lui.
+ */
+routeur.post("/invitation", cadenceJeton, valider(AccepterInvitationSchema), attraper(async (req, res) => {
+  const apercu = await lireInvitation(req.donnees.jeton);
+  if (!apercu) {
+    return res.status(400).json({ erreur: "Invitation invalide ou expirée. Demandez-en une nouvelle." });
+  }
+
+  const compteExistant = await prisma.utilisateur.findUnique({ where: { email: apercu.email } });
+
+  if (compteExistant) {
+    if (req.utilisateur?.id !== compteExistant.id) {
+      return res.status(401).json({
+        erreur: "Un compte existe déjà pour cette adresse. Connectez-vous avec, puis rouvrez le lien.",
+        motif: "connexion_requise",
+      });
+    }
+    if (compteExistant.foyerId === apercu.foyerId) {
+      return res.status(409).json({ erreur: "Vous faites déjà partie de ce foyer." });
+    }
+
+    const ancienFoyerId = compteExistant.foyerId;
+    const restant = await contenuFoyer(ancienFoyerId);
+    const autresComptes = await prisma.utilisateur.count({ where: { foyerId: ancienFoyerId, id: { not: compteExistant.id } } });
+    if (restant > 0) {
+      return res.status(409).json({
+        erreur: "Votre foyer actuel contient des données. Exportez-les puis videz-le avant de rejoindre un autre foyer.",
+      });
+    }
+
+    const invitation = await consommerInvitation(req.donnees.jeton);
+    if (!invitation) return res.status(400).json({ erreur: "Invitation déjà utilisée." });
+
+    const utilisateur = await prisma.$transaction(async (tx) => {
+      const deplace = await tx.utilisateur.update({
+        where: { id: compteExistant.id },
+        data: { foyerId: invitation.foyerId, role: invitation.role },
+      });
+      if (invitation.membreId) {
+        await tx.membre.update({ where: { id: invitation.membreId }, data: { utilisateurId: deplace.id } });
+      }
+      // Le foyer quitté disparaît s'il ne servait plus à personne.
+      if (autresComptes === 0) await tx.foyer.delete({ where: { id: ancienFoyerId } });
+      return deplace;
+    });
+
+    poserCookieSession(res, await ouvrirSession(utilisateur.id));
+    return res.json(profil(utilisateur));
+  }
+
+  if (!req.donnees.motDePasse) {
+    return res.status(400).json({ erreur: "mot de passe : 12 caractères minimum", motif: "mot_de_passe_requis" });
+  }
+
+  const motDePasseHash = await hacherMotDePasse(req.donnees.motDePasse);
+  const invitation = await consommerInvitation(req.donnees.jeton);
+  if (!invitation) return res.status(400).json({ erreur: "Invitation déjà utilisée." });
+
+  const utilisateur = await prisma.$transaction(async (tx) => {
+    const cree = await tx.utilisateur.create({
+      data: {
+        email: invitation.email,
+        motDePasseHash,
+        // Suivre le lien prouve l'accès à la boîte : rien à confirmer de plus.
+        emailValideLe: new Date(),
+        foyerId: invitation.foyerId,
+        role: invitation.role,
+      },
+    });
+    if (invitation.membreId) {
+      await tx.membre.update({ where: { id: invitation.membreId }, data: { utilisateurId: cree.id } });
+    }
+    return cree;
+  });
+
+  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  res.status(201).json(profil(utilisateur));
 }));
 
 /* ─── Compte courant ─────────────────────────────────────────────────────── */
