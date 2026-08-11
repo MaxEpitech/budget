@@ -59,7 +59,7 @@ async function recreerDemo() {
   await api.creerPlacement({ libelle: "PEA", valeur: 5200, versement: 200, rendement: 5.5 });
 }
 
-export default function Foyer({ etat, calc, executer, modifier, changerRepartition }) {
+export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion }) {
   const [occupe, setOccupe] = useState(false);
 
   const modifierMembre = (id, patch) => modifier("membres", id, patch);
@@ -107,6 +107,18 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
             {etat.repartition === "prorata"
               ? "Chacun contribue proportionnellement à ce qu'il gagne. Le reste à vivre est plus équilibré quand les salaires diffèrent."
               : "Chacun paie la même somme, quel que soit son salaire."}
+          </div>
+        </div>
+      </Carte>
+
+      <Carte titre="Compte">
+        <div className="corps">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div className="stat-lib">Connecté en tant que</div>
+              <div className="ligne-lib">{compte?.email}</div>
+            </div>
+            <button className="btn fant mini" onClick={onDeconnexion}>Se déconnecter</button>
           </div>
         </div>
       </Carte>

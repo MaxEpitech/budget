@@ -2,7 +2,7 @@
 import "./env.js";
 import express from "express";
 import cookieParser from "cookie-parser";
-import { chargerSession } from "./auth/garde.js";
+import { chargerSession, exigerAuth } from "./auth/garde.js";
 import { annoncerModeEnvoi } from "./email/envoyer.js";
 import auth from "./routes/auth.js";
 import etat from "./routes/etat.js";
@@ -17,18 +17,23 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 // Renseigne l'utilisateur connecté quand un cookie de session valide est
-// présent, sans bloquer : le verrou (exigerAuth) sera monté à la dernière étape.
+// présent, sans bloquer : les routes publiques le traversent sans effet.
 app.use(chargerSession);
 
 app.get("/api/ping", (_req, res) => res.json({ ok: true }));
+
+// Seul ensemble de routes accessible sans compte.
 app.use("/api/auth", auth);
-app.use("/api/etat", etat);
-app.use("/api/membres", membres);
-app.use("/api/transactions", transactions);
-app.use("/api/credits", credits);
-app.use("/api/projets", projets);
-app.use("/api/placements", placements);
-app.use("/api/foyer", foyer);
+
+// Routes métier : session valide et adresse confirmée exigées. Chacune lit
+// ensuite son foyer via foyerCourant(req), qui refuse de répondre sans session.
+app.use("/api/etat", exigerAuth, etat);
+app.use("/api/membres", exigerAuth, membres);
+app.use("/api/transactions", exigerAuth, transactions);
+app.use("/api/credits", exigerAuth, credits);
+app.use("/api/projets", exigerAuth, projets);
+app.use("/api/placements", exigerAuth, placements);
+app.use("/api/foyer", exigerAuth, foyer);
 
 // Route API inconnue → JSON, pas la page d'erreur HTML d'Express.
 app.use("/api", (_req, res) => res.status(404).json({ erreur: "Route inconnue" }));

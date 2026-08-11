@@ -1,242 +1,111 @@
-// Application budget du foyer — structure et calculs du prototype,
-// données servies par l'API (/api/etat) au lieu du stockage navigateur.
-import { useState, useEffect, useMemo, useRef } from "react";
+// Aiguillage de l'application : écrans d'authentification tant qu'aucun compte
+// n'est connecté, budget ensuite.
+//
+// Pas de routeur : deux chemins seulement viennent de l'extérieur, ceux des
+// liens envoyés par email. Ils sont lus une fois au chargement, puis l'URL est
+// nettoyée — un jeton n'a rien à faire dans la barre d'adresse une fois consommé.
+import { useState, useEffect, useCallback } from "react";
 import { api } from "./api.js";
-import { mensualite, capitalRestant } from "./finance.js";
-import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
-import Flux from "./onglets/Flux.jsx";
-import Credits from "./onglets/Credits.jsx";
-import Projets from "./onglets/Projets.jsx";
-import Epargne from "./onglets/Epargne.jsx";
-import Foyer from "./onglets/Foyer.jsx";
+import Budget from "./Budget.jsx";
+import Cadre from "./ecrans/Cadre.jsx";
+import Connexion from "./ecrans/Connexion.jsx";
+import Inscription from "./ecrans/Inscription.jsx";
+import BoiteMail from "./ecrans/BoiteMail.jsx";
+import Validation from "./ecrans/Validation.jsx";
+import MotDePasseOublie from "./ecrans/MotDePasseOublie.jsx";
+import NouveauMotDePasse from "./ecrans/NouveauMotDePasse.jsx";
 import "./styles.css";
 
-const ONGLETS = [
-  { id: "flux", nom: "Flux" },
-  { id: "credits", nom: "Crédits" },
-  { id: "projets", nom: "Projets" },
-  { id: "epargne", nom: "Épargne" },
-  { id: "foyer", nom: "Foyer" },
-];
+function ecranInitial() {
+  const jeton = new URLSearchParams(window.location.search).get("jeton");
+  const chemin = window.location.pathname.replace(/\/+$/, "");
+  if (jeton && chemin === "/valider") return { nom: "validation", jeton };
+  if (jeton && chemin === "/reinitialiser") return { nom: "nouveau-mot-de-passe", jeton };
+  return { nom: "connexion" };
+}
 
-// Route API de modification pour chaque ressource éditable au clavier.
-const MODIFICATEURS = {
-  projets: api.modifierProjet,
-  placements: api.modifierPlacement,
-  membres: api.modifierMembre,
+// Retire le jeton de la barre d'adresse sans recharger la page.
+const nettoyerUrl = () => {
+  if (window.location.pathname !== "/" || window.location.search) {
+    window.history.replaceState({}, "", "/");
+  }
 };
 
 export default function App() {
-  const [etat, setEtat] = useState(null);
-  const [mois, setMois] = useState(moisCle());
-  const [onglet, setOnglet] = useState("flux");
-  const [posteActif, setPosteActif] = useState(null);
-  const [erreur, setErreur] = useState(null);
-  const [rafraichissement, setRafraichissement] = useState(false);
-  const jetonChargement = useRef(0);
-  const enAttente = useRef({}); // envois différés des champs éditables, par "type:id"
-  const moisAffiche = useRef(mois);
-  moisAffiche.current = mois;
+  // undefined : on ne sait pas encore · null : déconnecté · objet : connecté
+  const [compte, setCompte] = useState(undefined);
+  const [ecran, setEcran] = useState(ecranInitial);
 
-  // Charge l'état d'un mois. L'écran précédent reste affiché pendant le fetch
-  // (pas d'écran blanc) ; un jeton ignore les réponses périmées si on navigue vite.
-  const charger = async (m) => {
-    const jeton = ++jetonChargement.current;
-    setErreur(null);
-    setRafraichissement(true);
-    try {
-      const e = await api.etat(m);
-      if (jeton === jetonChargement.current) setEtat(e);
-    } catch (err) {
-      if (jeton === jetonChargement.current) setErreur(err.message);
-    } finally {
-      if (jeton === jetonChargement.current) setRafraichissement(false);
-    }
-  };
-
+  // Une session déjà ouverte évite de redemander à se connecter à chaque visite.
   useEffect(() => {
-    charger(mois);
-  }, [mois]); // eslint-disable-line react-hooks/exhaustive-deps
+    let vivant = true;
+    api.moi().then(
+      (profil) => vivant && setCompte(profil),
+      () => vivant && setCompte(null)
+    );
+    return () => { vivant = false; };
+  }, []);
 
-  // Exécute une écriture puis recharge le mois affiché.
-  const executer = async (action) => {
+  const connecter = useCallback((profil) => {
+    nettoyerUrl();
+    // Indispensable : les écrans venant d'un lien email sont rendus avant même
+    // qu'on regarde le compte. Sans quitter cet écran, la session s'ouvrirait
+    // sans que l'affichage bouge.
+    setEcran({ nom: "connexion" });
+    setCompte(profil);
+  }, []);
+
+  const allerVers = useCallback((nom) => {
+    nettoyerUrl();
+    setEcran({ nom });
+  }, []);
+
+  const deconnecter = async () => {
     try {
-      setErreur(null);
-      await action();
-      await charger(moisAffiche.current);
-    } catch (err) {
-      setErreur(err.message);
+      await api.deconnexion();
+    } catch {
+      // Session déjà close côté serveur : le résultat voulu est atteint.
     }
+    setCompte(null);
+    setEcran({ nom: "connexion" });
   };
 
-  // Édition au clavier : mise à jour locale immédiate (comme le prototype),
-  // envoi à l'API différé de 400 ms — l'équivalent de son ancienne sauvegarde.
-  const modifier = (type, id, patch) => {
-    setEtat((e) => ({ ...e, [type]: e[type].map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
-    const cle = `${type}:${id}`;
-    const envoi = enAttente.current[cle] ?? { patch: {} };
-    envoi.patch = { ...envoi.patch, ...patch };
-    clearTimeout(envoi.minuterie);
-    envoi.minuterie = setTimeout(async () => {
-      delete enAttente.current[cle];
-      try {
-        await MODIFICATEURS[type](id, envoi.patch);
-      } catch (err) {
-        setErreur(err.message);
-        charger(moisAffiche.current); // l'état local et la base ont divergé : on resynchronise
-      }
-    }, 400);
-    enAttente.current[cle] = envoi;
-  };
+  // La session est tombée pendant l'utilisation : on repasse à la connexion.
+  const sessionExpiree = useCallback(() => {
+    setCompte(null);
+    setEcran({ nom: "connexion" });
+  }, []);
 
-  // Le mode de répartition s'applique immédiatement à l'écran, puis en base.
-  const changerRepartition = (v) => {
-    setEtat((e) => ({ ...e, repartition: v }));
-    executer(() => api.modifierFoyer(v));
-  };
+  // Les liens reçus par email s'ouvrent quel que soit l'état de la session :
+  // confirmer une adresse ou changer un mot de passe doit rester possible même
+  // en étant déjà connecté ailleurs.
+  if (ecran.nom === "validation") {
+    return <Validation jeton={ecran.jeton} onConnecte={connecter} allerVers={allerVers} />;
+  }
+  if (ecran.nom === "nouveau-mot-de-passe") {
+    return <NouveauMotDePasse jeton={ecran.jeton} onConnecte={connecter} allerVers={allerVers} />;
+  }
 
-  /* ─── Calculs du mois — identiques au prototype ─── */
-  const calc = useMemo(() => {
-    if (!etat) return null;
-    const actifs = etat.transactions; // déjà filtrées par mois côté API
-    const salaires = etat.membres.reduce((s, m) => s + m.revenu, 0);
-    const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
-    const revenus = salaires + autresRevenus;
-
-    const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);
-
-    const creditsActifs = etat.credits.map((c) => {
-      const k = Math.max(0, ecartMois(c.debut, mois));
-      const M = mensualite(c.capital, c.taux, c.duree);
-      return { ...c, k, mensualite: M, restant: capitalRestant(c.capital, c.taux, c.duree, k), solde: k >= c.duree };
-    });
-    const credits = creditsActifs.filter((c) => !c.solde).reduce((s, c) => s + c.mensualite, 0);
-
-    const projets = etat.projets.reduce((s, p) => s + p.versement, 0);
-    const placements = etat.placements.reduce((s, p) => s + p.versement, 0);
-    const reste = revenus - depenses - credits - projets - placements;
-
-    // Répartition par membre
-    const communes = actifs.filter((t) => t.type === "depense" && t.pour === "foyer").reduce((s, t) => s + t.montant, 0);
-    const chargesFoyer = communes + credits + projets + placements;
-    const parMembre = etat.membres.map((m) => {
-      const part = etat.repartition === "moitie" ? 1 / etat.membres.length : salaires ? m.revenu / salaires : 0;
-      const perso = actifs.filter((t) => t.type === "depense" && t.pour === m.id).reduce((s, t) => s + t.montant, 0);
-      const bonus = actifs.filter((t) => t.type === "revenu" && t.pour === m.id).reduce((s, t) => s + t.montant, 0);
-      const du = chargesFoyer * part;
-      return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
-    });
-
-    const total = Math.max(revenus, depenses + credits + projets + placements);
-    const parts = {
-      depenses: { montant: depenses, pct: total ? (depenses / total) * 100 : 0 },
-      credits: { montant: credits, pct: total ? (credits / total) * 100 : 0 },
-      projets: { montant: projets, pct: total ? (projets / total) * 100 : 0 },
-      placements: { montant: placements, pct: total ? (placements / total) * 100 : 0 },
-      reste: { montant: Math.max(0, reste), pct: total ? (Math.max(0, reste) / total) * 100 : 0 },
-    };
-
-    return { actifs, revenus, salaires, depenses, credits, creditsActifs, projets, placements, reste, parts, parMembre };
-  }, [etat, mois]);
-
-  if (!etat || !calc) {
+  if (compte === undefined) {
     return (
-      <div className="bdg">
-        <div className="vide" style={{ paddingTop: 60 }}>
-          {erreur ? (
-            <>
-              <p>Impossible de charger le budget : {erreur}</p>
-              <button className="btn" onClick={() => charger(mois)}>Réessayer</button>
-            </>
-          ) : (
-            "Chargement du budget…"
-          )}
-        </div>
-      </div>
+      <Cadre titre="Budget du foyer">
+        <p style={{ margin: 0 }}>Chargement…</p>
+      </Cadre>
     );
   }
 
-  const allerVers = (poste) => {
-    setPosteActif(poste);
-    const cible = { depenses: "flux", credits: "credits", projets: "projets", placements: "epargne", reste: "flux" }[poste];
-    setOnglet(cible);
-  };
+  if (compte) {
+    return <Budget compte={compte} onDeconnexion={deconnecter} onSessionExpiree={sessionExpiree} />;
+  }
 
-  return (
-    <div className="bdg" style={{ opacity: rafraichissement ? 0.6 : 1, transition: "opacity .15s" }}>
-      {/* ── En-tête + bande ── */}
-      <header className="entete">
-        <div className="entete-haut">
-          <div>
-            <p className="marque">Budget du foyer</p>
-            <div className="mois-nav">
-              <button className="fleche" onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">‹</button>
-              <span className="mois-titre chiffre">{libelleMois(mois)}</span>
-              <button className="fleche" onClick={() => setMois(decalerMois(mois, 1))} aria-label="Mois suivant">›</button>
-            </div>
-          </div>
-          <div className="solde">
-            <div className="solde-lib">Reste à vivre</div>
-            <div className={`solde-val chiffre ${calc.reste < 0 ? "neg" : ""}`}>{euro(calc.reste)}</div>
-          </div>
-        </div>
-
-        <div className="bande" role="img" aria-label="Répartition des revenus du mois">
-          {Object.entries(POSTES).map(([cle, poste]) => {
-            const p = calc.parts[cle];
-            if (p.pct <= 0) return null;
-            return (
-              <button
-                key={cle}
-                className="seg"
-                data-actif={posteActif === cle ? "1" : "0"}
-                style={{ width: `${p.pct}%`, background: `var(${poste.var})` }}
-                onClick={() => allerVers(cle)}
-                aria-label={`${poste.nom} : ${euro(p.montant)}`}
-              >
-                {p.pct > 9 && <span className="seg-pct">{Math.round(p.pct)}%</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="legende">
-          {Object.entries(POSTES).map(([cle, poste]) => (
-            <button
-              key={cle}
-              className="puce"
-              data-actif={posteActif === cle ? "1" : "0"}
-              onClick={() => allerVers(cle)}
-            >
-              <span className="pastille" style={{ background: `var(${poste.var})` }} />
-              <span className="puce-lib">{poste.nom}</span>
-              <span className="puce-val chiffre">{euro(calc.parts[cle].montant)}</span>
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <nav className="onglets">
-        {ONGLETS.map((o) => (
-          <button key={o.id} className="onglet" data-actif={onglet === o.id ? "1" : "0"} onClick={() => setOnglet(o.id)}>
-            {o.nom}
-          </button>
-        ))}
-      </nav>
-
-      <div className="zone">
-        {erreur && (
-          <div className="avis alerte" role="alert" style={{ marginTop: 0, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <span>{erreur}</span>
-            <button className="btn fant mini" onClick={() => charger(mois)}>Réessayer</button>
-          </div>
-        )}
-        {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} />}
-        {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} />}
-        {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} />}
-        {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} />}
-        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} />}
-      </div>
-    </div>
-  );
+  if (ecran.nom === "inscription") {
+    return <Inscription allerVers={allerVers} onEmailEnvoye={(email) => setEcran({ nom: "boite-mail", email })} />;
+  }
+  if (ecran.nom === "boite-mail") {
+    return <BoiteMail email={ecran.email} allerVers={allerVers} />;
+  }
+  if (ecran.nom === "mot-de-passe-oublie") {
+    return <MotDePasseOublie allerVers={allerVers} />;
+  }
+  return <Connexion onConnecte={connecter} allerVers={allerVers} />;
 }

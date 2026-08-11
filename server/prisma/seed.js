@@ -11,7 +11,14 @@ import { PrismaClient } from "@prisma/client";
 // Le .env vit à la racine du repo ; l'URL doit être chargée avant d'instancier le client.
 config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
+const { hacherMotDePasse } = await import("../src/auth/motDePasse.js");
+
 const prisma = new PrismaClient();
+
+// Compte de démonstration : sans lui, les données du seed seraient en base mais
+// inaccessibles, l'application n'ouvrant plus rien sans compte. Adresse et mot
+// de passe volontairement inoffensifs — c'est un jeu de démonstration local.
+const COMPTE_DEMO = { email: "demo@budget.local", motDePasse: "budget-demonstration" };
 
 // Mois courant décalé de `delta` mois, au format YYYY-MM.
 const moisCle = (delta = 0) => {
@@ -60,6 +67,16 @@ async function main() {
   // Le foyer de démonstration : tout le jeu d'exemple lui est rattaché.
   const foyer = await prisma.foyer.create({ data: { repartition: "prorata" } });
   const foyerId = foyer.id;
+
+  // Son compte, déjà confirmé pour pouvoir se connecter tout de suite.
+  await prisma.utilisateur.create({
+    data: {
+      email: COMPTE_DEMO.email,
+      motDePasseHash: await hacherMotDePasse(COMPTE_DEMO.motDePasse),
+      emailValideLe: new Date(),
+      foyerId,
+    },
+  });
 
   const alex = await prisma.membre.create({ data: { nom: "Alex", revenuMensuel: 245000, foyerId } });
   const camille = await prisma.membre.create({ data: { nom: "Camille", revenuMensuel: 198000, foyerId } });
@@ -119,6 +136,7 @@ async function main() {
   });
 
   console.log("Seed terminé : jeu de démonstration en base.");
+  console.log(`Connexion : ${COMPTE_DEMO.email} / ${COMPTE_DEMO.motDePasse}`);
 }
 
 main()

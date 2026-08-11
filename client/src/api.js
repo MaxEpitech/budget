@@ -9,24 +9,44 @@ async function requete(chemin, methode = "GET", corps) {
       method: methode,
       headers: corps !== undefined ? { "Content-Type": "application/json" } : undefined,
       body: corps !== undefined ? JSON.stringify(corps) : undefined,
+      // Le cookie de session accompagne chaque appel.
+      credentials: "same-origin",
     });
   } catch {
     throw new Error("Serveur injoignable — l'API est-elle démarrée ?");
   }
   if (!reponse.ok) {
     let message = `Erreur ${reponse.status}`;
+    let motif;
     try {
       const donnees = await reponse.json();
       if (donnees.erreur) message = donnees.erreur;
+      motif = donnees.motif;
     } catch {
       // réponse sans corps JSON : on garde le code HTTP
     }
-    throw new Error(message);
+    const erreur = new Error(message);
+    erreur.statut = reponse.status;
+    erreur.motif = motif;
+    // Permet à l'application de renvoyer vers la connexion quand la session tombe.
+    erreur.nonAutorise = reponse.status === 401 || reponse.status === 403;
+    throw erreur;
   }
   return reponse.status === 204 ? null : reponse.json();
 }
 
 export const api = {
+  /* ─── Compte ─── */
+  moi: () => requete("/auth/moi"),
+  inscription: (email, motDePasse) => requete("/auth/inscription", "POST", { email, motDePasse }),
+  connexion: (email, motDePasse) => requete("/auth/connexion", "POST", { email, motDePasse }),
+  deconnexion: () => requete("/auth/deconnexion", "POST"),
+  validerEmail: (jeton) => requete("/auth/validation", "POST", { jeton }),
+  renvoyerValidation: (email) => requete("/auth/renvoyer-validation", "POST", { email }),
+  motDePasseOublie: (email) => requete("/auth/mot-de-passe-oublie", "POST", { email }),
+  reinitialiser: (jeton, motDePasse) => requete("/auth/reinitialiser", "POST", { jeton, motDePasse }),
+
+  /* ─── Budget ─── */
   etat: (mois) => requete(`/etat?mois=${encodeURIComponent(mois)}`),
 
   transactions: () => requete("/transactions"),

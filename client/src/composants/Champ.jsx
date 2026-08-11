@@ -1,5 +1,10 @@
-// Champ de formulaire du prototype, repris à l'identique.
-export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree }) {
+// Champ de formulaire du prototype.
+// Le pavé numérique est réservé aux champs de montant ; les champs email et mot
+// de passe doivent garder le clavier ordinaire. `attributs` laisse passer ce
+// dont les formulaires de connexion ont besoin (autocomplete, autofocus…).
+const CLAVIER_ORDINAIRE = new Set(["text", "email", "password", "month"]);
+
+export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs }) {
   const commun = {
     className: "saisie",
     style: { width: largeur },
@@ -17,7 +22,13 @@ export default function Champ({ libelle, valeur, onChange, largeur = 120, type =
           ))}
         </select>
       ) : (
-        <input {...commun} type={type} placeholder={placeholder} inputMode={type === "text" ? undefined : "decimal"} />
+        <input
+          {...commun}
+          type={type}
+          placeholder={placeholder}
+          inputMode={CLAVIER_ORDINAIRE.has(type) ? undefined : "decimal"}
+          {...attributs}
+        />
       )}
     </label>
   );
