@@ -1,4 +1,5 @@
-/* CSS du prototype (budget-foyer.jsx), repris à l'identique.
+/* CSS du prototype d'origine (retiré du dépôt, consultable dans l'historique
+   Git : budget-foyer.jsx), repris à l'identique.
    Seul ajout : l'hébergement pleine page — le prototype vivait dans un
    conteneur fourni par son hôte, ici c'est la page qui joue ce rôle. */
 html, body, #root { height: 100%; margin: 0; }

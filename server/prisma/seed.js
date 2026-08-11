@@ -1,4 +1,5 @@
-// Jeu de démonstration — reprend ETAT_DEMO du prototype (budget-foyer.jsx),
+// Jeu de démonstration — reprend ETAT_DEMO du prototype d'origine (retiré du
+// dépôt, il reste consultable dans l'historique Git : budget-foyer.jsx),
 // montants convertis en centimes. Relancer le seed remet la base dans cet état.
 //
 // ATTENTION : ce script EFFACE tout le contenu de la base avant de la remplir.

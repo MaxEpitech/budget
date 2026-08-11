@@ -1,5 +1,6 @@
-// Formules financières du budget — extraites du prototype (budget-foyer.jsx),
-// comportement à préserver à l'identique.
+// Formules financières du budget — extraites du prototype d'origine (retiré du
+// dépôt, consultable dans l'historique Git : budget-foyer.jsx).
+// Comportement à préserver à l'identique.
 //
 // Toutes les fonctions sont pures et indifférentes à l'unité : appelées en
 // centimes elles rendent des centimes, en euros des euros. Elles renvoient des
