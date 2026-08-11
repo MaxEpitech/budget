@@ -156,6 +156,56 @@ testIntegration("la suppression exige une session", async () => {
   });
 });
 
+testIntegration("sur un foyer partagé, seul le compte s'en va", async () => {
+  await avecFoyer(async (contexte) => {
+    const prisma = await chargerPrisma();
+    await garnir(prisma, contexte.foyer.id);
+
+    // Un second compte sur le même foyer, propriétaire lui aussi.
+    const second = await prisma.utilisateur.create({
+      data: {
+        email: `second-${contexte.email}`,
+        motDePasseHash: contexte.utilisateur.motDePasseHash,
+        emailValideLe: new Date(),
+        foyerId: contexte.foyer.id,
+        role: "proprietaire",
+      },
+    });
+
+    const client = await clientConnecte(serveur.base, contexte);
+    assert.equal((await client.appel("/auth/moi", "DELETE", { motDePasse: contexte.motDePasse })).code, 204);
+
+    // Le budget appartient aussi à l'autre : l'emporter détruirait ses données.
+    assert.equal(await prisma.foyer.count({ where: { id: contexte.foyer.id } }), 1, "le foyer doit survivre");
+    assert.equal(await prisma.membre.count({ where: { foyerId: contexte.foyer.id } }), 1, "les données restent");
+    assert.equal(await prisma.utilisateur.count({ where: { id: contexte.utilisateur.id } }), 0, "le compte, lui, s'en va");
+    assert.equal(await prisma.utilisateur.count({ where: { id: second.id } }), 1);
+  });
+});
+
+testIntegration("le dernier propriétaire ne peut pas partir en laissant le foyer", async () => {
+  await avecFoyer(async (contexte) => {
+    const prisma = await chargerPrisma();
+    // Un compagnon simple membre : personne ne pourrait plus inviter ni
+    // supprimer le foyer si le seul propriétaire s'en allait.
+    await prisma.utilisateur.create({
+      data: {
+        email: `membre-${contexte.email}`,
+        motDePasseHash: contexte.utilisateur.motDePasseHash,
+        emailValideLe: new Date(),
+        foyerId: contexte.foyer.id,
+        role: "membre",
+      },
+    });
+
+    const client = await clientConnecte(serveur.base, contexte);
+    const r = await client.appel("/auth/moi", "DELETE", { motDePasse: contexte.motDePasse });
+    assert.equal(r.code, 409);
+    assert.match(r.corps.erreur, /dernier propriétaire/i);
+    assert.equal(await prisma.utilisateur.count({ where: { id: contexte.utilisateur.id } }), 1);
+  });
+});
+
 testIntegration("supprimer son compte ne touche pas au foyer voisin", async () => {
   await avecFoyer(async (voisin) => {
     const prisma = await chargerPrisma();

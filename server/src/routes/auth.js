@@ -277,15 +277,25 @@ routeur.get("/mes-donnees", attraper(async (req, res) => {
 }));
 
 /**
- * Suppression du compte et de toutes ses données.
+ * Suppression de son compte.
  *
- * C'est le foyer qui est supprimé, pas l'utilisateur : les cascades partent de
- * lui. Supprimer le compte seul laisserait derrière un foyer que plus personne
- * ne pourrait ni consulter ni effacer — l'inverse de ce qui est demandé.
+ * Deux situations, qu'il serait grave de confondre :
  *
- * Le mot de passe est redemandé : c'est le geste le plus irréversible de
- * l'application, et une session laissée ouverte sur un poste partagé ne doit
- * pas suffire à l'accomplir.
+ * — Seul sur son foyer : c'est le FOYER qui est supprimé, pas l'utilisateur.
+ *   Les cascades partent de lui, et supprimer le compte seul laisserait derrière
+ *   un foyer que plus personne ne pourrait ni consulter ni effacer.
+ *
+ * — Foyer partagé : seul le compte s'en va. Le budget appartient aussi aux
+ *   autres, l'emporter serait leur détruire leurs données. Le membre du budget
+ *   que ce compte incarnait reste en place, avec son revenu et ses lignes.
+ *
+ * Un foyer partagé doit par ailleurs garder un propriétaire : le dernier ne peut
+ * pas partir sans transmettre le rôle, faute de quoi plus personne ne pourrait
+ * inviter ni supprimer le foyer.
+ *
+ * Le mot de passe est redemandé dans tous les cas : une session laissée ouverte
+ * sur un poste partagé ne doit pas suffire au geste le plus irréversible de
+ * l'application.
  */
 routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), attraper(async (req, res) => {
   if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
@@ -294,7 +304,26 @@ routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), att
     return res.status(403).json({ erreur: "Mot de passe incorrect." });
   }
 
-  await prisma.foyer.delete({ where: { id: req.utilisateur.foyerId } });
+  const foyerId = req.utilisateur.foyerId;
+  const autres = await prisma.utilisateur.findMany({
+    where: { foyerId, id: { not: req.utilisateur.id } },
+    select: { id: true, role: true },
+  });
+
+  if (autres.length === 0) {
+    await prisma.foyer.delete({ where: { id: foyerId } });
+    effacerCookieSession(res);
+    return res.status(204).end();
+  }
+
+  if (req.utilisateur.role === "proprietaire" && !autres.some((u) => u.role === "proprietaire")) {
+    return res.status(409).json({
+      erreur:
+        "Vous êtes le dernier propriétaire de ce foyer. Nommez d'abord quelqu'un d'autre propriétaire, ou retirez les autres comptes.",
+    });
+  }
+
+  await prisma.utilisateur.delete({ where: { id: req.utilisateur.id } });
   effacerCookieSession(res);
   res.status(204).end();
 }));

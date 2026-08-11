@@ -57,10 +57,10 @@ async function main() {
   }
 
   if (cibleId === null) {
-    const foyers = await prisma.foyer.findMany({ include: { utilisateur: true }, orderBy: { id: "asc" } });
+    const foyers = await prisma.foyer.findMany({ include: { utilisateurs: true }, orderBy: { id: "asc" } });
     const candidats = [];
     for (const f of foyers) {
-      if (f.utilisateur) continue; // déjà réclamé
+      if (f.utilisateurs.length > 0) continue; // déjà réclamé
       const c = await compterFoyer(f.id);
       if (c.total > 0) candidats.push({ foyer: f, compte: c });
     }
@@ -81,10 +81,10 @@ async function main() {
     return;
   }
 
-  const cible = await prisma.foyer.findUnique({ where: { id: cibleId }, include: { utilisateur: true } });
+  const cible = await prisma.foyer.findUnique({ where: { id: cibleId }, include: { utilisateurs: true } });
   if (!cible) return echouer(`Le foyer n°${cibleId} n'existe pas.`);
-  if (cible.utilisateur) {
-    return echouer(`Le foyer n°${cibleId} appartient déjà à « ${cible.utilisateur.email} ». Rattachement refusé.`);
+  if (cible.utilisateurs.length > 0) {
+    return echouer(`Le foyer n°${cibleId} appartient déjà à « ${cible.utilisateurs.map((u) => u.email).join(", ")} ». Rattachement refusé.`);
   }
 
   // Le foyer que le compte quitte ne doit rien contenir : il va être supprimé.

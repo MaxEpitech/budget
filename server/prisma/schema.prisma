@@ -30,11 +30,18 @@ enum TypeJeton {
   reinitialisation
 }
 
+// Le propriétaire peut inviter, retirer quelqu'un et supprimer le foyer ;
+// un membre se sert du budget. Un foyer garde toujours au moins un propriétaire.
+enum RoleFoyer {
+  proprietaire
+  membre
+}
+
 // Les réglages d'un foyer, et la racine de son cloisonnement.
 model Foyer {
   id           Int           @id @default(autoincrement())
   repartition  Repartition   @default(prorata)
-  utilisateur  Utilisateur?
+  utilisateurs Utilisateur[]
   membres      Membre[]
   transactions Transaction[]
   credits      Credit[]
@@ -42,7 +49,9 @@ model Foyer {
   placements   Placement[]
 }
 
-// Un compte = un foyer. L'email est stocké normalisé en minuscules.
+// Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
+// l'application est bâtie autour de deux revenus, les deux personnes doivent
+// pouvoir s'y connecter. L'email est stocké normalisé en minuscules.
 model Utilisateur {
   id             String      @id @default(cuid())
   email          String      @unique
@@ -50,10 +59,16 @@ model Utilisateur {
   // Null tant que l'adresse n'a pas été confirmée : la connexion est refusée.
   emailValideLe  DateTime?
   foyer          Foyer       @relation(fields: [foyerId], references: [id], onDelete: Cascade)
-  foyerId        Int         @unique
+  foyerId        Int
+  role           RoleFoyer   @default(proprietaire)
   creeLe         DateTime    @default(now())
   jetons         Jeton[]
   sessions       Session[]
+  // Le membre du budget que ce compte incarne, s'il y en a un : un membre peut
+  // rester une personne sans identifiants, un enfant par exemple.
+  membre         Membre?
+
+  @@index([foyerId])
 }
 
 // Jetons à usage unique envoyés par email (validation d'adresse, réinitialisation).
@@ -91,6 +106,10 @@ model Membre {
   foyerId       Int
   transactions  Transaction[]
   versements    Versement[]
+  // Le compte qui incarne ce membre, s'il en a un. Supprimer le compte ne
+  // supprime pas le membre : ses transactions et son revenu restent au budget.
+  utilisateur   Utilisateur?  @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
+  utilisateurId String?       @unique
 
   @@index([foyerId])
 }
