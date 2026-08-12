@@ -8,6 +8,8 @@ import {
   capitalRestant,
   coutTotal,
   interetsPayes,
+  indemniteAnticipee,
+  rembourserParAnticipation,
   moisAvantPlafond,
   projeter,
   projeterPlafonne,
@@ -210,6 +212,99 @@ test("cumul versé : jamais supérieur à la valeur projetée à rendement posit
     const verse = verseAvecPlafond(V, P, rdt, mois, plafond);
     assert.ok(valeur >= verse, `mois ${mois} : valeur ${valeur} < versé ${verse}`);
   }
+});
+
+/* ─── Remboursement anticipé ─── */
+
+const PRET = { capital: 105000, tauxAnnuel: 3.5, dureeMois: 300, echeancesPayees: 26 };
+
+test("remboursement anticipé : null quand le versement n'a pas de sens", () => {
+  for (const versement of [0, -1000, Number.NaN]) {
+    assert.equal(rembourserParAnticipation({ ...PRET, versement }), null, `versement ${versement}`);
+  }
+});
+
+test("remboursement anticipé : null si le versement solde le crédit", () => {
+  const restant = capitalRestant(105000, 3.5, 300, 26);
+  assert.equal(rembourserParAnticipation({ ...PRET, versement: restant }), null);
+  assert.equal(rembourserParAnticipation({ ...PRET, versement: restant + 1 }), null);
+});
+
+test("remboursement anticipé : null sur un crédit déjà arrivé à terme", () => {
+  assert.equal(rembourserParAnticipation({ ...PRET, echeancesPayees: 300, versement: 5000 }), null);
+});
+
+test("remboursement anticipé : le scénario sans rien faire retrouve les intérêts restants", () => {
+  const r = rembourserParAnticipation({ ...PRET, versement: 5000 });
+  const restants = coutTotal(105000, 3.5, 300) - interetsPayes(105000, 3.5, 300, 26);
+  proche(r.interetsSansRien, restants, 1, "intérêts restants");
+});
+
+test("remboursement anticipé : raccourcir la durée économise plus que baisser la mensualité", () => {
+  const r = rembourserParAnticipation({ ...PRET, versement: 5000 });
+  assert.ok(
+    r.surDuree.economie > r.surMensualite.economie,
+    `durée ${r.surDuree.economie} vs mensualité ${r.surMensualite.economie}`
+  );
+});
+
+test("remboursement anticipé sur la durée : mensualité inchangée, échéances en moins", () => {
+  const r = rembourserParAnticipation({ ...PRET, versement: 5000 });
+  assert.ok(r.surDuree.moisGagnes > 0, "aucun mois gagné");
+  assert.equal(r.surDuree.echeances + r.surDuree.moisGagnes, r.echeancesRestantes);
+});
+
+test("remboursement anticipé sur la mensualité : durée inchangée, échéance en baisse", () => {
+  const r = rembourserParAnticipation({ ...PRET, versement: 5000 });
+  assert.ok(r.surMensualite.baisse > 0, "la mensualité ne baisse pas");
+  proche(
+    r.surMensualite.mensualite,
+    mensualite(r.restantApres, 3.5, r.echeancesRestantes),
+    1e-9,
+    "nouvelle mensualité"
+  );
+});
+
+test("remboursement anticipé : plus on verse, plus on gagne", () => {
+  let moisPrecedent = -1, economiePrecedente = -1;
+  for (const versement of [1000, 5000, 10000, 20000, 40000]) {
+    const r = rembourserParAnticipation({ ...PRET, versement });
+    assert.ok(r.surDuree.moisGagnes >= moisPrecedent, `mois gagnés en recul à ${versement}`);
+    assert.ok(r.surDuree.economie >= economiePrecedente, `économie en recul à ${versement}`);
+    moisPrecedent = r.surDuree.moisGagnes;
+    economiePrecedente = r.surDuree.economie;
+  }
+});
+
+test("remboursement anticipé à taux zéro : des mois gagnés, aucun intérêt économisé", () => {
+  const r = rembourserParAnticipation({ capital: 12000, tauxAnnuel: 0, dureeMois: 24, echeancesPayees: 0, versement: 3000 });
+  assert.equal(r.surDuree.moisGagnes, 6); // 3 000 € à 500 €/mois
+  proche(r.surDuree.economie, 0, 1e-9, "économie à taux zéro");
+  proche(r.surMensualite.economie, 0, 1e-9, "économie à taux zéro");
+});
+
+test("remboursement anticipé : le capital est bien remboursé, à l'euro près", () => {
+  const r = rembourserParAnticipation({ ...PRET, versement: 5000 });
+  // Ce qui est versé au total couvre exactement le capital restant et ses intérêts.
+  const verseSurDuree = r.surDuree.interets + r.restantApres;
+  proche(verseSurDuree - r.surDuree.interets, r.restantAvant - 5000, 1e-6, "capital amorti");
+});
+
+test("indemnité : c'est le semestre d'intérêts qui mord aux taux courants", () => {
+  // À 3,5 %, le plafond de 3 % ne peut jamais s'appliquer : il faudrait verser
+  // 6R/t, soit 1,7 fois le capital restant dû. Le semestre décide donc seul.
+  proche(indemniteAnticipee(5000, 99083, 3.5), 5000 * (3.5 / 100 / 12) * 6, 1e-9, "semestre d'intérêts");
+  proche(indemniteAnticipee(90000, 99083, 3.5), 90000 * (3.5 / 100 / 12) * 6, 1e-9, "semestre d'intérêts");
+});
+
+test("indemnité : le plafond de 3 % prend le relais quand le taux est élevé", () => {
+  // À 12 %, un semestre d'intérêts sur 80 000 € vaut 4 800 € : le plafond mord.
+  proche(indemniteAnticipee(80000, 99083, 12), 99083 * 0.03, 1e-9, "plafond de 3 %");
+});
+
+test("indemnité : nulle à taux zéro, et jamais négative", () => {
+  assert.equal(indemniteAnticipee(5000, 99083, 0), 0);
+  assert.equal(indemniteAnticipee(-5000, 99083, 3.5), 0);
 });
 
 /* ─── Échéance de plafond ─── */

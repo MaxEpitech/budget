@@ -5,11 +5,13 @@ import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import { euro, euroPrecis, num, libelleMois, decalerMois } from "../utiles.js";
-import { capitalRestant, coutTotal, interetsPayes } from "../finance.js";
+import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation } from "../finance.js";
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois });
   const [ouvert, setOuvert] = useState(null);
+  // Un seul panneau ouvert à la fois : « amortissement » ou « anticipation ».
+  const [panneau, setPanneau] = useState(null);
 
   const ajouter = () => {
     if (!f.libelle.trim() || num(f.capital) <= 0 || num(f.duree) <= 0) return;
@@ -107,12 +109,24 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                   <div className="chiffre montant">{c.solde ? "—" : euro(c.mensualite) + " /mois"}</div>
                   <div className="ligne-meta">reste {euro(c.restant)}</div>
                 </div>
-                <button className="btn fant mini" onClick={() => setOuvert(ouvert === c.id ? null : c.id)}>
-                  {ouvert === c.id ? "Masquer" : "Détail"}
+                {!c.solde && (
+                  <button
+                    className="btn fant mini"
+                    onClick={() => { const actif = ouvert === c.id && panneau === "anticipation"; setOuvert(actif ? null : c.id); setPanneau(actif ? null : "anticipation"); }}
+                  >
+                    {ouvert === c.id && panneau === "anticipation" ? "Masquer" : "Anticiper"}
+                  </button>
+                )}
+                <button
+                  className="btn fant mini"
+                  onClick={() => { const actif = ouvert === c.id && panneau === "amortissement"; setOuvert(actif ? null : c.id); setPanneau(actif ? null : "amortissement"); }}
+                >
+                  {ouvert === c.id && panneau === "amortissement" ? "Masquer" : "Détail"}
                 </button>
                 <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}>×</button>
               </div>
-              {ouvert === c.id && <Amortissement credit={c} mois={mois} />}
+              {ouvert === c.id && panneau === "amortissement" && <Amortissement credit={c} mois={mois} />}
+              {ouvert === c.id && panneau === "anticipation" && <Anticipation credit={c} />}
             </div>
           );
         })}
@@ -131,6 +145,90 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         </div>
       </Carte>
     </>
+  );
+}
+
+/**
+ * Simulateur de remboursement anticipé.
+ *
+ * Les deux issues sont montrées côte à côte, jamais la seule plus rentable :
+ * raccourcir la durée économise davantage, mais baisser la mensualité soulage
+ * le budget tous les mois. Le choix dépend de ce qu'on cherche, et n'afficher
+ * que le gain maximal escamoterait la question.
+ */
+function Anticipation({ credit }) {
+  const [saisie, setSaisie] = useState("");
+  const versement = num(saisie);
+  const restant = capitalRestant(credit.capital, credit.taux, credit.duree, credit.k);
+  const simulation = rembourserParAnticipation({
+    capital: credit.capital,
+    tauxAnnuel: credit.taux,
+    dureeMois: credit.duree,
+    echeancesPayees: credit.k,
+    versement,
+  });
+
+  return (
+    <div className="corps" style={{ background: "var(--survol)" }}>
+      <div className="forme">
+        <Champ
+          libelle="Versement exceptionnel" valeur={saisie} onChange={setSaisie}
+          largeur={170} placeholder="0"
+        />
+        <div className="carte-note" style={{ alignSelf: "center" }}>
+          Sur {euro(restant)} restant dû.
+        </div>
+      </div>
+
+      {versement > 0 && !simulation && (
+        <div className="avis alerte">
+          {versement >= restant
+            ? "Ce versement solde le crédit : il ne s'agit plus d'un remboursement partiel."
+            : "Montant invalide."}
+        </div>
+      )}
+
+      {simulation && (
+        <>
+          <div className="duo" style={{ marginTop: 14 }}>
+            <div>
+              <div className="stat-lib">Garder la mensualité, finir plus tôt</div>
+              <div className="stat-val chiffre" style={{ color: "var(--caisse)" }}>
+                {euro(simulation.surDuree.economie)}
+              </div>
+              <div className="carte-note" style={{ marginTop: 4 }}>
+                d'intérêts économisés · {simulation.surDuree.moisGagnes} mensualité{simulation.surDuree.moisGagnes > 1 ? "s" : ""} en moins,
+                soit {Math.floor(simulation.surDuree.moisGagnes / 12)} an{Math.floor(simulation.surDuree.moisGagnes / 12) > 1 ? "s" : ""}
+                {simulation.surDuree.moisGagnes % 12 ? ` et ${simulation.surDuree.moisGagnes % 12} mois` : ""}.
+                Mensualité inchangée à {euro(simulation.mensualiteActuelle)}.
+              </div>
+            </div>
+            <div>
+              <div className="stat-lib">Garder la durée, payer moins chaque mois</div>
+              <div className="stat-val chiffre" style={{ color: "var(--caisse)" }}>
+                {euro(simulation.surMensualite.economie)}
+              </div>
+              <div className="carte-note" style={{ marginTop: 4 }}>
+                d'intérêts économisés · {euro(simulation.surMensualite.mensualite)} par mois au lieu de {euro(simulation.mensualiteActuelle)},
+                soit {euro(simulation.surMensualite.baisse)} de moins.
+                Terme inchangé.
+              </div>
+            </div>
+          </div>
+
+          <div className="avis ok" style={{ marginTop: 14 }}>
+            Sans rien faire, il reste {euro(simulation.interetsSansRien)} d'intérêts à payer sur ce crédit.
+          </div>
+
+          <div className="carte-note" style={{ marginTop: 12 }}>
+            <strong>Indemnité de remboursement anticipé : jusqu'à {euro(simulation.indemnite)}.</strong>{" "}
+            C'est le maximum que la loi autorise pour un prêt immobilier — un semestre d'intérêts sur
+            la somme remboursée, plafonné à 3 % du capital restant dû. Votre contrat peut prévoir
+            moins, et certaines situations en dispensent. Vérifiez-le avant de décider.
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

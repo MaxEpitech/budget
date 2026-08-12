@@ -57,6 +57,105 @@ export function interetsPayes(capital, tauxAnnuel, dureeMois, k) {
 }
 
 /**
+ * Amortissement simulé d'un solde à mensualité fixe : combien d'échéances
+ * jusqu'à extinction, et quels intérêts en tout.
+ *
+ * Simulé et non résolu par une formule fermée, pour deux raisons : la dernière
+ * échéance est partielle — une formule donnerait un nombre de mois fractionnaire
+ * qu'il faudrait arrondir, et l'arrondi se paie en euros — et c'est le même
+ * moteur qui sert au scénario « sans rien faire » et au scénario « après
+ * versement », de sorte que la comparaison ne peut pas être biaisée.
+ *
+ * Renvoie null si la mensualité ne couvre pas les intérêts : le solde ne
+ * descendrait jamais, et annoncer une durée serait mentir.
+ */
+const MAX_ECHEANCES = 12000; // mille ans : garde-fou, pas une limite métier
+
+function amortir(solde, r, M) {
+  if (!(M > 0)) return null;
+  if (r > 0 && M <= solde * r) return null;
+  let interets = 0;
+  let echeances = 0;
+  while (solde > 1e-9 && echeances < MAX_ECHEANCES) {
+    const interet = solde * r;
+    interets += interet;
+    solde -= Math.min(solde, M - interet);
+    echeances++;
+  }
+  return { echeances, interets };
+}
+
+/**
+ * Indemnité de remboursement anticipé d'un prêt immobilier.
+ *
+ * Plafond légal (code de la consommation) : un semestre d'intérêts sur le
+ * capital remboursé, sans pouvoir dépasser 3 % du capital restant dû avant le
+ * remboursement. C'est un maximum — le contrat peut prévoir moins, et certaines
+ * situations en dispensent. On calcule donc le pire cas, pas le cas réel.
+ */
+export function indemniteAnticipee(versement, capitalRestantDu, tauxAnnuel) {
+  const r = tauxAnnuel / 100 / 12;
+  const semestre = Math.max(0, versement) * r * 6;
+  const plafond = Math.max(0, capitalRestantDu) * 0.03;
+  return Math.max(0, Math.min(semestre, plafond));
+}
+
+/**
+ * Remboursement anticipé partiel : ce qu'un versement exceptionnel change.
+ *
+ * Une banque propose deux issues, et elles ne se valent pas :
+ *  — raccourcir la durée en gardant la mensualité, ce qui supprime les
+ *    dernières échéances, donc les intérêts les plus tardifs ;
+ *  — baisser la mensualité en gardant la durée, ce qui soulage le budget
+ *    mensuel mais laisse courir le prêt aussi longtemps.
+ *
+ * La première économise toujours davantage. Les deux sont rendues, parce que le
+ * choix dépend de ce qu'on cherche, et qu'afficher la seule plus rentable
+ * masquerait la question.
+ *
+ * Renvoie null si le versement ne veut rien dire ici : négatif, nul, ou
+ * supérieur à ce qui reste dû — dans ce dernier cas c'est un solde, pas un
+ * remboursement partiel.
+ */
+export function rembourserParAnticipation({ capital, tauxAnnuel, dureeMois, echeancesPayees = 0, versement }) {
+  const r = tauxAnnuel / 100 / 12;
+  const M = mensualite(capital, tauxAnnuel, dureeMois);
+  const restantAvant = capitalRestant(capital, tauxAnnuel, dureeMois, echeancesPayees);
+  const echeancesRestantes = Math.max(0, dureeMois - Math.max(0, echeancesPayees));
+
+  if (!(versement > 0) || versement >= restantAvant || echeancesRestantes <= 0) return null;
+
+  const sansRien = amortir(restantAvant, r, M);
+  if (!sansRien) return null;
+
+  const restantApres = restantAvant - versement;
+  const surDuree = amortir(restantApres, r, M);
+  const nouvelleMensualite = mensualite(restantApres, tauxAnnuel, echeancesRestantes);
+  const interetsSurMensualite = nouvelleMensualite * echeancesRestantes - restantApres;
+
+  return {
+    restantAvant,
+    restantApres,
+    echeancesRestantes,
+    mensualiteActuelle: M,
+    interetsSansRien: sansRien.interets,
+    indemnite: indemniteAnticipee(versement, restantAvant, tauxAnnuel),
+    surDuree: surDuree && {
+      echeances: surDuree.echeances,
+      moisGagnes: sansRien.echeances - surDuree.echeances,
+      interets: surDuree.interets,
+      economie: sansRien.interets - surDuree.interets,
+    },
+    surMensualite: {
+      mensualite: nouvelleMensualite,
+      baisse: M - nouvelleMensualite,
+      interets: interetsSurMensualite,
+      economie: sansRien.interets - interetsSurMensualite,
+    },
+  };
+}
+
+/**
  * Projection d'épargne sur n mois : valeur actuelle + versements mensuels capitalisés.
  * V(1+r)^n + P((1+r)^n − 1)/r ; cas r = 0 → V + P×n.
  */

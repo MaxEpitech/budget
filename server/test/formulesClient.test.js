@@ -37,6 +37,9 @@ const CAS = {
   verseAvecPlafond: [
     [8400, 150, 2.4, 120, null], [8400, 150, 2.4, 120, 22950], [1000, 100, 0, 60, 1500],
   ],
+  indemniteAnticipee: [
+    [5000, 99083, 3.5], [80000, 99083, 12], [5000, 99083, 0], [-5000, 99083, 3.5],
+  ],
   moisAvantPlafond: [
     [8400, 150, 2.4, 22950], [1000, 100, 0, 1500], [23000, 150, 2.4, 22950],
     [1000, 0, 0, 5000], [1000, 100, 2, null], [1000, 0, 12, 1010],
@@ -63,6 +66,13 @@ const CAS_NON_NUMERIQUES = {
     [{ debut: "2026-01", fin: "2026-06", periodicite: "mensuel" }, "2026-08"],
     [{ debut: "2026-01", fin: "2026-08", periodicite: "mensuel" }, "2026-08"],
     [{ debut: "2025-08", fin: null, periodicite: "annuel" }, "2026-08"],
+  ],
+  rembourserParAnticipation: [
+    [{ capital: 105000, tauxAnnuel: 3.5, dureeMois: 300, echeancesPayees: 26, versement: 5000 }],
+    [{ capital: 105000, tauxAnnuel: 3.5, dureeMois: 300, echeancesPayees: 26, versement: 40000 }],
+    [{ capital: 12000, tauxAnnuel: 0, dureeMois: 24, echeancesPayees: 0, versement: 3000 }],
+    [{ capital: 105000, tauxAnnuel: 3.5, dureeMois: 300, echeancesPayees: 26, versement: 0 }],
+    [{ capital: 105000, tauxAnnuel: 3.5, dureeMois: 300, echeancesPayees: 300, versement: 5000 }],
   ],
   lignesDuMois: [
     [[

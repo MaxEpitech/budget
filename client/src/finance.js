@@ -36,6 +36,76 @@ export function interetsPayes(capital, tauxAnnuel, dureeMois, k) {
   return Math.max(0, verse - rembourse);
 }
 
+// Amortissement simulé d'un solde à mensualité fixe : échéances et intérêts
+// jusqu'à extinction. Simulé plutôt que résolu : la dernière échéance est
+// partielle, et c'est le même moteur qui sert aux deux scénarios comparés.
+const MAX_ECHEANCES = 12000;
+
+function amortir(solde, r, M) {
+  if (!(M > 0)) return null;
+  if (r > 0 && M <= solde * r) return null;
+  let interets = 0;
+  let echeances = 0;
+  while (solde > 1e-9 && echeances < MAX_ECHEANCES) {
+    const interet = solde * r;
+    interets += interet;
+    solde -= Math.min(solde, M - interet);
+    echeances++;
+  }
+  return { echeances, interets };
+}
+
+// Indemnité de remboursement anticipé : plafond légal d'un prêt immobilier,
+// un semestre d'intérêts sur le capital remboursé, sans dépasser 3 % du
+// capital restant dû. C'est un maximum, pas forcément ce que le contrat prévoit.
+export function indemniteAnticipee(versement, capitalRestantDu, tauxAnnuel) {
+  const r = tauxAnnuel / 100 / 12;
+  const semestre = Math.max(0, versement) * r * 6;
+  const plafond = Math.max(0, capitalRestantDu) * 0.03;
+  return Math.max(0, Math.min(semestre, plafond));
+}
+
+// Remboursement anticipé partiel : les deux issues que propose une banque —
+// raccourcir la durée à mensualité constante, ou baisser la mensualité à durée
+// constante. La première économise toujours davantage.
+export function rembourserParAnticipation({ capital, tauxAnnuel, dureeMois, echeancesPayees = 0, versement }) {
+  const r = tauxAnnuel / 100 / 12;
+  const M = mensualite(capital, tauxAnnuel, dureeMois);
+  const restantAvant = capitalRestant(capital, tauxAnnuel, dureeMois, echeancesPayees);
+  const echeancesRestantes = Math.max(0, dureeMois - Math.max(0, echeancesPayees));
+
+  if (!(versement > 0) || versement >= restantAvant || echeancesRestantes <= 0) return null;
+
+  const sansRien = amortir(restantAvant, r, M);
+  if (!sansRien) return null;
+
+  const restantApres = restantAvant - versement;
+  const surDuree = amortir(restantApres, r, M);
+  const nouvelleMensualite = mensualite(restantApres, tauxAnnuel, echeancesRestantes);
+  const interetsSurMensualite = nouvelleMensualite * echeancesRestantes - restantApres;
+
+  return {
+    restantAvant,
+    restantApres,
+    echeancesRestantes,
+    mensualiteActuelle: M,
+    interetsSansRien: sansRien.interets,
+    indemnite: indemniteAnticipee(versement, restantAvant, tauxAnnuel),
+    surDuree: surDuree && {
+      echeances: surDuree.echeances,
+      moisGagnes: sansRien.echeances - surDuree.echeances,
+      interets: surDuree.interets,
+      economie: sansRien.interets - surDuree.interets,
+    },
+    surMensualite: {
+      mensualite: nouvelleMensualite,
+      baisse: M - nouvelleMensualite,
+      interets: interetsSurMensualite,
+      economie: sansRien.interets - interetsSurMensualite,
+    },
+  };
+}
+
 // Projection épargne : valeur + versements mensuels capitalisés
 export function projeter(valeur, versement, rendement, mois) {
   const r = rendement / 100 / 12;
