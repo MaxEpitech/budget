@@ -77,6 +77,14 @@ export const teinteMembre = (membres, pour) => {
   return rang < 0 ? "var(--depenses)" : `var(${TEINTES_MEMBRE[rang % TEINTES_MEMBRE.length]})`;
 };
 
+// ─── Les couleurs d'un graphique de répartition ─────────────────────────
+// Distinctes des teintes de personnes : dans un camembert, la couleur ne
+// désigne pas quelqu'un mais un poste. Huit suffisent pour les catégories
+// courantes ; au-delà, le cycle recommence.
+export const TEINTES_PART = ["--part-1", "--part-2", "--part-3", "--part-4", "--part-5", "--part-6", "--part-7", "--part-8"];
+
+export const teintePart = (rang) => `var(${TEINTES_PART[rang % TEINTES_PART.length]})`;
+
 // ─── L'état d'une enveloppe ─────────────────────────────────────────────
 // La couleur change avant le dépassement : prévenir après coup n'aurait servi
 // à rien. Partagée entre l'enveloppe et les dépenses qu'elle couvre, pour que

@@ -56,6 +56,17 @@
   --membre-5: #BE185D;
   --membre-6: #15803D;
 
+  /* Les couleurs d'un camembert. Distinctes des teintes de personnes : dans un
+     graphique de répartition, la couleur désigne un poste, pas quelqu'un. */
+  --part-1: #0F766E;
+  --part-2: #B45309;
+  --part-3: #6D28D9;
+  --part-4: #BE123C;
+  --part-5: #0369A1;
+  --part-6: #4D7C0F;
+  --part-7: #A21CAF;
+  --part-8: #334155;
+
   /* La couleur des commandes, qui n'est celle d'aucun poste. */
   --accent: #4F46E5;
   --accent-survol: #4338CA;
@@ -126,6 +137,14 @@
     --membre-4: #93C5FD;
     --membre-5: #F9A8D4;
     --membre-6: #86EFAC;
+    --part-1: #5EEAD4;
+    --part-2: #FCD34D;
+    --part-3: #C4B5FD;
+    --part-4: #FDA4AF;
+    --part-5: #7DD3FC;
+    --part-6: #BEF264;
+    --part-7: #F0ABFC;
+    --part-8: #CBD5E1;
     --accent: #818CF8;
     --accent-survol: #A5B0FC;
     --accent-pale: #20243A;
@@ -165,6 +184,14 @@
   --membre-4: #93C5FD;
   --membre-5: #F9A8D4;
   --membre-6: #86EFAC;
+  --part-1: #5EEAD4;
+  --part-2: #FCD34D;
+  --part-3: #C4B5FD;
+  --part-4: #FDA4AF;
+  --part-5: #7DD3FC;
+  --part-6: #BEF264;
+  --part-7: #F0ABFC;
+  --part-8: #CBD5E1;
   --accent: #818CF8;
   --accent-survol: #A5B0FC;
   --accent-pale: #20243A;
@@ -485,6 +512,34 @@ body { background: var(--fond); color: var(--texte); }
 }
 .bdg .lien:hover { text-decoration-color: currentColor; }
 
+/* ─── Anneau de répartition ─────────────────────────────────────────────
+   Le camembert et sa légende se répondent : survoler l'un éteint le reste de
+   l'autre. Sans cet écho, il faudrait compter les parts dans le sens horaire
+   pour retrouver laquelle est laquelle. */
+.bdg .anneau {
+  display: flex; align-items: center; gap: calc(var(--pas) * 3); flex-wrap: wrap;
+}
+.bdg .anneau-svg { flex: none; }
+.bdg .part { cursor: pointer; transition: opacity .18s; }
+.bdg .anneau:has(.part[data-actif="1"]) .part[data-actif="0"] { opacity: .28; }
+.bdg .anneau:has(.anneau-ligne[data-actif="1"]) .anneau-ligne[data-actif="0"] { opacity: .5; }
+.bdg .anneau-total { font-size: 21px; font-weight: 660; fill: var(--texte); }
+.bdg .anneau-sous { font-size: 12px; fill: var(--texte-tres-doux); }
+
+.bdg .anneau-legende { display: flex; flex-direction: column; gap: 1px; flex: 1 1 260px; min-width: 0; max-width: 440px; }
+.bdg .anneau-ligne {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 6px 8px; border-radius: var(--arrondi-petit);
+  transition: background .12s, opacity .18s;
+}
+.bdg .anneau-ligne:hover, .bdg .anneau-ligne[data-actif="1"] { background: var(--survol); }
+.bdg .anneau-nom {
+  flex: 1 1 auto; min-width: 0; font-size: 13.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdg .anneau-val { font-size: 13.5px; font-weight: 600; }
+.bdg .anneau-part { font-size: 12.5px; color: var(--texte-tres-doux); min-width: 76px; text-align: right; }
+
 /* ─── Jauges ──────────────────────────────────────────────────────────── */
 .bdg .jauge {
   height: 8px; background: var(--survol); border-radius: 999px;
@@ -545,6 +600,8 @@ body { background: var(--fond); color: var(--texte); }
   .bdg .legende { padding: calc(var(--pas) * 1.5) calc(var(--pas) * 1.5) calc(var(--pas) * 2); }
   .bdg .solde { text-align: right; }
   .bdg .duo { grid-template-columns: 1fr; gap: calc(var(--pas) * 3); }
+  .bdg .anneau { justify-content: center; gap: calc(var(--pas) * 2); }
+  .bdg .anneau-legende { max-width: none; }
   .bdg .champ { flex: 1 1 140px; }
   .bdg .carte-tete, .bdg .corps, .bdg .ligne { padding-left: calc(var(--pas) * 2); padding-right: calc(var(--pas) * 2); }
   /* Les onglets débordent volontairement : un dégradé au bord dit qu'il y a

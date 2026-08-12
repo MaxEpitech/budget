@@ -3,7 +3,8 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
 import Jauge from "./Jauge.jsx";
-import { euro, num, CATEGORIES, couleurBudget } from "../utiles.js";
+import Anneau from "./Anneau.jsx";
+import { euro, num, CATEGORIES, couleurBudget, teintePart } from "../utiles.js";
 
 /**
  * Enveloppes mensuelles par catégorie.
@@ -17,6 +18,7 @@ import { euro, num, CATEGORIES, couleurBudget } from "../utiles.js";
 
 export default function Budgets({ budgets, executer }) {
   const [f, setF] = useState({ categorie: "", montant: "" });
+  const [survolee, setSurvolee] = useState(null);
 
   // On ne propose que les catégories sans enveloppe : deux budgets concurrents
   // sur la même n'auraient aucun sens.
@@ -31,6 +33,27 @@ export default function Budgets({ budgets, executer }) {
 
   const depassements = budgets.filter((b) => b.consomme > b.montant);
 
+  // L'anneau dit où va l'argent, les barres en dessous disent si ça tient :
+  // un camembert ne sait pas montrer un dépassement, et une barre ne sait pas
+  // comparer deux postes entre eux. Les deux lectures sont complémentaires.
+  const consomme = budgets.reduce((s, b) => s + b.consomme, 0);
+  const enveloppes = budgets.reduce((s, b) => s + b.montant, 0);
+  const disponible = Math.max(0, enveloppes - consomme);
+
+  const parts = budgets.map((b, i) => ({
+    cle: b.categorie,
+    libelle: `${b.categorie} : ${euro(b.consomme)}`,
+    nom: b.categorie,
+    montant: Math.max(0, b.consomme),
+    enveloppe: b.montant,
+    couleur: teintePart(i),
+  }));
+  // Ce qui reste dans les enveloppes ferme le tour : sans cette part, un mois
+  // à peine entamé donnerait un anneau plein, donc rassurant à tort.
+  const partsAnneau = disponible > 0
+    ? [...parts, { cle: "__reste", nom: "Encore disponible", libelle: `Encore disponible : ${euro(disponible)}`, montant: disponible, couleur: "var(--bord)" }]
+    : parts;
+
   return (
     <Carte
       titre="Budgets par catégorie"
@@ -42,6 +65,42 @@ export default function Budgets({ budgets, executer }) {
             : `${depassements.length} enveloppe${depassements.length > 1 ? "s" : ""} dépassée${depassements.length > 1 ? "s" : ""}`
       }
     >
+      {budgets.length > 0 && (
+        <div className="corps anneau">
+          <Anneau
+            parts={partsAnneau}
+            actif={survolee}
+            onSurvol={setSurvolee}
+            centreHaut={euro(consomme)}
+            centreBas={`sur ${euro(enveloppes)}`}
+            titre={`Répartition du consommé : ${parts.map((p) => p.libelle).join(", ")}`}
+          />
+          <div className="anneau-legende">
+            {partsAnneau.map((p) => (
+              <button
+                key={p.cle}
+                className="anneau-ligne"
+                data-actif={survolee === p.cle ? "1" : "0"}
+                onMouseEnter={() => setSurvolee(p.cle)}
+                onMouseLeave={() => setSurvolee(null)}
+                onFocus={() => setSurvolee(p.cle)}
+                onBlur={() => setSurvolee(null)}
+              >
+                <span className="pastille" style={{ background: p.couleur }} />
+                <span className="anneau-nom">{p.nom}</span>
+                <span className="anneau-val chiffre">{euro(p.montant)}</span>
+                {/* « sur 500 € » et non « 25 % » : dans la légende d'un
+                    camembert, un pourcentage se lit comme une part du tour,
+                    alors qu'il s'agirait ici du remplissage de l'enveloppe. */}
+                <span className="anneau-part chiffre">
+                  {p.enveloppe > 0 ? `sur ${euro(p.enveloppe)}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {budgets.map((b) => {
         const part = b.montant > 0 ? b.consomme / b.montant : 0;
         const restant = b.montant - b.consomme;
