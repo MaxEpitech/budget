@@ -1,17 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { attraper, valider, modifierDansFoyer, supprimerDansFoyer } from "../middleware.js";
+import { attraper, valider, modifierDansFoyer, supprimerDansFoyer, pourValide } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { TransactionSchema } from "../schemas.js";
 import { transactionVersApi, transactionVersDb } from "../conversion.js";
 
 const routeur = Router();
-
-// `pour` doit désigner "foyer" ou un membre du foyer courant.
-async function pourValide(pour, foyerId) {
-  if (pour === "foyer") return true;
-  return Boolean(await prisma.membre.findFirst({ where: { id: pour, foyerId } }));
-}
 
 routeur.get("/", attraper(async (req, res) => {
   const foyerId = await foyerCourant(req);

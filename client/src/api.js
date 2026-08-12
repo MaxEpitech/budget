@@ -66,6 +66,7 @@ export const api = {
 
   credits: () => requete("/credits"),
   creerCredit: (c) => requete("/credits", "POST", c),
+  modifierCredit: (id, credit) => requete(`/credits/${id}`, "PUT", credit),
   supprimerCredit: (id, options) => requete(`/credits/${id}`, "DELETE", undefined, options),
 
   projets: () => requete("/projets"),

@@ -379,6 +379,59 @@ export function quotePart(revenu, totalRevenus, nbMembres, repartition) {
 }
 
 /**
+ * Ce que chacun doit au foyer, et ce qu'il lui reste.
+ *
+ * Une charge nominative ne se partage pas. Une dépense « pour untel » pesait
+ * déjà sur lui seul ; un crédit ou un support d'épargne qui lui appartient fait
+ * désormais de même. Sans cela, un prêt étudiant contracté par une personne se
+ * retrouvait réparti au prorata des revenus, et le reste à vivre de l'autre s'en
+ * trouvait amputé d'une dette qui ne la concernait pas.
+ *
+ * Les projets restent communs : ils portent déjà, versement par versement, le
+ * nom de qui a mis au pot.
+ *
+ * Cette fonction vit ici et non dans une route parce que le serveur et le client
+ * la calculent tous les deux — le premier pour servir /etat, le second pour
+ * répondre à la frappe sans aller-retour. Deux définitions auraient divergé, et
+ * l'ont déjà fait par le passé.
+ */
+export function repartirParMembre(
+  { membres = [], transactions = [], credits = [], projets = [], placements = [], repartition = "prorata" },
+  mois
+) {
+  const actifs = lignesDuMois(transactions, mois);
+  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
+  const appartientA = (x, cible) => (x.pour ?? "foyer") === cible;
+
+  // Un crédit soldé ne pèse plus, et l'assurance fait partie du prélèvement.
+  const echeanceDe = (c) => {
+    const k = Math.max(0, ecartMois(c.debut, mois));
+    return k >= c.duree ? 0 : echeanceTotale(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, k);
+  };
+
+  const creditsDe = (cible) => credits.filter((c) => appartientA(c, cible)).reduce((s, c) => s + echeanceDe(c), 0);
+  const placementsDe = (cible) => placements.filter((p) => appartientA(p, cible)).reduce((s, p) => s + p.versement, 0);
+  const depensesDe = (cible) =>
+    actifs.filter((t) => t.type === "depense" && t.pour === cible).reduce((s, t) => s + t.montant, 0);
+
+  const chargesFoyer =
+    depensesDe("foyer") +
+    creditsDe("foyer") +
+    projets.reduce((s, p) => s + p.versement, 0) +
+    placementsDe("foyer");
+
+  return membres.map((m) => {
+    const part = quotePart(m.revenu, salaires, membres.length, repartition);
+    const perso = depensesDe(m.id) + creditsDe(m.id) + placementsDe(m.id);
+    const bonus = actifs
+      .filter((t) => t.type === "revenu" && t.pour === m.id)
+      .reduce((s, t) => s + t.montant, 0);
+    const du = chargesFoyer * part;
+    return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
+  });
+}
+
+/**
  * Reste à vivre du foyer :
  * revenus − dépenses − mensualités crédits − versements projets − versements placements.
  */

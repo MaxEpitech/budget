@@ -95,6 +95,32 @@ const CAS_NON_NUMERIQUES = {
       { recurrent: false, mois: "2026-07", montant: 68 },
     ], "2026-08"],
   ],
+  repartirParMembre: [
+    [{
+      membres: [{ id: "a", nom: "Maxime", revenu: 3050 }, { id: "b", nom: "Estelle", revenu: 1980 }],
+      transactions: [
+        { type: "depense", pour: "foyer", recurrent: true, periodicite: "mensuel", debut: null, fin: null, montant: 980 },
+        { type: "depense", pour: "a", recurrent: false, mois: "2026-08", montant: 26 },
+        { type: "revenu", pour: "a", recurrent: false, mois: "2026-08", montant: 300 },
+      ],
+      credits: [
+        { capital: 105000, taux: 3.5, duree: 300, debut: "2024-06", assuranceTaux: 0.34, assuranceBase: "initial", pour: "foyer" },
+        { capital: 14000, taux: 3.9, duree: 60, debut: "2025-03", assuranceTaux: 0, assuranceBase: "initial", pour: "b" },
+      ],
+      projets: [{ versement: 250 }],
+      placements: [{ versement: 150, pour: "foyer" }, { versement: 80, pour: "a" }],
+      repartition: "prorata",
+    }, "2026-08"],
+    [{
+      membres: [{ id: "a", nom: "Maxime", revenu: 3050 }, { id: "b", nom: "Estelle", revenu: 1980 }],
+      transactions: [],
+      credits: [{ capital: 14000, taux: 3.9, duree: 60, debut: "2025-03", pour: "b" }],
+      projets: [],
+      placements: [],
+      repartition: "moitie",
+    }, "2026-08"],
+    [{ membres: [], transactions: [], credits: [], projets: [], placements: [] }, "2026-08"],
+  ],
   totauxDuMois: [
     [{
       membres: [{ id: 1, revenu: 3050 }, { id: 2, revenu: 1980 }],

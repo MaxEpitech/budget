@@ -12,7 +12,8 @@ const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
 export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
   const [horizon, setHorizon] = useState(10);
   const [ouvert, setOuvert] = useState(null);
-  const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
+  const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "", pour: "foyer" });
+  const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
 
   const ajouter = () => {
     if (!f.libelle.trim()) return;
@@ -23,9 +24,10 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
         versement: num(f.versement),
         rendement: num(f.rendement),
         plafond: plafondSaisi(f.plafond),
+        pour: f.pour,
       })
     );
-    setF({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
+    setF({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "", pour: "foyer" });
   };
 
   const valeurTotale = etat.placements.reduce((s, p) => s + p.valeur, 0);
@@ -96,6 +98,7 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
               <div style={{ minWidth: 140 }}>
                 <div className="ligne-lib">
                   {p.libelle}{" "}
+                  <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, p.pour) }}>{nomDe(p.pour)}</span>
                   {atteint && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Plafond atteint</span>}
                 </div>
                 <div className="ligne-meta">
@@ -120,6 +123,8 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
                 <Champ libelle="/mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur={85} />
                 <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
                 <Champ libelle="Plafond" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur={100} placeholder="aucun" />
+                <Champ libelle="Pour qui" valeur={p.pour} onChange={(v) => modifier("placements", p.id, { pour: v })} largeur={120}
+                  options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
               </div>
               <button className="suppr" onClick={() => supprimer("placements", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
             </div>
@@ -152,6 +157,8 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
             <Champ libelle="Versement /mois" valeur={f.versement} onChange={(v) => setF({ ...f, versement: v })} largeur={130} placeholder="0" onEntree={ajouter} />
             <Champ libelle="Rendement %" valeur={f.rendement} onChange={(v) => setF({ ...f, rendement: v })} largeur={110} placeholder="0" onEntree={ajouter} />
             <Champ libelle="Plafond" valeur={f.plafond} onChange={(v) => setF({ ...f, plafond: v })} largeur={110} placeholder="aucun" onEntree={ajouter} />
+            <Champ libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={130}
+              options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
             <button className="btn" onClick={ajouter}>Ajouter</button>
           </div>
         </div>

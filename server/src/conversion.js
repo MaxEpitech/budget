@@ -67,6 +67,7 @@ export const creditVersApi = (c) => ({
   debut: c.moisDebut,
   assuranceTaux: c.assuranceTaux,
   assuranceBase: c.assuranceBase,
+  pour: c.membreId ?? "foyer",
 });
 
 export const creditVersDb = (d) => ({
@@ -79,6 +80,8 @@ export const creditVersDb = (d) => ({
   // exactement ce qu'il était.
   assuranceTaux: d.assuranceTaux ?? 0,
   assuranceBase: d.assuranceBase ?? "initial",
+  // "foyer" et l'absence de champ valent la même chose : personne en propre.
+  membreId: !d.pour || d.pour === "foyer" ? null : d.pour,
 });
 
 /* ─── Projet — l'épargne est la somme des versements, jamais un champ stocké ─── */
@@ -127,6 +130,7 @@ export const placementVersApi = (p) => ({
   versement: enEuros(p.versementMensuel),
   rendement: p.rendement,
   plafond: p.plafond == null ? null : enEuros(p.plafond),
+  pour: p.membreId ?? "foyer",
   // Les mouvements accompagnent toujours le support : c'est leur somme qui dit
   // ce qui a réellement été mis de côté, quand la valeur, elle, comprend aussi
   // les intérêts.
@@ -141,6 +145,8 @@ export const placementVersDb = (d) => {
   if (d.rendement !== undefined) patch.rendement = d.rendement;
   // null efface le plafond, une valeur le pose.
   if (d.plafond !== undefined) patch.plafond = d.plafond == null ? null : enCentimes(d.plafond);
+  // "foyer" remet le support en commun ; l'absence de champ ne change rien.
+  if (d.pour !== undefined) patch.membreId = d.pour === "foyer" ? null : d.pour;
   return patch;
 };
 

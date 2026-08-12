@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { attraper, valider, modifierDansFoyer, supprimerDansFoyer } from "../middleware.js";
+import { attraper, valider, modifierDansFoyer, supprimerDansFoyer, pourValide } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { CreditSchema } from "../schemas.js";
 import { creditVersApi, creditVersDb } from "../conversion.js";
@@ -13,14 +13,22 @@ routeur.get("/", attraper(async (req, res) => {
   res.json(credits.map(creditVersApi));
 }));
 
+const refuserMembreInconnu = async (req, res, foyerId) => {
+  if (await pourValide(req.donnees.pour, foyerId)) return false;
+  res.status(400).json({ erreur: "pour : membre inconnu" });
+  return true;
+};
+
 routeur.post("/", valider(CreditSchema), attraper(async (req, res) => {
   const foyerId = await foyerCourant(req);
+  if (await refuserMembreInconnu(req, res, foyerId)) return;
   const credit = await prisma.credit.create({ data: { ...creditVersDb(req.donnees), foyerId } });
   res.status(201).json(creditVersApi(credit));
 }));
 
 routeur.put("/:id", valider(CreditSchema), attraper(async (req, res) => {
   const foyerId = await foyerCourant(req);
+  if (await refuserMembreInconnu(req, res, foyerId)) return;
   const credit = await modifierDansFoyer(res, "Crédit", prisma.credit, req.params.id, foyerId, creditVersDb(req.donnees));
   if (credit) res.json(creditVersApi(credit));
 }));

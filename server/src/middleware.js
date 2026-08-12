@@ -1,4 +1,5 @@
 // Middlewares et aides partagés par les routes.
+import { prisma } from "./db.js";
 
 // Express 4 ne remonte pas les rejets des handlers async : on les attrape ici.
 export const attraper = (fn) => (req, res, next) =>
@@ -49,4 +50,16 @@ export async function supprimerDansFoyer(res, nom, modele, id, foyerId) {
     return false;
   }
   return true;
+}
+
+/**
+ * « pour » désigne-t-il le foyer, ou un membre de ce foyer ?
+ *
+ * Le contrôle porte sur le foyer courant : un identifiant de membre venu
+ * d'ailleurs doit être refusé comme un identifiant inexistant, sans dire lequel
+ * des deux il est.
+ */
+export async function pourValide(pour, foyerId) {
+  if (pour === undefined || pour === "foyer") return true;
+  return Boolean(await prisma.membre.findFirst({ where: { id: pour, foyerId } }));
 }

@@ -23,6 +23,7 @@ import {
   resteAVivre,
   versementRequis,
   totauxDuMois,
+  repartirParMembre,
 } from "../src/finance.js";
 
 const proche = (obtenu, attendu, tolerance, message) =>
@@ -309,6 +310,84 @@ test("indemnité : le plafond de 3 % prend le relais quand le taux est élevé",
 test("indemnité : nulle à taux zéro, et jamais négative", () => {
   assert.equal(indemniteAnticipee(5000, 99083, 0), 0);
   assert.equal(indemniteAnticipee(-5000, 99083, 3.5), 0);
+});
+
+/* ─── Répartition par membre ─── */
+
+const FOYER = {
+  membres: [{ id: "a", nom: "Maxime", revenu: 3000 }, { id: "b", nom: "Estelle", revenu: 1000 }],
+  transactions: [{ type: "depense", pour: "foyer", recurrent: true, periodicite: "mensuel", debut: null, fin: null, montant: 1000 }],
+  projets: [],
+  placements: [],
+  credits: [],
+  repartition: "prorata",
+};
+
+test("répartition : sans charge nominative, chacun paie sa quote-part", () => {
+  const [maxime, estelle] = repartirParMembre(FOYER, "2026-08");
+  proche(maxime.du, 750, 1e-9, "quote-part de 75 %");
+  proche(estelle.du, 250, 1e-9, "quote-part de 25 %");
+  assert.equal(maxime.perso, 0);
+});
+
+test("répartition : un crédit nominatif pèse sur son porteur, pas sur le foyer", () => {
+  const credit = { capital: 12000, taux: 0, duree: 24, debut: "2026-01", pour: "b" };
+  const [maxime, estelle] = repartirParMembre({ ...FOYER, credits: [credit] }, "2026-08");
+
+  // 500 €/mois de mensualité : ils sortent entièrement du reste à vivre
+  // d'Estelle, et n'entrent pas dans la quote-part de Maxime.
+  proche(estelle.perso, 500, 1e-9, "la mensualité revient à Estelle");
+  assert.equal(maxime.perso, 0);
+  proche(maxime.du, 750, 1e-9, "la quote-part de Maxime ne bouge pas");
+});
+
+test("répartition : le même crédit laissé au foyer se partage", () => {
+  const credit = { capital: 12000, taux: 0, duree: 24, debut: "2026-01", pour: "foyer" };
+  const [maxime, estelle] = repartirParMembre({ ...FOYER, credits: [credit] }, "2026-08");
+  assert.equal(estelle.perso, 0);
+  proche(maxime.du, 1125, 1e-9, "75 % de 1 500 €");
+  proche(estelle.du, 375, 1e-9, "25 % de 1 500 €");
+});
+
+test("répartition : un crédit sans « pour » vaut « foyer »", () => {
+  const sans = { capital: 12000, taux: 0, duree: 24, debut: "2026-01" };
+  const avec = { ...sans, pour: "foyer" };
+  assert.deepEqual(
+    repartirParMembre({ ...FOYER, credits: [sans] }, "2026-08"),
+    repartirParMembre({ ...FOYER, credits: [avec] }, "2026-08")
+  );
+});
+
+test("répartition : un support nominatif pèse sur son propriétaire", () => {
+  const [maxime, estelle] = repartirParMembre(
+    { ...FOYER, placements: [{ versement: 200, pour: "a" }] },
+    "2026-08"
+  );
+  proche(maxime.perso, 200, 1e-9, "le versement revient à Maxime");
+  assert.equal(estelle.perso, 0);
+  proche(estelle.du, 250, 1e-9, "la quote-part d'Estelle ne bouge pas");
+});
+
+test("répartition : le crédit soldé ne pèse sur personne", () => {
+  const credit = { capital: 12000, taux: 0, duree: 24, debut: "2020-01", pour: "b" };
+  const [, estelle] = repartirParMembre({ ...FOYER, credits: [credit] }, "2026-08");
+  assert.equal(estelle.perso, 0);
+});
+
+test("répartition : l'assurance d'un crédit nominatif suit le crédit", () => {
+  const base = { capital: 12000, taux: 0, duree: 24, debut: "2026-01", pour: "b" };
+  const sans = repartirParMembre({ ...FOYER, credits: [base] }, "2026-08")[1].perso;
+  const avec = repartirParMembre({ ...FOYER, credits: [{ ...base, assuranceTaux: 0.6, assuranceBase: "initial" }] }, "2026-08")[1].perso;
+  proche(avec - sans, 12000 * (0.6 / 100 / 12), 1e-9, "cotisation d'assurance");
+});
+
+test("répartition : ce qui est nominatif sort de la quote-part, jamais des deux côtés", () => {
+  const credit = { capital: 12000, taux: 0, duree: 24, debut: "2026-01", pour: "b" };
+  const commun = repartirParMembre({ ...FOYER, credits: [{ ...credit, pour: "foyer" }] }, "2026-08");
+  const nominatif = repartirParMembre({ ...FOYER, credits: [credit] }, "2026-08");
+  // Le foyer sort la même somme dans les deux cas : seule sa répartition change.
+  const total = (r) => r.reduce((s, m) => s + m.du + m.perso, 0);
+  proche(total(commun), total(nominatif), 1e-9, "somme des charges");
 });
 
 /* ─── Assurance emprunteur ─── */

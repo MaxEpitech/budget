@@ -56,6 +56,8 @@ export const CreditSchema = z.object({
   // Assurance emprunteur : facultative, absente vaut « pas d'assurance ».
   assuranceTaux: positifOuNul("taux d'assurance").optional(),
   assuranceBase: z.enum(["initial", "restant"], "base d'assurance : « initial » ou « restant » attendu").optional(),
+  // À qui appartient l'emprunt : "foyer" par défaut, ou l'id d'un membre.
+  pour: chaine("pour").optional(),
 });
 
 export const ProjetSchema = z.object({
@@ -87,6 +89,8 @@ export const PlacementSchema = z.object({
   rendement: nombre("rendement"),
   // Plafond de versements ; null ou absent = pas de plafond.
   plafond: montantPositif("plafond").nullish(),
+  // À qui appartient le support : "foyer" par défaut, ou l'id d'un membre.
+  pour: chaine("pour").optional(),
 });
 export const PlacementPartielSchema = PlacementSchema.partial();
 

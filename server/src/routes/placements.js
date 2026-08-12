@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { attraper, valider, modifierDansFoyer, supprimerDansFoyer } from "../middleware.js";
+import { attraper, valider, modifierDansFoyer, supprimerDansFoyer, pourValide } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { PlacementSchema, PlacementPartielSchema, MouvementSchema } from "../schemas.js";
 import { placementVersApi, placementVersDb, mouvementVersApi, enCentimes } from "../conversion.js";
@@ -17,14 +17,22 @@ routeur.get("/", attraper(async (req, res) => {
   res.json(placements.map(placementVersApi));
 }));
 
+const refuserMembreInconnu = async (req, res, foyerId) => {
+  if (await pourValide(req.donnees.pour, foyerId)) return false;
+  res.status(400).json({ erreur: "pour : membre inconnu" });
+  return true;
+};
+
 routeur.post("/", valider(PlacementSchema), attraper(async (req, res) => {
   const foyerId = await foyerCourant(req);
+  if (await refuserMembreInconnu(req, res, foyerId)) return;
   const placement = await prisma.placement.create({ data: { ...placementVersDb(req.donnees), foyerId }, include: avecMouvements });
   res.status(201).json(placementVersApi(placement));
 }));
 
 routeur.put("/:id", valider(PlacementPartielSchema), attraper(async (req, res) => {
   const foyerId = await foyerCourant(req);
+  if (await refuserMembreInconnu(req, res, foyerId)) return;
   const modifie = await modifierDansFoyer(res, "Placement", prisma.placement, req.params.id, foyerId, placementVersDb(req.donnees));
   if (!modifie) return;
   const placement = await prisma.placement.findUnique({ where: { id: modifie.id }, include: avecMouvements });
@@ -53,11 +61,8 @@ routeur.post("/:id/mouvements", valider(MouvementSchema), attraper(async (req, r
   const placement = await prisma.placement.findFirst({ where: { id: req.params.id, foyerId } });
   if (!placement) return res.status(404).json({ erreur: "Placement introuvable" });
 
-  // `pour` doit désigner "foyer" ou un membre du foyer courant.
   const { pour, type } = req.donnees;
-  if (pour !== "foyer" && !(await prisma.membre.findFirst({ where: { id: pour, foyerId } }))) {
-    return res.status(400).json({ erreur: "pour : membre inconnu" });
-  }
+  if (await refuserMembreInconnu(req, res, foyerId)) return;
 
   const montant = enCentimes(req.donnees.montant);
   const signe = type === "retrait" ? -1 : 1;

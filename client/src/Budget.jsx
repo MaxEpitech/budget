@@ -2,7 +2,7 @@
 // données servies par l'API (/api/etat) au lieu du stockage navigateur.
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
-import { mensualite, capitalRestant, cotisationAssurance } from "./finance.js";
+import { mensualite, capitalRestant, cotisationAssurance, repartirParMembre } from "./finance.js";
 import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
 import Flux from "./onglets/Flux.jsx";
 import Historique from "./onglets/Historique.jsx";
@@ -245,16 +245,19 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
     const placements = etat.placements.reduce((s, p) => s + p.versement, 0);
     const reste = revenus - depenses - credits - projets - placements;
 
-    // Répartition par membre
-    const communes = actifs.filter((t) => t.type === "depense" && t.pour === "foyer").reduce((s, t) => s + t.montant, 0);
-    const chargesFoyer = communes + credits + projets + placements;
-    const parMembre = etat.membres.map((m) => {
-      const part = etat.repartition === "moitie" ? 1 / etat.membres.length : salaires ? m.revenu / salaires : 0;
-      const perso = actifs.filter((t) => t.type === "depense" && t.pour === m.id).reduce((s, t) => s + t.montant, 0);
-      const bonus = actifs.filter((t) => t.type === "revenu" && t.pour === m.id).reduce((s, t) => s + t.montant, 0);
-      const du = chargesFoyer * part;
-      return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
-    });
+    // Répartition par membre : la même fonction que celle du serveur, pour que
+    // l'écran et l'API ne puissent pas raconter deux choses différentes.
+    const parMembre = repartirParMembre(
+      {
+        membres: etat.membres,
+        transactions: etat.transactions,
+        credits: etat.credits,
+        projets: etat.projets,
+        placements: etat.placements,
+        repartition: etat.repartition,
+      },
+      mois
+    );
 
     const total = Math.max(revenus, depenses + credits + projets + placements);
     const parts = {

@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { attraper } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { MoisSchema } from "../schemas.js";
-import { mensualite, capitalRestant, quotePart, echeanceCeMois } from "../finance.js";
+import { mensualite, capitalRestant, echeanceCeMois, repartirParMembre } from "../finance.js";
 import { moisCourant, ecartMois } from "../mois.js";
 import {
   membreVersApi,
@@ -72,27 +72,13 @@ routeur.get("/", attraper(async (req, res) => {
     };
   });
 
-  // Répartition par membre — mêmes règles que le prototype.
-  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
-  const mensualitesCredits = credits.filter((c) => !c.solde).reduce((s, c) => s + c.mensualite, 0);
-  const versementsProjets = projets.reduce((s, p) => s + p.versement, 0);
-  const versementsPlacements = placements.reduce((s, p) => s + p.versement, 0);
-  const communes = transactions
-    .filter((t) => t.type === "depense" && t.pour === "foyer")
-    .reduce((s, t) => s + t.montant, 0);
-  const chargesFoyer = communes + mensualitesCredits + versementsProjets + versementsPlacements;
-
-  const parMembre = membres.map((m) => {
-    const part = quotePart(m.revenu, salaires, membres.length, repartition);
-    const perso = transactions
-      .filter((t) => t.type === "depense" && t.pour === m.id)
-      .reduce((s, t) => s + t.montant, 0);
-    const bonus = transactions
-      .filter((t) => t.type === "revenu" && t.pour === m.id)
-      .reduce((s, t) => s + t.montant, 0);
-    const du = chargesFoyer * part;
-    return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
-  });
+  // Répartition par membre. Le calcul vit dans finance.js parce que le client
+  // le refait de son côté pour répondre à la frappe sans aller-retour : deux
+  // définitions auraient divergé, et l'ont déjà fait.
+  const parMembre = repartirParMembre(
+    { membres, transactions, credits, projets, placements, repartition },
+    mois
+  );
 
   res.json({ mois, repartition, membres, transactions, credits, projets, placements, budgets, parMembre });
 }));

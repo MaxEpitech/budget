@@ -153,6 +153,8 @@ model Membre {
   creeLe              DateTime             @default(now())
   modifieLe           DateTime             @updatedAt
   mouvementPlacements MouvementPlacement[]
+  credits             Credit[]
+  placements          Placement[]
 
   @@index([foyerId])
 }
@@ -220,12 +222,17 @@ model Credit {
   // du simple au double sur vingt-cinq ans.
   assuranceTaux Float    @default(0) // taux annuel, en %
   assuranceBase String   @default("initial") // "initial" | "restant"
+  // À qui appartient l'emprunt : null = le foyer, sinon la personne qui le
+  // porte seule. Sa mensualité pèse alors sur elle et non sur la quote-part.
+  membre        Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId      String?
   foyer         Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId       Int
   creeLe        DateTime @default(now())
   modifieLe     DateTime @updatedAt
 
   @@index([foyerId])
+  @@index([membreId])
 }
 
 model Projet {
@@ -278,6 +285,9 @@ model Placement {
   rendement        Float // rendement annuel, en %
   // Plafond de versements (livrets réglementés) ; null = pas de plafond.
   plafond          Int? // centimes
+  // À qui appartient le support : null = le foyer, sinon la personne seule.
+  membre           Membre?              @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId         String?
   mouvements       MouvementPlacement[]
   foyer            Foyer                @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId          Int
@@ -285,6 +295,7 @@ model Placement {
   modifieLe        DateTime             @updatedAt
 
   @@index([foyerId])
+  @@index([membreId])
 }
 
 // Ce qu'on verse ou retire d'un support, acte par acte. Les intérêts n'y

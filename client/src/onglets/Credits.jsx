@@ -4,12 +4,13 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
-import { euro, euroPrecis, num, libelleMois, decalerMois } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, decalerMois, teinteMembre } from "../utiles.js";
 import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
-  const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial" });
+  const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
   const [ouvert, setOuvert] = useState(null);
+  const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
   // Un seul panneau ouvert à la fois : « amortissement » ou « anticipation ».
   const [panneau, setPanneau] = useState(null);
 
@@ -24,9 +25,10 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         debut: f.debut,
         assuranceTaux: num(f.assuranceTaux),
         assuranceBase: f.assuranceBase,
+        pour: f.pour,
       })
     );
-    setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial" });
+    setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
   };
 
   const totalRestant = calc.creditsActifs.reduce((s, c) => s + c.restant, 0);
@@ -109,7 +111,9 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
               <div className="ligne">
                 <div style={{ minWidth: 0 }}>
                   <div className="ligne-lib">
-                    {c.libelle} {c.solde && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Soldé</span>}
+                    {c.libelle}{" "}
+                    <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, c.pour) }}>{nomDe(c.pour)}</span>
+                    {c.solde && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Soldé</span>}
                   </div>
                   <div className="ligne-meta">
                     {euro(c.capital)} sur {c.duree} mois à {c.taux}% · échéance {libelleMois(fin)}
@@ -119,6 +123,14 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                       ` · assurance ${c.assuranceTaux}% sur le capital ${c.assuranceBase === "restant" ? "restant dû" : "initial"}`}
                   </div>
                 </div>
+                {/* Le propriétaire se change après coup : les crédits saisis
+                    avant cette possibilité étaient tous communs par défaut. */}
+                <Champ libelle="Pour qui" valeur={c.pour} largeur={125}
+                  onChange={(v) => executer(() => api.modifierCredit(c.id, {
+                    libelle: c.libelle, capital: c.capital, taux: c.taux, duree: c.duree,
+                    debut: c.debut, assuranceTaux: c.assuranceTaux, assuranceBase: c.assuranceBase, pour: v,
+                  }))}
+                  options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
                 <div className="pousse" style={{ textAlign: "right" }}>
                   <div className="chiffre montant">{c.solde ? "—" : euro(c.echeance) + " /mois"}</div>
                   <div className="ligne-meta">
@@ -158,6 +170,8 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
             <Champ libelle="Durée (mois)" valeur={f.duree} onChange={(v) => setF({ ...f, duree: v })} largeur={110} placeholder="0" onEntree={ajouter} />
             <Champ libelle="1re échéance" valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur={130} type="month" />
             <Champ libelle="Assurance %/an" valeur={f.assuranceTaux} onChange={(v) => setF({ ...f, assuranceTaux: v })} largeur={120} placeholder="0" onEntree={ajouter} />
+            <Champ libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={130}
+              options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
             <Champ libelle="Assurance sur" valeur={f.assuranceBase} onChange={(v) => setF({ ...f, assuranceBase: v })} largeur={185}
               options={[{ v: "initial", l: "Le capital initial" }, { v: "restant", l: "Le capital restant dû" }]} />
             <button className="btn" onClick={ajouter}>Ajouter</button>

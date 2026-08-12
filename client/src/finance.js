@@ -295,6 +295,45 @@ export function versementRequis(objectif, epargne, moisRestants) {
   return restant / Math.max(1, moisRestants);
 }
 
+// Ce que chacun doit au foyer, et ce qu'il lui reste. Une charge nominative ne
+// se partage pas : un crédit ou un support qui appartient à une personne pèse
+// sur elle seule, comme une dépense « pour untel ». Les projets restent communs
+// — ils portent déjà, versement par versement, le nom de qui a mis au pot.
+export function repartirParMembre(
+  { membres = [], transactions = [], credits = [], projets = [], placements = [], repartition = "prorata" },
+  mois
+) {
+  const actifs = lignesDuMois(transactions, mois);
+  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
+  const appartientA = (x, cible) => (x.pour ?? "foyer") === cible;
+
+  const echeanceDe = (c) => {
+    const k = Math.max(0, ecartMois(c.debut, mois));
+    return k >= c.duree ? 0 : echeanceTotale(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, k);
+  };
+
+  const creditsDe = (cible) => credits.filter((c) => appartientA(c, cible)).reduce((s, c) => s + echeanceDe(c), 0);
+  const placementsDe = (cible) => placements.filter((p) => appartientA(p, cible)).reduce((s, p) => s + p.versement, 0);
+  const depensesDe = (cible) =>
+    actifs.filter((t) => t.type === "depense" && t.pour === cible).reduce((s, t) => s + t.montant, 0);
+
+  const chargesFoyer =
+    depensesDe("foyer") +
+    creditsDe("foyer") +
+    projets.reduce((s, p) => s + p.versement, 0) +
+    placementsDe("foyer");
+
+  return membres.map((m) => {
+    const part = quotePart(m.revenu, salaires, membres.length, repartition);
+    const perso = depensesDe(m.id) + creditsDe(m.id) + placementsDe(m.id);
+    const bonus = actifs
+      .filter((t) => t.type === "revenu" && t.pour === m.id)
+      .reduce((s, t) => s + t.montant, 0);
+    const du = chargesFoyer * part;
+    return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
+  });
+}
+
 export function resteAVivre({ revenus, depenses, mensualitesCredits, versementsProjets, versementsPlacements }) {
   return revenus - depenses - mensualitesCredits - versementsProjets - versementsPlacements;
 }
