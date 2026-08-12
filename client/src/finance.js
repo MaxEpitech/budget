@@ -21,6 +21,36 @@ export function capitalRestant(capital, tauxAnnuel, dureeMois, k) {
   return Math.max(0, capital * f - M * ((f - 1) / r));
 }
 
+// Cotisation d'assurance d'une échéance. Deux bases, toutes deux courantes :
+// « initial » (cotisation constante) et « restant » (décroissante). L'écart
+// entre elles atteint le double sur vingt-cinq ans.
+export function cotisationAssurance(capitalInitial, capitalRestantDu, tauxAssurance, base = "initial") {
+  if (!tauxAssurance) return 0;
+  const assiette = base === "restant" ? capitalRestantDu : capitalInitial;
+  return Math.max(0, assiette) * (tauxAssurance / 100 / 12);
+}
+
+// Assurance payée sur les k premières échéances. À base dégressive il faut
+// sommer : le capital restant dû n'a pas de moyenne simple.
+export function assurancePayee(capital, tauxAnnuel, dureeMois, tauxAssurance, base, k) {
+  if (!tauxAssurance) return 0;
+  const echeances = Math.max(0, Math.min(k, dureeMois));
+  const mensuel = tauxAssurance / 100 / 12;
+  if (base !== "restant") return capital * mensuel * echeances;
+  let total = 0;
+  for (let i = 0; i < echeances; i++) {
+    total += capitalRestant(capital, tauxAnnuel, dureeMois, i) * mensuel;
+  }
+  return total;
+}
+
+// Ce qui est réellement prélevé chaque mois : la mensualité et son assurance.
+export function echeanceTotale(capital, tauxAnnuel, dureeMois, tauxAssurance, base, k = 0) {
+  const M = mensualite(capital, tauxAnnuel, dureeMois);
+  const restant = capitalRestant(capital, tauxAnnuel, dureeMois, k);
+  return M + cotisationAssurance(capital, restant, tauxAssurance, base);
+}
+
 // Ce que le crédit coûte en tout : la somme des mensualités moins le capital
 export function coutTotal(capital, tauxAnnuel, dureeMois) {
   if (!capital || !dureeMois) return 0;
@@ -222,7 +252,8 @@ export function totauxDuMois({ membres = [], transactions = [], credits = [], pr
   // Un crédit soldé ne pèse plus : sa dernière échéance est passée.
   const mensualites = credits.reduce((s, c) => {
     const k = Math.max(0, ecartMois(c.debut, mois));
-    return k >= c.duree ? s : s + mensualite(c.capital, c.taux, c.duree);
+    if (k >= c.duree) return s;
+    return s + echeanceTotale(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, k);
   }, 0);
 
   const versementsProjets = projets.reduce((s, p) => s + p.versement, 0);

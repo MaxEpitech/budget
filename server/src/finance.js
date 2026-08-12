@@ -32,6 +32,53 @@ export function capitalRestant(capital, tauxAnnuel, dureeMois, k) {
 }
 
 /**
+ * Cotisation d'assurance emprunteur pour une échéance donnée.
+ *
+ * Deux bases, toutes deux courantes, et l'écart entre elles atteint le double
+ * sur vingt-cinq ans :
+ *   « initial » — le taux porte sur le capital emprunté, la cotisation ne bouge
+ *                 pas de toute la durée ;
+ *   « restant » — il porte sur le capital restant dû, la cotisation décroît.
+ *
+ * L'assiette est passée par l'appelant plutôt que recalculée ici : c'est lui
+ * qui sait à quelle échéance il se trouve.
+ */
+export function cotisationAssurance(capitalInitial, capitalRestantDu, tauxAssurance, base = "initial") {
+  if (!tauxAssurance) return 0;
+  const assiette = base === "restant" ? capitalRestantDu : capitalInitial;
+  return Math.max(0, assiette) * (tauxAssurance / 100 / 12);
+}
+
+/**
+ * Assurance payée sur les k premières échéances, et sur toute la durée quand
+ * k vaut la durée. À base constante c'est une multiplication ; à base
+ * dégressive il faut sommer, le capital restant dû n'ayant pas de moyenne
+ * simple.
+ */
+export function assurancePayee(capital, tauxAnnuel, dureeMois, tauxAssurance, base, k) {
+  if (!tauxAssurance) return 0;
+  const echeances = Math.max(0, Math.min(k, dureeMois));
+  const mensuel = tauxAssurance / 100 / 12;
+  if (base !== "restant") return capital * mensuel * echeances;
+  let total = 0;
+  for (let i = 0; i < echeances; i++) {
+    total += capitalRestant(capital, tauxAnnuel, dureeMois, i) * mensuel;
+  }
+  return total;
+}
+
+/**
+ * Ce qui est réellement prélevé chaque mois : la mensualité et son assurance.
+ * C'est ce montant, et non la seule mensualité, que les banques rapportent aux
+ * revenus pour juger d'un endettement.
+ */
+export function echeanceTotale(capital, tauxAnnuel, dureeMois, tauxAssurance, base, k = 0) {
+  const M = mensualite(capital, tauxAnnuel, dureeMois);
+  const restant = capitalRestant(capital, tauxAnnuel, dureeMois, k);
+  return M + cotisationAssurance(capital, restant, tauxAssurance, base);
+}
+
+/**
  * Ce que le crédit coûte en tout : la somme des mensualités moins le capital
  * emprunté. C'est le seul chiffre qui répond à « combien me coûte cet
  * emprunt » — la mensualité, elle, ne dit que ce qu'il pèse chaque mois.
@@ -290,10 +337,13 @@ export function totauxDuMois({ membres = [], transactions = [], credits = [], pr
   const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
   const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);
 
-  // Un crédit soldé ne pèse plus : sa dernière échéance est passée.
+  // Un crédit soldé ne pèse plus : sa dernière échéance est passée. L'assurance
+  // fait partie du prélèvement — l'omettre annoncerait un reste à vivre que
+  // personne n'a jamais eu sur son compte.
   const mensualites = credits.reduce((s, c) => {
     const k = Math.max(0, ecartMois(c.debut, mois));
-    return k >= c.duree ? s : s + mensualite(c.capital, c.taux, c.duree);
+    if (k >= c.duree) return s;
+    return s + echeanceTotale(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, k);
   }, 0);
 
   const versementsProjets = projets.reduce((s, p) => s + p.versement, 0);

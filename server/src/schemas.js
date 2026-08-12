@@ -53,6 +53,9 @@ export const CreditSchema = z.object({
   taux: positifOuNul("taux"),
   duree: nombre("durée").int("durée : nombre entier de mois attendu").positive("durée : doit être supérieure à 0"),
   debut: MoisSchema,
+  // Assurance emprunteur : facultative, absente vaut « pas d'assurance ».
+  assuranceTaux: positifOuNul("taux d'assurance").optional(),
+  assuranceBase: z.enum(["initial", "restant"], "base d'assurance : « initial » ou « restant » attendu").optional(),
 });
 
 export const ProjetSchema = z.object({

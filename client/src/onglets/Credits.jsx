@@ -5,10 +5,10 @@ import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import { euro, euroPrecis, num, libelleMois, decalerMois } from "../utiles.js";
-import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation } from "../finance.js";
+import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
-  const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois });
+  const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial" });
   const [ouvert, setOuvert] = useState(null);
   // Un seul panneau ouvert à la fois : « amortissement » ou « anticipation ».
   const [panneau, setPanneau] = useState(null);
@@ -22,9 +22,11 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         taux: num(f.taux),
         duree: Math.round(num(f.duree)),
         debut: f.debut,
+        assuranceTaux: num(f.assuranceTaux),
+        assuranceBase: f.assuranceBase,
       })
     );
-    setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois });
+    setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial" });
   };
 
   const totalRestant = calc.creditsActifs.reduce((s, c) => s + c.restant, 0);
@@ -33,13 +35,19 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   // jamais son prix.
   const totalInterets = etat.credits.reduce((s, c) => s + coutTotal(c.capital, c.taux, c.duree), 0);
   const interetsVerses = calc.creditsActifs.reduce((s, c) => s + interetsPayes(c.capital, c.taux, c.duree, c.k), 0);
+  // L'assurance est comptée à part : ce n'est pas le prix de l'argent prêté,
+  // mais celui d'une garantie. Les additionner masquerait laquelle peut se
+  // renégocier — et c'est presque toujours l'assurance.
+  const totalAssurance = etat.credits.reduce((s, c) => s + assurancePayee(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, c.duree), 0);
+  const assuranceVersee = calc.creditsActifs.reduce((s, c) => s + assurancePayee(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, c.k), 0);
+  const capitalEmprunte = etat.credits.reduce((s, c) => s + c.capital, 0);
 
   return (
     <>
       <div className="duo">
         <Carte titre="Mensualités">
           <div className="corps">
-            <div className="stat-lib">Total dû chaque mois</div>
+            <div className="stat-lib">Prélevé chaque mois, assurance comprise</div>
             <div className="stat-val chiffre">{euro(calc.credits)}</div>
             <div className="carte-note" style={{ marginTop: 4 }}>
               {calc.revenus ? Math.round((calc.credits / calc.revenus) * 100) : 0}% des revenus du foyer
@@ -65,22 +73,26 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
       </div>
 
       {etat.credits.length > 0 && (
-        <Carte titre="Coût des emprunts" note="Les intérêts, seule chose que le crédit ajoute au prix">
+        <Carte titre="Coût des emprunts" note="Intérêts et assurance : tout ce que le crédit ajoute au prix">
           <div className="corps duo">
             <div>
-              <div className="stat-lib">Intérêts sur toute la durée</div>
-              <div className="stat-val chiffre" style={{ color: "var(--brique)" }}>{euro(totalInterets)}</div>
+              <div className="stat-lib">Coût sur toute la durée</div>
+              <div className="stat-val chiffre" style={{ color: "var(--brique)" }}>{euro(totalInterets + totalAssurance)}</div>
               <div className="carte-note" style={{ marginTop: 4 }}>
-                Soit {euro(totalInterets + etat.credits.reduce((s, c) => s + c.capital, 0))} remboursés pour{" "}
-                {euro(etat.credits.reduce((s, c) => s + c.capital, 0))} empruntés.
+                {euro(totalInterets)} d'intérêts
+                {totalAssurance > 0 && ` et ${euro(totalAssurance)} d'assurance`}. Soit{" "}
+                {euro(totalInterets + totalAssurance + capitalEmprunte)} déboursés pour {euro(capitalEmprunte)} empruntés.
               </div>
             </div>
             <div>
-              <div className="stat-lib">Déjà payés à ce jour</div>
-              <div className="stat-val chiffre">{euro(interetsVerses)}</div>
-              <Jauge pct={totalInterets ? (interetsVerses / totalInterets) * 100 : 0} couleur="var(--brique)" />
+              <div className="stat-lib">Déjà payé à ce jour</div>
+              <div className="stat-val chiffre">{euro(interetsVerses + assuranceVersee)}</div>
+              <Jauge
+                pct={totalInterets + totalAssurance ? ((interetsVerses + assuranceVersee) / (totalInterets + totalAssurance)) * 100 : 0}
+                couleur="var(--brique)"
+              />
               <div className="carte-note" style={{ marginTop: 7 }}>
-                Reste {euro(Math.max(0, totalInterets - interetsVerses))} d'intérêts à verser.
+                Reste {euro(Math.max(0, totalInterets + totalAssurance - interetsVerses - assuranceVersee))} à verser.
               </div>
             </div>
           </div>
@@ -103,11 +115,16 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                     {euro(c.capital)} sur {c.duree} mois à {c.taux}% · échéance {libelleMois(fin)}
                     {!c.solde && ` · ${restants} mensualité${restants > 1 ? "s" : ""} restante${restants > 1 ? "s" : ""}`}
                     {` · ${euro(coutTotal(c.capital, c.taux, c.duree))} d'intérêts`}
+                    {c.assuranceTaux > 0 &&
+                      ` · assurance ${c.assuranceTaux}% sur le capital ${c.assuranceBase === "restant" ? "restant dû" : "initial"}`}
                   </div>
                 </div>
                 <div className="pousse" style={{ textAlign: "right" }}>
-                  <div className="chiffre montant">{c.solde ? "—" : euro(c.mensualite) + " /mois"}</div>
-                  <div className="ligne-meta">reste {euro(c.restant)}</div>
+                  <div className="chiffre montant">{c.solde ? "—" : euro(c.echeance) + " /mois"}</div>
+                  <div className="ligne-meta">
+                    {c.assurance > 0 && !c.solde && `dont ${euro(c.assurance)} d'assurance · `}
+                    reste {euro(c.restant)}
+                  </div>
                 </div>
                 {!c.solde && (
                   <button
@@ -140,6 +157,9 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
             <Champ libelle="Taux annuel %" valeur={f.taux} onChange={(v) => setF({ ...f, taux: v })} largeur={110} placeholder="0" onEntree={ajouter} />
             <Champ libelle="Durée (mois)" valeur={f.duree} onChange={(v) => setF({ ...f, duree: v })} largeur={110} placeholder="0" onEntree={ajouter} />
             <Champ libelle="1re échéance" valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur={130} type="month" />
+            <Champ libelle="Assurance %/an" valeur={f.assuranceTaux} onChange={(v) => setF({ ...f, assuranceTaux: v })} largeur={120} placeholder="0" onEntree={ajouter} />
+            <Champ libelle="Assurance sur" valeur={f.assuranceBase} onChange={(v) => setF({ ...f, assuranceBase: v })} largeur={185}
+              options={[{ v: "initial", l: "Le capital initial" }, { v: "restant", l: "Le capital restant dû" }]} />
             <button className="btn" onClick={ajouter}>Ajouter</button>
           </div>
         </div>

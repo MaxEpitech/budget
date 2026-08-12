@@ -10,6 +10,9 @@ import {
   interetsPayes,
   indemniteAnticipee,
   rembourserParAnticipation,
+  cotisationAssurance,
+  assurancePayee,
+  echeanceTotale,
   moisAvantPlafond,
   projeter,
   projeterPlafonne,
@@ -19,6 +22,7 @@ import {
   quotePart,
   resteAVivre,
   versementRequis,
+  totauxDuMois,
 } from "../src/finance.js";
 
 const proche = (obtenu, attendu, tolerance, message) =>
@@ -305,6 +309,71 @@ test("indemnité : le plafond de 3 % prend le relais quand le taux est élevé",
 test("indemnité : nulle à taux zéro, et jamais négative", () => {
   assert.equal(indemniteAnticipee(5000, 99083, 0), 0);
   assert.equal(indemniteAnticipee(-5000, 99083, 3.5), 0);
+});
+
+/* ─── Assurance emprunteur ─── */
+
+test("assurance : sans taux, rien — et la mensualité reste la mensualité", () => {
+  assert.equal(cotisationAssurance(105000, 99083, 0, "initial"), 0);
+  assert.equal(assurancePayee(105000, 3.5, 300, 0, "initial", 26), 0);
+  assert.equal(echeanceTotale(105000, 3.5, 300, 0, "initial", 26), mensualite(105000, 3.5, 300));
+});
+
+test("assurance sur capital initial : cotisation constante, quelle que soit l'échéance", () => {
+  const attendue = 105000 * (0.34 / 100 / 12);
+  for (const k of [0, 26, 150, 299]) {
+    const restant = capitalRestant(105000, 3.5, 300, k);
+    proche(cotisationAssurance(105000, restant, 0.34, "initial"), attendue, 1e-9, `échéance ${k}`);
+  }
+});
+
+test("assurance sur capital restant dû : cotisation décroissante", () => {
+  let precedente = Infinity;
+  for (const k of [0, 50, 100, 200, 299]) {
+    const restant = capitalRestant(105000, 3.5, 300, k);
+    const cotisation = cotisationAssurance(105000, restant, 0.34, "restant");
+    assert.ok(cotisation < precedente, `cotisation non décroissante à l'échéance ${k}`);
+    precedente = cotisation;
+  }
+});
+
+test("assurance : la base dégressive coûte moins que la base initiale", () => {
+  const surInitial = assurancePayee(105000, 3.5, 300, 0.34, "initial", 300);
+  const surRestant = assurancePayee(105000, 3.5, 300, 0.34, "restant", 300);
+  assert.ok(surRestant < surInitial, `${surRestant} devrait être sous ${surInitial}`);
+  // Sur vingt-cinq ans l'écart est considérable : c'est ce qui justifie de
+  // demander la base plutôt que d'en supposer une.
+  assert.ok(surInitial / surRestant > 1.5, `écart trop faible : ${surInitial / surRestant}`);
+});
+
+test("assurance payée : somme des cotisations, échéance par échéance", () => {
+  let cumul = 0;
+  for (let i = 0; i < 26; i++) {
+    cumul += cotisationAssurance(105000, capitalRestant(105000, 3.5, 300, i), 0.34, "restant");
+  }
+  proche(assurancePayee(105000, 3.5, 300, 0.34, "restant", 26), cumul, 1e-9, "assurance payée");
+});
+
+test("assurance payée : bornée au terme, jamais négative", () => {
+  const auTerme = assurancePayee(105000, 3.5, 300, 0.34, "initial", 300);
+  proche(assurancePayee(105000, 3.5, 300, 0.34, "initial", 900), auTerme, 1e-9, "au-delà du terme");
+  assert.equal(assurancePayee(105000, 3.5, 300, 0.34, "initial", -5), 0);
+});
+
+test("échéance totale : mensualité plus cotisation, sur la bonne assiette", () => {
+  const M = mensualite(105000, 3.5, 300);
+  proche(echeanceTotale(105000, 3.5, 300, 0.34, "initial", 26), M + 105000 * (0.34 / 100 / 12), 1e-9, "base initiale");
+  const restant = capitalRestant(105000, 3.5, 300, 26);
+  proche(echeanceTotale(105000, 3.5, 300, 0.34, "restant", 26), M + restant * (0.34 / 100 / 12), 1e-9, "base restante");
+});
+
+test("assurance : le total du mois la compte, et un crédit soldé ne la compte plus", () => {
+  const credit = { capital: 105000, taux: 3.5, duree: 300, debut: "2024-06", assuranceTaux: 0.34, assuranceBase: "initial" };
+  const avec = totauxDuMois({ credits: [credit] }, "2026-08");
+  const sans = totauxDuMois({ credits: [{ ...credit, assuranceTaux: 0 }] }, "2026-08");
+  proche(avec.credits - sans.credits, 105000 * (0.34 / 100 / 12), 1e-9, "assurance dans le total");
+  // Un mois postérieur au terme : plus de mensualité, plus d'assurance.
+  assert.equal(totauxDuMois({ credits: [credit] }, "2050-01").credits, 0);
 });
 
 /* ─── Échéance de plafond ─── */

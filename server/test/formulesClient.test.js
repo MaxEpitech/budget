@@ -37,6 +37,19 @@ const CAS = {
   verseAvecPlafond: [
     [8400, 150, 2.4, 120, null], [8400, 150, 2.4, 120, 22950], [1000, 100, 0, 60, 1500],
   ],
+  cotisationAssurance: [
+    [105000, 99083, 0.34, "initial"], [105000, 99083, 0.34, "restant"],
+    [105000, 99083, 0, "initial"], [105000, -50, 0.34, "restant"],
+  ],
+  assurancePayee: [
+    [105000, 3.5, 300, 0.34, "initial", 26], [105000, 3.5, 300, 0.34, "restant", 26],
+    [105000, 3.5, 300, 0.34, "restant", 300], [105000, 3.5, 300, 0, "initial", 26],
+    [105000, 3.5, 300, 0.34, "initial", 900], [105000, 3.5, 300, 0.34, "initial", -5],
+  ],
+  echeanceTotale: [
+    [105000, 3.5, 300, 0.34, "initial", 26], [105000, 3.5, 300, 0.34, "restant", 26],
+    [105000, 3.5, 300, 0, "initial", 0],
+  ],
   indemniteAnticipee: [
     [5000, 99083, 3.5], [80000, 99083, 12], [5000, 99083, 0], [-5000, 99083, 3.5],
   ],
@@ -89,7 +102,10 @@ const CAS_NON_NUMERIQUES = {
         { type: "depense", pour: "foyer", recurrent: true, periodicite: "mensuel", debut: null, fin: null, montant: 980 },
         { type: "revenu", pour: 1, recurrent: false, mois: "2026-08", montant: 300 },
       ],
-      credits: [{ capital: 105000, taux: 3.5, duree: 300, debut: "2024-06" }],
+      credits: [
+        { capital: 105000, taux: 3.5, duree: 300, debut: "2024-06", assuranceTaux: 0.34, assuranceBase: "initial" },
+        { capital: 12000, taux: 2, duree: 48, debut: "2020-01", assuranceTaux: 0.2, assuranceBase: "restant" },
+      ],
       projets: [{ versement: 250 }],
       placements: [{ versement: 150 }],
     }, "2026-08"],

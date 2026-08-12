@@ -65,6 +65,8 @@ export const creditVersApi = (c) => ({
   taux: c.taux,
   duree: c.dureeMois,
   debut: c.moisDebut,
+  assuranceTaux: c.assuranceTaux,
+  assuranceBase: c.assuranceBase,
 });
 
 export const creditVersDb = (d) => ({
@@ -73,6 +75,10 @@ export const creditVersDb = (d) => ({
   taux: d.taux,
   dureeMois: d.duree,
   moisDebut: d.debut,
+  // Absent vaut « pas d'assurance » : un crédit saisi sans ce champ reste
+  // exactement ce qu'il était.
+  assuranceTaux: d.assuranceTaux ?? 0,
+  assuranceBase: d.assuranceBase ?? "initial",
 });
 
 /* ─── Projet — l'épargne est la somme des versements, jamais un champ stocké ─── */

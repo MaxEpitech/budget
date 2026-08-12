@@ -2,7 +2,7 @@
 // données servies par l'API (/api/etat) au lieu du stockage navigateur.
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
-import { mensualite, capitalRestant } from "./finance.js";
+import { mensualite, capitalRestant, cotisationAssurance } from "./finance.js";
 import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
 import Flux from "./onglets/Flux.jsx";
 import Historique from "./onglets/Historique.jsx";
@@ -233,9 +233,13 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
     const creditsActifs = etat.credits.map((c) => {
       const k = Math.max(0, ecartMois(c.debut, mois));
       const M = mensualite(c.capital, c.taux, c.duree);
-      return { ...c, k, mensualite: M, restant: capitalRestant(c.capital, c.taux, c.duree, k), solde: k >= c.duree };
+      const restant = capitalRestant(c.capital, c.taux, c.duree, k);
+      // L'assurance fait partie du prélèvement : c'est « echeance » qui pèse sur
+      // le budget, pas la seule mensualité d'amortissement.
+      const assurance = cotisationAssurance(c.capital, restant, c.assuranceTaux ?? 0, c.assuranceBase);
+      return { ...c, k, mensualite: M, assurance, echeance: M + assurance, restant, solde: k >= c.duree };
     });
-    const credits = creditsActifs.filter((c) => !c.solde).reduce((s, c) => s + c.mensualite, 0);
+    const credits = creditsActifs.filter((c) => !c.solde).reduce((s, c) => s + c.echeance, 0);
 
     const projets = etat.projets.reduce((s, p) => s + p.versement, 0);
     const placements = etat.placements.reduce((s, p) => s + p.versement, 0);
