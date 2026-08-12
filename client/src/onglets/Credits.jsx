@@ -119,7 +119,7 @@ function Amortissement({ credit, mois }) {
   }
   if (lignes.length === 0) return <div className="vide">Crédit soldé — plus d'échéance à venir.</div>;
   return (
-    <div className="corps" style={{ background: "var(--survol)" }}>
+    <div className="corps" style={{ background: "var(--survol)", overflowX: "auto" }}>
       <table className="amort">
         <thead>
           <tr><th>Échéance</th><th>Intérêts</th><th>Capital</th><th>Restant dû</th></tr>

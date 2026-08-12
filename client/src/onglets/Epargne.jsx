@@ -135,7 +135,7 @@ function Courbe({ points }) {
       <path d={traceur("valeur")} fill="none" stroke="var(--indigo)" strokeWidth="2.5" strokeLinejoin="round" />
       {points.map((p, i) =>
         i % Math.ceil(points.length / 6) === 0 || i === points.length - 1 ? (
-          <text key={i} x={x(i)} y={H - 6} fontSize="10" fill="var(--doux)" textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"} fontFamily="var(--mono)">
+          <text key={i} x={x(i)} y={H - 6} fontSize="10" fill="var(--doux)" textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}>
             {p.annee === 0 ? "auj." : `+${p.annee} an${p.annee > 1 ? "s" : ""}`}
           </text>
         ) : null

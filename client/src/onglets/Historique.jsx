@@ -123,7 +123,7 @@ export default function Historique({ mois }) {
       </div>
 
       <Carte titre="Mois par mois">
-        <div style={{ overflowX: "auto" }}>
+        <div className="corps" style={{ overflowX: "auto" }}>
           <table className="amort" style={{ minWidth: 520 }}>
             <thead>
               <tr>

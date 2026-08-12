@@ -8,7 +8,11 @@ export default function Cadre({ titre, note, erreur, message, children, bas, lar
   return (
     <div className="bdg" style={{ minHeight: "100%" }}>
       <div style={{ maxWidth: large ? 720 : 430, margin: "0 auto", padding: "56px 20px 40px" }}>
-        <p className="marque" style={{ color: "var(--ardoise)", margin: "0 0 14px" }}>Budget du foyer</p>
+        {/* Même marque qu'une fois connecté : on doit reconnaître où l'on est. */}
+        <div className="marque-app" style={{ justifyContent: "center", marginBottom: 18 }}>
+          <span className="marque-logo" aria-hidden="true">€</span>
+          Budget du foyer
+        </div>
         <Carte titre={titre} note={note}>
           <div className="corps">
             {erreur && <div className="avis alerte" role="alert" style={{ marginTop: 0, marginBottom: 14 }}>{erreur}</div>}

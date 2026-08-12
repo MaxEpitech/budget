@@ -10,6 +10,7 @@ import Credits from "./onglets/Credits.jsx";
 import Projets from "./onglets/Projets.jsx";
 import Epargne from "./onglets/Epargne.jsx";
 import Foyer from "./onglets/Foyer.jsx";
+import MenuCompte from "./composants/MenuCompte.jsx";
 
 const ONGLETS = [
   { id: "flux", nom: "Flux" },
@@ -288,16 +289,29 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
 
   return (
     <div className="bdg" style={{ opacity: rafraichissement ? 0.6 : 1, transition: "opacity .15s" }}>
-      {/* ── En-tête + bande ── */}
+      {/* ── Barre d'application : la marque, et le compte à portée de clic ── */}
+      <div className="barre">
+        <div className="barre-inner">
+          <div className="marque-app">
+            <span className="marque-logo" aria-hidden="true">€</span>
+            Budget du foyer
+          </div>
+          <MenuCompte
+            compte={compte}
+            onReglages={() => setOnglet("foyer")}
+            onDeconnexion={deconnexionApresVidage}
+            ouvrirPage={ouvrirPage}
+          />
+        </div>
+      </div>
+
+      {/* ── En-tête du mois + bande ── */}
       <header className="entete">
         <div className="entete-haut">
-          <div>
-            <p className="marque">Budget du foyer</p>
-            <div className="mois-nav">
-              <button className="fleche" onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">‹</button>
-              <span className="mois-titre chiffre">{libelleMois(mois)}</span>
-              <button className="fleche" onClick={() => setMois(decalerMois(mois, 1))} aria-label="Mois suivant">›</button>
-            </div>
+          <div className="mois-nav">
+            <button className="fleche" onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">‹</button>
+            <span className="mois-titre chiffre">{libelleMois(mois)}</span>
+            <button className="fleche" onClick={() => setMois(decalerMois(mois, 1))} aria-label="Mois suivant">›</button>
           </div>
           <div className="solde">
             <div className="solde-lib">Reste à vivre</div>
