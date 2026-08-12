@@ -123,3 +123,10 @@ export const placementVersDb = (d) => {
   if (d.plafond !== undefined) patch.plafond = d.plafond == null ? null : enCentimes(d.plafond);
   return patch;
 };
+
+/* ─── Budget par catégorie ─── */
+export const budgetVersApi = (b) => ({
+  id: b.id,
+  categorie: b.categorie,
+  montant: enEuros(b.montant),
+});

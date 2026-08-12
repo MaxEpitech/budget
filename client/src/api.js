@@ -84,6 +84,10 @@ export const api = {
   modifierMembre: (id, patch, options) => requete(`/membres/${id}`, "PUT", patch, options),
   supprimerMembre: (id) => requete(`/membres/${id}`, "DELETE"),
 
+  budgets: () => requete("/budgets"),
+  definirBudget: (categorie, montant) => requete("/budgets", "PUT", { categorie, montant }),
+  supprimerBudget: (id) => requete(`/budgets/${id}`, "DELETE"),
+
   modifierFoyer: (repartition) => requete("/foyer", "PUT", { repartition }),
 
   /* ─── Foyer partagé ─── */

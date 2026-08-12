@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
+import Budgets from "../composants/Budgets.jsx";
 import { euro, num, libelleMois, CATEGORIES } from "../utiles.js";
 
 const RYTHMES = [
@@ -125,6 +126,8 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
           </div>
         ))}
       </Carte>
+
+      <Budgets budgets={etat.budgets ?? []} executer={executer} />
 
       <Carte titre="Qui paie quoi" note={etat.repartition === "prorata" ? "Charges communes au prorata des revenus" : "Charges communes partagées à parts égales"}>
         {calc.parMembre.map((m) => (

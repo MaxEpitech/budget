@@ -58,6 +58,7 @@ model Foyer {
   credits      Credit[]
   projets      Projet[]
   placements   Placement[]
+  budgets      Budget[]
 }
 
 // Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
@@ -184,6 +185,24 @@ model Transaction {
   foyer     Foyer           @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId   Int
 
+  @@index([foyerId])
+}
+
+// Enveloppe mensuelle sur une catégorie de dépenses.
+//
+// Une seule par catégorie et par foyer : deux budgets concurrents sur « Courses »
+// ne voudraient rien dire. Le montant est mensuel, et se compare aux dépenses
+// réellement tombées sur le mois — échéances trimestrielles comprises.
+model Budget {
+  id        String   @id @default(cuid())
+  foyer     Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId   Int
+  categorie String
+  montant   Int // centimes
+  creeLe    DateTime @default(now())
+  modifieLe DateTime @updatedAt
+
+  @@unique([foyerId, categorie])
   @@index([foyerId])
 }
 

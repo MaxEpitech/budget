@@ -11,6 +11,7 @@ import {
   creditVersApi,
   projetVersApi,
   placementVersApi,
+  budgetVersApi,
 } from "../conversion.js";
 
 const routeur = Router();
@@ -23,7 +24,7 @@ routeur.get("/", attraper(async (req, res) => {
   }
 
   const foyerId = await foyerCourant(req);
-  const [foyer, membresDb, transactionsDb, creditsDb, projetsDb, placementsDb] = await Promise.all([
+  const [foyer, membresDb, transactionsDb, creditsDb, projetsDb, placementsDb, budgetsDb] = await Promise.all([
     prisma.foyer.findUnique({ where: { id: foyerId } }),
     prisma.membre.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     // Les récurrentes sont filtrées ensuite : leur période de validité et leur
@@ -32,6 +33,7 @@ routeur.get("/", attraper(async (req, res) => {
     prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
     prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.budget.findMany({ where: { foyerId }, orderBy: { categorie: "asc" } }),
   ]);
 
   const repartition = foyer?.repartition ?? "prorata";
@@ -43,6 +45,16 @@ routeur.get("/", attraper(async (req, res) => {
     .map(transactionVersApi);
   const projets = projetsDb.map(projetVersApi);
   const placements = placementsDb.map(placementVersApi);
+
+  // Chaque enveloppe est servie avec ce qui en a déjà été consommé ce mois-ci :
+  // le montant seul ne dit rien, c'est l'écart qui intéresse.
+  const depensesParCategorie = transactions
+    .filter((t) => t.type === "depense")
+    .reduce((somme, t) => ({ ...somme, [t.categorie]: (somme[t.categorie] ?? 0) + t.montant }), {});
+  const budgets = budgetsDb.map((b) => {
+    const budget = budgetVersApi(b);
+    return { ...budget, consomme: depensesParCategorie[budget.categorie] ?? 0 };
+  });
 
   // Crédits enrichis comme dans le calcul du prototype :
   // k échéances passées, mensualité, capital restant dû, crédit soldé.
@@ -80,7 +92,7 @@ routeur.get("/", attraper(async (req, res) => {
     return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };
   });
 
-  res.json({ mois, repartition, membres, transactions, credits, projets, placements, parMembre });
+  res.json({ mois, repartition, membres, transactions, credits, projets, placements, budgets, parMembre });
 }));
 
 export default routeur;

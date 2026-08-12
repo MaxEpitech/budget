@@ -18,6 +18,7 @@ import transactions from "./routes/transactions.js";
 import credits from "./routes/credits.js";
 import projets from "./routes/projets.js";
 import placements from "./routes/placements.js";
+import budgets from "./routes/budgets.js";
 import foyer from "./routes/foyer.js";
 
 const app = express();
@@ -70,6 +71,7 @@ const ROUTES_METIER = [
   ["/api/credits", credits],
   ["/api/projets", projets],
   ["/api/placements", placements],
+  ["/api/budgets", budgets],
   ["/api/foyer", foyer],
 ];
 

@@ -83,6 +83,13 @@ export const FoyerSchema = z.object({
   repartition: z.enum(["prorata", "moitie"], "repartition : « prorata » ou « moitie » attendu"),
 });
 
+export const BudgetSchema = z.object({
+  categorie: chaine("catégorie"),
+  // Un budget nul n'a pas de sens : pour ne plus rien s'autoriser, on supprime
+  // l'enveloppe plutôt que de la mettre à zéro.
+  montant: montantPositif("montant"),
+});
+
 const RoleValeur = z.enum(["proprietaire", "membre"], "rôle : « proprietaire » ou « membre » attendu");
 
 export const RoleSchema = z.object({ role: RoleValeur });
