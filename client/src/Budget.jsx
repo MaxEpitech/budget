@@ -5,6 +5,7 @@ import { api } from "./api.js";
 import { mensualite, capitalRestant } from "./finance.js";
 import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
 import Flux from "./onglets/Flux.jsx";
+import Historique from "./onglets/Historique.jsx";
 import Credits from "./onglets/Credits.jsx";
 import Projets from "./onglets/Projets.jsx";
 import Epargne from "./onglets/Epargne.jsx";
@@ -12,6 +13,7 @@ import Foyer from "./onglets/Foyer.jsx";
 
 const ONGLETS = [
   { id: "flux", nom: "Flux" },
+  { id: "historique", nom: "Historique" },
   { id: "credits", nom: "Crédits" },
   { id: "projets", nom: "Projets" },
   { id: "epargne", nom: "Épargne" },
@@ -364,6 +366,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
           </div>
         )}
         {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
+        {onglet === "historique" && <Historique mois={mois} />}
         {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
         {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} supprimer={supprimer} />}

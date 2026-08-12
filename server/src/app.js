@@ -12,6 +12,7 @@ import { prisma } from "./db.js";
 import { journal, journaliserRequetes } from "./journal.js";
 import auth from "./routes/auth.js";
 import etat from "./routes/etat.js";
+import historique from "./routes/historique.js";
 import membres from "./routes/membres.js";
 import transactions from "./routes/transactions.js";
 import credits from "./routes/credits.js";
@@ -63,6 +64,7 @@ app.use("/api/auth", auth);
 // exactement le genre d'omission qu'une liste rend impossible.
 const ROUTES_METIER = [
   ["/api/etat", etat],
+  ["/api/historique", historique],
   ["/api/membres", membres],
   ["/api/transactions", transactions],
   ["/api/credits", credits],

@@ -58,6 +58,7 @@ export const api = {
 
   /* ─── Budget ─── */
   etat: (mois) => requete(`/etat?mois=${encodeURIComponent(mois)}`),
+  historique: (jusqu, mois = 12) => requete(`/historique?jusqu=${encodeURIComponent(jusqu)}&mois=${mois}`),
 
   transactions: () => requete("/transactions"),
   creerTransaction: (t) => requete("/transactions", "POST", t),

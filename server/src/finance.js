@@ -115,6 +115,58 @@ export function echeanceCeMois({ debut, fin, periodicite = "mensuel" }, mois) {
 }
 
 /**
+ * Les lignes actives d'un mois : les ponctuelles de ce mois, et les récurrentes
+ * dont c'est une échéance. Idempotent sur une liste déjà filtrée.
+ */
+export const lignesDuMois = (transactions, mois) =>
+  transactions.filter((t) => (t.recurrent ? echeanceCeMois(t, mois) : t.mois === mois));
+
+/**
+ * Les totaux d'un mois, à partir de l'ensemble des données du foyer.
+ *
+ * Une seule définition, partagée par le mois affiché et par l'historique : ce
+ * sont les mêmes chiffres, et les voir diverger d'un écran à l'autre serait le
+ * plus sûr moyen de perdre confiance dans les deux.
+ *
+ * Les montants sont dans l'unité qu'on lui donne — euros à la frontière de
+ * l'API, comme partout côté client.
+ */
+export function totauxDuMois({ membres = [], transactions = [], credits = [], projets = [], placements = [] }, mois) {
+  const actifs = lignesDuMois(transactions, mois);
+
+  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
+  const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
+  const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);
+
+  // Un crédit soldé ne pèse plus : sa dernière échéance est passée.
+  const mensualites = credits.reduce((s, c) => {
+    const k = Math.max(0, ecartMois(c.debut, mois));
+    return k >= c.duree ? s : s + mensualite(c.capital, c.taux, c.duree);
+  }, 0);
+
+  const versementsProjets = projets.reduce((s, p) => s + p.versement, 0);
+  const versementsPlacements = placements.reduce((s, p) => s + p.versement, 0);
+  const revenus = salaires + autresRevenus;
+
+  return {
+    mois,
+    salaires,
+    revenus,
+    depenses,
+    credits: mensualites,
+    projets: versementsProjets,
+    placements: versementsPlacements,
+    reste: resteAVivre({
+      revenus,
+      depenses,
+      mensualitesCredits: mensualites,
+      versementsProjets,
+      versementsPlacements,
+    }),
+  };
+}
+
+/**
  * Quote-part d'un membre dans les charges communes :
  * au prorata de son revenu, ou 1/nb membres si repartition = "moitie".
  * Si le total des revenus est nul en mode prorata, la part est 0.

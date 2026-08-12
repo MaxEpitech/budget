@@ -55,3 +55,99 @@ export function verseAvecPlafond(valeur, versement, rendement, mois, plafond) {
   if (plafond == null) return valeur + versement * mois;
   return simulerPlafonne(valeur, versement, rendement, mois, plafond).verse;
 }
+
+// Nombre de mois entre deux clés « YYYY-MM ».
+const ecartMois = (de, vers) => {
+  const [a1, m1] = de.split("-").map(Number);
+  const [a2, m2] = vers.split("-").map(Number);
+  return (a2 - a1) * 12 + (m2 - m1);
+};
+
+/** Nombre de mois entre deux échéances, selon le rythme. */
+export const PAS_PERIODICITE = { mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12 };
+
+/**
+ * Une ligne récurrente tombe-t-elle sur ce mois ?
+ *
+ * Trois conditions, dans cet ordre : la ligne a commencé, elle n'est pas
+ * terminée, et le mois est bien une de ses échéances. Le début sert d'ancrage —
+ * un trimestriel commencé en février tombe en février, mai, août, novembre.
+ * Sans début, la ligne vaut depuis toujours, et seul le mensuel a alors un sens.
+ *
+ * Le montant n'est jamais lissé : une assurance annuelle de 240 € pèse 240 € sur
+ * le mois où elle est prélevée. Lisser reviendrait à afficher un reste à vivre
+ * que personne n'a jamais eu sur son compte.
+ */
+export function echeanceCeMois({ debut, fin, periodicite = "mensuel" }, mois) {
+  // Avant le début, ou après la fin — celle-ci étant incluse.
+  if (debut && ecartMois(debut, mois) < 0) return false;
+  if (fin && ecartMois(fin, mois) > 0) return false;
+
+  const pas = PAS_PERIODICITE[periodicite] ?? 1;
+  if (pas === 1) return true;
+  // Sans ancrage, un rythme non mensuel n'a pas de sens : on retombe alors sur
+  // le comportement le moins surprenant, celui d'une ligne qui tombe chaque mois.
+  if (!debut) return true;
+  return ecartMois(debut, mois) % pas === 0;
+}
+
+/**
+ * Les lignes actives d'un mois : les ponctuelles de ce mois, et les récurrentes
+ * dont c'est une échéance. Idempotent sur une liste déjà filtrée.
+ */
+export const lignesDuMois = (transactions, mois) =>
+  transactions.filter((t) => (t.recurrent ? echeanceCeMois(t, mois) : t.mois === mois));
+
+/**
+ * Les totaux d'un mois, à partir de l'ensemble des données du foyer.
+ *
+ * Une seule définition, partagée par le mois affiché et par l'historique : ce
+ * sont les mêmes chiffres, et les voir diverger d'un écran à l'autre serait le
+ * plus sûr moyen de perdre confiance dans les deux.
+ *
+ * Les montants sont dans l'unité qu'on lui donne — euros à la frontière de
+ * l'API, comme partout côté client.
+ */
+export function totauxDuMois({ membres = [], transactions = [], credits = [], projets = [], placements = [] }, mois) {
+  const actifs = lignesDuMois(transactions, mois);
+
+  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
+  const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
+  const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);
+
+  // Un crédit soldé ne pèse plus : sa dernière échéance est passée.
+  const mensualites = credits.reduce((s, c) => {
+    const k = Math.max(0, ecartMois(c.debut, mois));
+    return k >= c.duree ? s : s + mensualite(c.capital, c.taux, c.duree);
+  }, 0);
+
+  const versementsProjets = projets.reduce((s, p) => s + p.versement, 0);
+  const versementsPlacements = placements.reduce((s, p) => s + p.versement, 0);
+  const revenus = salaires + autresRevenus;
+
+  return {
+    mois,
+    salaires,
+    revenus,
+    depenses,
+    credits: mensualites,
+    projets: versementsProjets,
+    placements: versementsPlacements,
+    reste: resteAVivre({
+      revenus,
+      depenses,
+      mensualitesCredits: mensualites,
+      versementsProjets,
+      versementsPlacements,
+    }),
+  };
+}
+
+
+/**
+ * Reste à vivre du foyer :
+ * revenus − dépenses − mensualités crédits − versements projets − versements placements.
+ */
+export function resteAVivre({ revenus, depenses, mensualitesCredits, versementsProjets, versementsPlacements }) {
+  return revenus - depenses - mensualitesCredits - versementsProjets - versementsPlacements;
+}
