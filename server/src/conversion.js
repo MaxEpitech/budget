@@ -33,6 +33,9 @@ export const transactionVersApi = (t) => ({
   pour: t.membreId ?? "foyer",
   recurrent: t.recurrent,
   mois: t.mois,
+  periodicite: t.periodicite,
+  debut: t.debut,
+  fin: t.fin,
 });
 
 export const transactionVersDb = (d) => ({
@@ -48,6 +51,10 @@ export const transactionVersDb = (d) => ({
   // premier du mois. Une récurrente n'en a pas : elle revient tous les mois,
   // elle n'arrive pas un jour précis.
   date: d.recurrent ? null : (d.date ? new Date(d.date) : new Date(`${d.mois}-01T00:00:00.000Z`)),
+  // Rythme et validité n'ont de sens que pour une récurrente.
+  periodicite: d.recurrent ? (d.periodicite ?? "mensuel") : "mensuel",
+  debut: d.recurrent ? (d.debut ?? null) : null,
+  fin: d.recurrent ? (d.fin ?? null) : null,
 });
 
 /* ─── Crédit ─── */

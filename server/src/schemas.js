@@ -28,10 +28,22 @@ export const TransactionSchema = z
     mois: MoisSchema.nullish(),
     // Jour réel de l'opération. Facultatif : le premier du mois fait foi à défaut.
     date: z.iso.datetime({ offset: true }).or(z.iso.date()).nullish(),
+    // Rythme d'une ligne récurrente, et sa période de validité.
+    periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"], "périodicité inconnue").default("mensuel"),
+    debut: MoisSchema.nullish(),
+    fin: MoisSchema.nullish(),
   })
   .superRefine((d, ctx) => {
     if (!d.recurrent && !d.mois) {
       ctx.addIssue({ code: "custom", path: ["mois"], message: "mois requis pour une ligne ponctuelle (format YYYY-MM)" });
+    }
+    // Un rythme non mensuel a besoin d'un ancrage : sans mois de départ, on ne
+    // saurait pas quand tombe la première échéance.
+    if (d.recurrent && d.periodicite !== "mensuel" && !d.debut) {
+      ctx.addIssue({ code: "custom", path: ["debut"], message: "premier prélèvement requis pour un rythme autre que mensuel" });
+    }
+    if (d.recurrent && d.debut && d.fin && d.fin < d.debut) {
+      ctx.addIssue({ code: "custom", path: ["fin"], message: "la fin ne peut pas précéder le début" });
     }
   });
 

@@ -30,6 +30,16 @@ enum TypeJeton {
   reinitialisation
 }
 
+// Rythme d'une ligne récurrente. Le montant est celui de l'échéance, porté par
+// le mois où elle tombe : une assurance annuelle de 240 € pèse 240 € en mars,
+// pas 20 € tous les mois. C'est ce que « reste à vivre » veut dire.
+enum Periodicite {
+  mensuel
+  trimestriel
+  semestriel
+  annuel
+}
+
 // Le propriétaire peut inviter, retirer quelqu'un et supprimer le foyer ;
 // un membre se sert du budget. Un foyer garde toujours au moins un propriétaire.
 enum RoleFoyer {
@@ -153,6 +163,15 @@ model Transaction {
   categorie String
   recurrent Boolean         @default(false)
   mois      String? // YYYY-MM, null si récurrente
+  // Rythme et période de validité d'une ligne récurrente.
+  //
+  // Sans début ni fin, une récurrente valait pour l'éternité dans les deux sens :
+  // résilier un abonnement l'effaçait aussi des mois passés, et changer son prix
+  // réécrivait l'histoire. Le début sert aussi d'ancrage aux rythmes non
+  // mensuels — un trimestriel commencé en février tombe en février, mai, août.
+  periodicite Periodicite   @default(mensuel)
+  debut       String? // YYYY-MM ; null = depuis toujours
+  fin         String? // YYYY-MM inclus ; null = sans terme
   // Date réelle de l'opération, pour les lignes ponctuelles. Le mois reste : il
   // sert au filtrage et n'a pas à disparaître. Une ligne récurrente n'a pas de
   // date — elle revient tous les mois, elle n'arrive pas un jour précis.

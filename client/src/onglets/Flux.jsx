@@ -6,8 +6,27 @@ import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import { euro, num, libelleMois, CATEGORIES } from "../utiles.js";
 
+const RYTHMES = [
+  { cle: "mensuel", nom: "Tous les mois" },
+  { cle: "trimestriel", nom: "Tous les 3 mois" },
+  { cle: "semestriel", nom: "Tous les 6 mois" },
+  { cle: "annuel", nom: "Tous les ans" },
+];
+
+/** « Tous les 3 mois · depuis mars 2026 · jusqu'à juin 2027 » */
+function decrireRythme(t) {
+  const rythme = RYTHMES.find((r) => r.cle === t.periodicite)?.nom ?? "Tous les mois";
+  const morceaux = [rythme.toLowerCase()];
+  if (t.debut) morceaux.push(`depuis ${libelleMois(t.debut).toLowerCase()}`);
+  if (t.fin) morceaux.push(`jusqu'à ${libelleMois(t.fin).toLowerCase()}`);
+  return morceaux.join(" · ");
+}
+
 export default function Flux({ etat, calc, mois, executer, supprimer }) {
-  const [f, setF] = useState({ libelle: "", montant: "", categorie: "Courses", pour: "foyer", type: "depense", recurrent: true });
+  const [f, setF] = useState({
+    libelle: "", montant: "", categorie: "Courses", pour: "foyer", type: "depense",
+    recurrent: true, periodicite: "mensuel", debut: "", fin: "",
+  });
 
   const ajouter = () => {
     if (!f.libelle.trim() || num(f.montant) <= 0) return;
@@ -20,6 +39,10 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
         pour: f.pour,
         recurrent: f.recurrent,
         mois: f.recurrent ? null : mois,
+        periodicite: f.periodicite,
+        // Un rythme non mensuel a besoin d'un ancrage ; à défaut, le mois affiché.
+        debut: f.recurrent ? (f.debut || (f.periodicite !== "mensuel" ? mois : null)) : null,
+        fin: f.recurrent ? (f.fin || null) : null,
       })
     );
     setF({ ...f, libelle: "", montant: "" });
@@ -45,21 +68,36 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
               options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
             <label className="bascule">
               <input type="checkbox" checked={f.recurrent} onChange={(e) => setF({ ...f, recurrent: e.target.checked })} />
-              Tous les mois
+              Revient régulièrement
             </label>
+            {f.recurrent && (
+              <>
+                <Champ libelle="Rythme" valeur={f.periodicite} onChange={(v) => setF({ ...f, periodicite: v })} largeur={130}
+                  options={RYTHMES.map((r) => ({ v: r.cle, l: r.nom }))} />
+                <Champ libelle={f.periodicite === "mensuel" ? "Depuis (facultatif)" : "1er prélèvement"}
+                  valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur={130} type="month" />
+                <Champ libelle="Jusqu'à (facultatif)" valeur={f.fin} onChange={(v) => setF({ ...f, fin: v })} largeur={130} type="month" />
+              </>
+            )}
             <button className="btn" onClick={ajouter}>Ajouter</button>
           </div>
+          {f.recurrent && (
+            <div className="carte-note" style={{ marginTop: 8 }}>
+              Le montant est celui d'une échéance : une assurance annuelle de 240 € pèse 240 € sur
+              le mois où elle est prélevée, pas 20 € tous les mois.
+            </div>
+          )}
         </div>
       </Carte>
 
-      <Carte titre="Tous les mois" note={`${recurrents.length} ligne${recurrents.length > 1 ? "s" : ""} récurrente${recurrents.length > 1 ? "s" : ""}`}>
+      <Carte titre="Lignes régulières" note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci`}>
         {recurrents.length === 0 && <div className="vide">Aucune ligne récurrente. Les charges fixes se saisissent une fois pour toutes.</div>}
         {recurrents.map((t) => (
           <div className="ligne" key={t.id}>
             <div>
               <div className="ligne-lib">{t.libelle}</div>
               <div className="ligne-meta">
-                <span className={`etiq ${t.pour !== "foyer" ? "perso" : ""}`}>{nomDe(t.pour)}</span> · {t.categorie}
+                <span className={`etiq ${t.pour !== "foyer" ? "perso" : ""}`}>{nomDe(t.pour)}</span> · {t.categorie} · {decrireRythme(t)}
               </div>
             </div>
             <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>

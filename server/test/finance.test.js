@@ -8,6 +8,8 @@ import {
   capitalRestant,
   projeter,
   projeterPlafonne,
+  echeanceCeMois,
+  PAS_PERIODICITE,
   verseAvecPlafond,
   quotePart,
   resteAVivre,
@@ -149,6 +151,68 @@ test("cumul versé : jamais supérieur à la valeur projetée à rendement posit
     const verse = verseAvecPlafond(V, P, rdt, mois, plafond);
     assert.ok(valeur >= verse, `mois ${mois} : valeur ${valeur} < versé ${verse}`);
   }
+});
+
+/* ─── Échéances des lignes récurrentes ─── */
+
+test("sans début ni fin, une récurrente mensuelle tombe tous les mois", () => {
+  for (const mois of ["2020-01", "2026-08", "2030-12"]) {
+    assert.equal(echeanceCeMois({}, mois), true);
+  }
+});
+
+test("une récurrente ne tombe pas avant son début", () => {
+  const ligne = { debut: "2026-06", periodicite: "mensuel" };
+  assert.equal(echeanceCeMois(ligne, "2026-05"), false);
+  assert.equal(echeanceCeMois(ligne, "2026-06"), true);
+  assert.equal(echeanceCeMois(ligne, "2026-07"), true);
+});
+
+test("une récurrente ne tombe plus après sa fin, mais tombe le mois même", () => {
+  // Résilier un abonnement ne doit pas l'effacer des mois déjà passés.
+  const ligne = { fin: "2026-08", periodicite: "mensuel" };
+  assert.equal(echeanceCeMois(ligne, "2026-07"), true);
+  assert.equal(echeanceCeMois(ligne, "2026-08"), true, "la fin est incluse");
+  assert.equal(echeanceCeMois(ligne, "2026-09"), false);
+});
+
+test("un trimestriel tombe un mois sur trois, ancré sur son début", () => {
+  const ligne = { debut: "2026-02", periodicite: "trimestriel" };
+  const tombe = ["2026-02", "2026-05", "2026-08", "2026-11", "2027-02"];
+  const pasTombe = ["2026-03", "2026-04", "2026-06", "2026-07", "2026-12"];
+  for (const m of tombe) assert.equal(echeanceCeMois(ligne, m), true, `devrait tomber en ${m}`);
+  for (const m of pasTombe) assert.equal(echeanceCeMois(ligne, m), false, `ne devrait pas tomber en ${m}`);
+});
+
+test("un annuel ne tombe qu'un mois par an", () => {
+  const ligne = { debut: "2026-03", periodicite: "annuel" };
+  assert.equal(echeanceCeMois(ligne, "2026-03"), true);
+  assert.equal(echeanceCeMois(ligne, "2027-03"), true);
+  assert.equal(echeanceCeMois(ligne, "2026-09"), false);
+  assert.equal(echeanceCeMois(ligne, "2027-02"), false);
+});
+
+test("un semestriel tombe deux fois par an", () => {
+  const ligne = { debut: "2026-01", periodicite: "semestriel" };
+  const annee = Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`);
+  const echeances = annee.filter((m) => echeanceCeMois(ligne, m));
+  assert.deepEqual(echeances, ["2026-01", "2026-07"]);
+});
+
+test("début et rythme se combinent avec la fin", () => {
+  const ligne = { debut: "2026-01", fin: "2026-12", periodicite: "trimestriel" };
+  assert.equal(echeanceCeMois(ligne, "2026-10"), true);
+  assert.equal(echeanceCeMois(ligne, "2027-01"), false, "au-delà de la fin, même une échéance ne compte plus");
+});
+
+test("un rythme non mensuel sans ancrage retombe sur le mensuel", () => {
+  // Cas qui ne devrait pas se produire — la validation exige un début — mais
+  // mieux vaut le comportement le moins surprenant qu'un mois arbitraire.
+  assert.equal(echeanceCeMois({ periodicite: "annuel" }, "2026-08"), true);
+});
+
+test("les pas correspondent aux rythmes annoncés", () => {
+  assert.deepEqual(PAS_PERIODICITE, { mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12 });
 });
 
 /* ─── Quote-part ─── */

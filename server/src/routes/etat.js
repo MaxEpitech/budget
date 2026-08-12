@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { attraper } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { MoisSchema } from "../schemas.js";
-import { mensualite, capitalRestant, quotePart } from "../finance.js";
+import { mensualite, capitalRestant, quotePart, echeanceCeMois } from "../finance.js";
 import { moisCourant, ecartMois } from "../mois.js";
 import {
   membreVersApi,
@@ -26,8 +26,8 @@ routeur.get("/", attraper(async (req, res) => {
   const [foyer, membresDb, transactionsDb, creditsDb, projetsDb, placementsDb] = await Promise.all([
     prisma.foyer.findUnique({ where: { id: foyerId } }),
     prisma.membre.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
-    // Transactions actives du mois : les récurrentes + les ponctuelles du mois,
-    // de la plus récente à la plus ancienne (le prototype ajoute en tête).
+    // Les récurrentes sont filtrées ensuite : leur période de validité et leur
+    // rythme se calculent, ils ne s'expriment pas en clause SQL simple.
     prisma.transaction.findMany({ where: { foyerId, OR: [{ recurrent: true }, { mois }] }, orderBy: { id: "desc" } }),
     prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
@@ -36,7 +36,11 @@ routeur.get("/", attraper(async (req, res) => {
 
   const repartition = foyer?.repartition ?? "prorata";
   const membres = membresDb.map(membreVersApi);
-  const transactions = transactionsDb.map(transactionVersApi);
+  // Une récurrente ne compte que si le mois est bien une de ses échéances :
+  // commencée, pas terminée, et au bon rythme.
+  const transactions = transactionsDb
+    .filter((t) => !t.recurrent || echeanceCeMois(t, mois))
+    .map(transactionVersApi);
   const projets = projetsDb.map(projetVersApi);
   const placements = placementsDb.map(placementVersApi);
 
