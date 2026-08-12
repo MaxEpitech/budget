@@ -41,7 +41,7 @@ export default function Sessions() {
   if (!sessions) return null;
 
   return (
-    <div className="corps" style={{ borderTop: "1px solid #EDF1F3" }}>
+    <div className="corps" style={{ borderTop: "1px solid var(--filet-fin)" }}>
       <div className="stat-lib">Connexions ouvertes</div>
       {erreur && <div className="avis alerte" role="alert">{erreur}</div>}
       <div style={{ marginTop: 8 }}>

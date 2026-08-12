@@ -131,7 +131,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
 
       <Carte titre="Qui paie quoi" note={etat.repartition === "prorata" ? "Charges communes au prorata des revenus" : "Charges communes partagées à parts égales"}>
         {calc.parMembre.map((m) => (
-          <div className="corps" key={m.id} style={{ borderBottom: "1px solid #EDF1F3" }}>
+          <div className="corps" key={m.id} style={{ borderBottom: "1px solid var(--filet-fin)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div className="ligne-lib">{m.nom}</div>

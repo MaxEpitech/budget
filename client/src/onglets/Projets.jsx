@@ -48,7 +48,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
               const suffisant = p.versement >= requis - 0.5;
               const pct = (p.epargne / Math.max(1, p.objectif)) * 100;
               return (
-                <div key={p.id} style={{ border: "1px solid var(--trait)", borderRadius: 6, padding: 14 }}>
+                <div key={p.id} className="projet">
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <div className="ligne-lib">{p.libelle}</div>
                     <button className="suppr" style={{ opacity: 1 }} onClick={() => supprimer("projets", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
@@ -133,7 +133,7 @@ function Historique({ versements, nomDe }) {
           <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>
         </div>
       ))}
-      <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px solid #EDF1F3" }}>
+      <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px solid var(--filet-fin)" }}>
         {parContributeur.length > 1 &&
           parContributeur.map((c) => (
             <div key={c.pour} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "2px 0" }}>

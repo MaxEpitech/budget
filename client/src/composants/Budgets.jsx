@@ -51,7 +51,7 @@ export default function Budgets({ budgets, executer }) {
         const part = b.montant > 0 ? b.consomme / b.montant : 0;
         const restant = b.montant - b.consomme;
         return (
-          <div className="corps" key={b.id} style={{ borderBottom: "1px solid #EDF1F3" }}>
+          <div className="corps" key={b.id} style={{ borderBottom: "1px solid var(--filet-fin)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
               <div className="ligne-lib">{b.categorie}</div>
               <div className="chiffre" style={{ fontWeight: 600 }}>

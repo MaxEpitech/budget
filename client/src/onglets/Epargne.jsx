@@ -84,7 +84,7 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
               <div style={{ minWidth: 140 }}>
                 <div className="ligne-lib">
                   {p.libelle}{" "}
-                  {atteint && <span className="etiq" style={{ background: "#E7F2EE", color: "var(--caisse)" }}>Plafond atteint</span>}
+                  {atteint && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Plafond atteint</span>}
                 </div>
                 <div className="ligne-meta">
                   {p.rendement}% par an · {euro(projeterPlafonne(p.valeur, p.versement, p.rendement, horizon * 12, p.plafond))} dans {horizon} ans

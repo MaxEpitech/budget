@@ -218,7 +218,7 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
           </div>
         </div>
         <Sessions />
-        <div className="corps" style={{ borderTop: "1px solid var(--trait-pale, #EDF1F3)" }}>
+        <div className="corps" style={{ borderTop: "1px solid var(--filet-fin)" }}>
           <div className="carte-note">
             Vos données vous appartiennent : vous pouvez les emporter, et faire disparaître ce compte
             quand vous voulez.
@@ -228,10 +228,10 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
             <SupprimerCompte onSupprime={onCompteSupprime} />
           </div>
           <div className="carte-note" style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button style={{ color: "var(--indigo)", textDecoration: "underline", fontSize: 12 }} onClick={() => ouvrirPage("confidentialite")}>
+            <button className="lien" style={{ fontSize: 12 }} onClick={() => ouvrirPage("confidentialite")}>
               Politique de confidentialité
             </button>
-            <button style={{ color: "var(--indigo)", textDecoration: "underline", fontSize: 12 }} onClick={() => ouvrirPage("mentions-legales")}>
+            <button className="lien" style={{ fontSize: 12 }} onClick={() => ouvrirPage("mentions-legales")}>
               Mentions légales
             </button>
           </div>

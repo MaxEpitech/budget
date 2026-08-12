@@ -359,7 +359,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
           <div
             className="avis"
             role="status"
-            style={{ marginTop: 0, marginBottom: 14, background: "#EDF1F3", color: "var(--ardoise)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+            style={{ marginTop: 0, marginBottom: 14, background: "var(--filet-fin)", color: "var(--ardoise)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
           >
             <span>{SUPPRESSIONS[annulable.type].nom} « {annulable.libelle} » a été supprimé.</span>
             <button className="btn fant mini" onClick={annulerSuppression}>Annuler</button>

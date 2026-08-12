@@ -67,7 +67,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
               <div className="ligne">
                 <div style={{ minWidth: 0 }}>
                   <div className="ligne-lib">
-                    {c.libelle} {c.solde && <span className="etiq" style={{ background: "#E7F2EE", color: "var(--caisse)" }}>Soldé</span>}
+                    {c.libelle} {c.solde && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Soldé</span>}
                   </div>
                   <div className="ligne-meta">
                     {euro(c.capital)} sur {c.duree} mois à {c.taux}% · échéance {libelleMois(fin)}
@@ -119,7 +119,7 @@ function Amortissement({ credit, mois }) {
   }
   if (lignes.length === 0) return <div className="vide">Crédit soldé — plus d'échéance à venir.</div>;
   return (
-    <div className="corps" style={{ background: "#F7F9FA" }}>
+    <div className="corps" style={{ background: "var(--survol)" }}>
       <table className="amort">
         <thead>
           <tr><th>Échéance</th><th>Intérêts</th><th>Capital</th><th>Restant dû</th></tr>

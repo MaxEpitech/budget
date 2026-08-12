@@ -1,119 +1,445 @@
-/* CSS du prototype d'origine (retiré du dépôt, consultable dans l'historique
-   Git : budget-foyer.jsx), repris à l'identique.
-   Seul ajout : l'hébergement pleine page — le prototype vivait dans un
-   conteneur fourni par son hôte, ici c'est la page qui joue ce rôle. */
+/* ═══════════════════════════════════════════════════════════════════════
+   Budget du foyer — identité visuelle
+   ═══════════════════════════════════════════════════════════════════════
+
+   Parti pris : un livre de comptes, pas un tableau de bord.
+
+   L'application parle de chiffres rangés en colonnes et d'un tout qu'on
+   divise. Elle est donc bâtie sur du papier réglé plutôt que sur des boîtes
+   flottantes : les sections se séparent par des filets et de l'air, les
+   montants s'alignent dans une vraie colonne, et le chiffre est l'élément le
+   plus assuré de l'écran — le libellé s'efface derrière lui.
+
+   Un filet se comporte de la même façon sur 390 px et sur 1280 ; une boîte
+   non. C'est ce qui permet de traiter mobile et bureau à parité.
+
+   Les noms de classes sont ceux d'origine : toute l'interface se rhabille
+   sans qu'aucun composant ne bouge.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Jetons ────────────────────────────────────────────────────────────
+   Le thème clair est défini sur :root, le sombre redéfinit les MÊMES jetons.
+   Aucune couleur n'est écrite ailleurs que dans ces blocs : c'est ce qui
+   garantit que les deux thèmes restent cohérents l'un avec l'autre. */
+:root {
+  /* Encre légèrement verte plutôt que bleu marine : moins « logiciel de
+     banque », plus proche de l'encre d'un registre. */
+  --encre: #151A18;
+  --encre-douce: #2A3330;
+  --papier: #EFEFEA;
+  --craie: #FFFFFF;
+
+  --texte: #151A18;
+  /* Assez sombres pour rester lisibles : les micro-libellés en capitales font
+     10 px, un gris de nuance n'y suffit pas. La hiérarchie tient alors à la
+     taille et à la casse plutôt qu'à la seule clarté. */
+  --texte-doux: #4E5652;
+  --texte-tres-doux: #666D69;
+
+  --filet: #D8D9D2;
+  --filet-fin: #E6E7E1;
+  --survol: #E6E7E1;
+
+  /* Cinq pigments, un par poste. Choisis pour rester distincts entre eux,
+     et pour tenir sur fond clair comme sur fond sombre. */
+  --depenses: #5A6470;
+  --credits: #9C4A45;
+  --projets: #A8742A;
+  --epargne: #3E5C8A;
+  --reste: #2F7156;
+
+  /* Noms hérités du prototype, conservés : les composants les utilisent. */
+  --ardoise: var(--texte-doux);
+  --doux: var(--texte-tres-doux);
+  --trait: var(--filet);
+  --trait-pale: var(--filet-fin);
+  --caisse: var(--reste);
+  --brique: var(--credits);
+  --ocre: var(--projets);
+  --indigo: var(--epargne);
+
+  --sur-encre: #F4F4EF;
+  --sur-encre-doux: #9AA5A0;
+  --filet-encre: #2E3833;
+
+  /* Le bouton d'action se lit par contraste avec la page, pas par sa couleur
+     propre : sur fond clair il est sombre, sur fond sombre il est clair. Sans
+     ce jeton distinct, un bouton « encre » disparaîtrait dans le thème sombre,
+     où la page est elle-même de l'encre. */
+  --action: #151A18;
+  --action-survol: #2A3330;
+  --sur-action: #F4F4EF;
+
+  --ok-fond: #E4EDE7;
+  --ok-texte: #275F49;
+  --alerte-fond: #F5E9DE;
+  --alerte-texte: #8A5518;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --corps: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  /* Rythme vertical unique : tout l'espacement en dérive. */
+  --pas: 8px;
+  --marge-page: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --encre: #0C100F;
+    --encre-douce: #161C1A;
+    --papier: #121614;
+    --craie: #181E1C;
+
+    --texte: #E8EAE5;
+    --texte-doux: #A0A9A4;
+    --texte-tres-doux: #7C847F;
+
+    --filet: #2A322E;
+    --filet-fin: #212825;
+    --survol: #1E2522;
+
+    /* Éclaircis pour tenir sur fond sombre : la teinte est conservée, la
+       luminosité remonte. Les reprendre tels quels les rendrait illisibles. */
+    --depenses: #94A0AC;
+    --credits: #D98A80;
+    --projets: #D9A85C;
+    --epargne: #8DA5D6;
+    --reste: #6BBD97;
+
+    --sur-encre: #E8EAE5;
+    --sur-encre-doux: #8B948F;
+    --filet-encre: #262E2B;
+
+    --action: #E3E6E0;
+    --action-survol: #FFFFFF;
+    --sur-action: #101514;
+
+    --ok-fond: #16261F;
+    --ok-texte: #7FCCA6;
+    --alerte-fond: #2A2016;
+    --alerte-texte: #E0AC6A;
+  }
+}
+
+:root[data-theme="dark"] {
+  --encre: #0C100F;
+  --encre-douce: #161C1A;
+  --papier: #121614;
+  --craie: #181E1C;
+  --texte: #E8EAE5;
+  --texte-doux: #A0A9A4;
+  --texte-tres-doux: #7C847F;
+  --filet: #2A322E;
+  --filet-fin: #212825;
+  --survol: #1E2522;
+  --depenses: #94A0AC;
+  --credits: #D98A80;
+  --projets: #D9A85C;
+  --epargne: #8DA5D6;
+  --reste: #6BBD97;
+  --sur-encre: #E8EAE5;
+  --sur-encre-doux: #8B948F;
+  --filet-encre: #262E2B;
+  --action: #E3E6E0;
+  --action-survol: #FFFFFF;
+  --sur-action: #101514;
+  --ok-fond: #16261F;
+  --ok-texte: #7FCCA6;
+  --alerte-fond: #2A2016;
+  --alerte-texte: #E0AC6A;
+}
+
+/* ─── Socle ─────────────────────────────────────────────────────────── */
 html, body, #root { height: 100%; margin: 0; }
-body { background: #E7EBED; }
+body { background: var(--papier); color: var(--texte); }
 
 .bdg {
-  --encre:#101A24; --ardoise:#46596B; --papier:#E7EBED; --craie:#FFFFFF;
-  --trait:#D3DADE; --caisse:#1D7A5F; --brique:#A93B2E; --ocre:#C08422;
-  --indigo:#3B4C8F; --doux:#7A8B98;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, monospace;
-  --corps: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--papier); color: var(--encre); font-family: var(--corps);
-  min-height:100%; font-size:15px; line-height:1.45; padding-bottom:48px;
+  background: var(--papier);
+  color: var(--texte);
+  font-family: var(--corps);
+  min-height: 100%;
+  font-size: 15px;
+  line-height: 1.5;
+  padding-bottom: calc(var(--pas) * 8);
+  -webkit-font-smoothing: antialiased;
 }
 .bdg *, .bdg *::before, .bdg *::after { box-sizing: border-box; }
 .bdg button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 .bdg input, .bdg select { font: inherit; color: inherit; }
-.bdg :focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
-.bdg .chiffre { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+.bdg :focus-visible { outline: 2px solid var(--epargne); outline-offset: 2px; border-radius: 2px; }
 
-/* En-tête */
-.bdg .entete { background: var(--encre); color: var(--craie); padding: 22px 24px 26px; }
-.bdg .entete-haut { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-.bdg .marque { font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#8FA3B4; margin:0 0 6px; }
-.bdg .mois-nav { display:flex; align-items:center; gap:4px; }
-.bdg .mois-titre { font-size:23px; font-weight:600; letter-spacing:-0.02em; min-width:180px; }
-.bdg .fleche { width:30px; height:30px; border-radius:50%; border:1px solid #2E4254; color:#B9C9D6; display:grid; place-items:center; }
-.bdg .fleche:hover { background:#1B2A38; color:#fff; }
-.bdg .solde { text-align:right; }
-.bdg .solde-lib { font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8FA3B4; }
-.bdg .solde-val { font-size:30px; font-weight:600; }
-.bdg .solde-val.neg { color:#F08C7D; }
+/* Les chiffres sont le sujet : chasse fixe, chiffres tabulaires, serrés. */
+.bdg .chiffre {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  font-feature-settings: "tnum" 1;
+}
 
-/* La bande — élément signature */
-.bdg .bande { display:flex; height:34px; border-radius:5px; overflow:hidden; margin-top:20px; background:#1B2A38; }
-.bdg .seg { position:relative; transition: width .7s cubic-bezier(.22,1,.36,1), filter .15s; min-width:2px; }
-.bdg .seg:hover, .bdg .seg[data-actif="1"] { filter: brightness(1.22); }
-.bdg .seg-pct { position:absolute; inset:0; display:grid; place-items:center; font-size:11px; font-weight:600; color:#fff; font-family:var(--mono); }
-.bdg .legende { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-.bdg .puce { display:flex; align-items:center; gap:7px; padding:6px 11px 6px 8px; border-radius:4px; border:1px solid #2E4254; }
-.bdg .puce[data-actif="1"] { background:#1B2A38; border-color:#3E5568; }
-.bdg .pastille { width:9px; height:9px; border-radius:2px; flex:none; }
-.bdg .puce-lib { font-size:12px; color:#B9C9D6; }
-.bdg .puce-val { font-size:12px; font-weight:600; }
+/* ─── En-tête ───────────────────────────────────────────────────────────
+   Le solde domine ; le mois et la marque passent au second plan. */
+/* L'en-tête et les onglets sont d'encre dans les deux thèmes : les pigments y
+   sont donc toujours ceux du fond sombre. Redéclarés ici, ils se propagent à la
+   bande, aux pastilles, au solde négatif et à l'anneau de focus sans qu'aucun
+   d'eux ait à le savoir. Les versions claires y tombaient sous le seuil. */
+.bdg .entete, .bdg .onglets {
+  --depenses: #94A0AC;
+  --credits: #D98A80;
+  --projets: #D9A85C;
+  --epargne: #8DA5D6;
+  --reste: #6BBD97;
+}
+.bdg .entete {
+  background: var(--encre);
+  color: var(--sur-encre);
+  padding: calc(var(--pas) * 4) var(--marge-page) calc(var(--pas) * 3.5);
+}
+.bdg .entete-haut {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: calc(var(--pas) * 2); flex-wrap: wrap;
+  max-width: 1040px; margin: 0 auto;
+}
+.bdg .marque {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--sur-encre-doux); margin: 0 0 calc(var(--pas) * 1.5);
+}
+.bdg .mois-nav { display: flex; align-items: center; gap: 2px; margin-left: -6px; }
+.bdg .mois-titre {
+  font-size: 19px; font-weight: 500; letter-spacing: -0.01em;
+  min-width: 168px; color: var(--sur-encre);
+}
+.bdg .fleche {
+  width: 30px; height: 30px; border-radius: 50%; color: var(--sur-encre-doux);
+  display: grid; place-items: center; font-size: 18px; line-height: 1;
+  transition: background .15s, color .15s;
+}
+.bdg .fleche:hover { background: var(--filet-encre); color: var(--sur-encre); }
 
-/* Onglets */
-.bdg .onglets { display:flex; gap:2px; padding:0 16px; background:var(--encre); overflow-x:auto; }
-.bdg .onglet { padding:11px 15px; font-size:13px; font-weight:500; color:#8FA3B4; border-radius:5px 5px 0 0; white-space:nowrap; }
-.bdg .onglet:hover { color:#DCE6ED; }
-.bdg .onglet[data-actif="1"] { background:var(--papier); color:var(--encre); font-weight:600; }
+.bdg .solde { text-align: right; }
+.bdg .solde-lib {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--sur-encre-doux); margin-bottom: 2px;
+}
+.bdg .solde-val {
+  font-size: clamp(30px, 6vw, 40px); font-weight: 600; line-height: 1.05;
+  color: var(--sur-encre);
+}
+.bdg .solde-val.neg { color: var(--credits); }
 
-/* Contenu */
-.bdg .zone { padding:22px 24px 0; max-width:960px; }
-.bdg .carte { background:var(--craie); border:1px solid var(--trait); border-radius:7px; margin-bottom:16px; }
-.bdg .carte-tete { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border-bottom:1px solid var(--trait); flex-wrap:wrap; }
-.bdg .carte-titre { font-size:13px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; }
-.bdg .carte-note { font-size:12px; color:var(--doux); }
-.bdg .corps { padding:14px 16px; }
+/* La bande : élément signature, affiné. Des segments jointifs séparés par un
+   mince trait d'encre, comme les colonnes d'un registre. */
+.bdg .bande {
+  display: flex; height: 10px; overflow: hidden; border-radius: 2px;
+  margin: calc(var(--pas) * 3) auto 0; background: var(--filet-encre);
+  max-width: 1040px;
+}
+.bdg .seg {
+  position: relative; min-width: 3px;
+  transition: width .55s cubic-bezier(.22,1,.36,1), filter .15s;
+  border-right: 1px solid var(--encre);
+}
+.bdg .seg:last-child { border-right: none; }
+.bdg .seg:hover, .bdg .seg[data-actif="1"] { filter: brightness(1.25); }
+/* Les pourcentages ne tiennent plus dans une bande fine : la légende les porte. */
+.bdg .seg-pct { display: none; }
 
-.bdg .ligne { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid #EDF1F3; }
-.bdg .ligne:last-child { border-bottom:none; }
-.bdg .ligne:hover .suppr { opacity:1; }
-.bdg .ligne-lib { font-weight:500; }
-.bdg .ligne-meta { font-size:12px; color:var(--doux); margin-top:1px; }
-.bdg .pousse { margin-left:auto; }
-.bdg .montant { font-weight:600; }
-.bdg .montant.pos { color:var(--caisse); }
-.bdg .suppr { opacity:0; color:var(--doux); font-size:17px; line-height:1; padding:2px 6px; border-radius:4px; transition:opacity .15s; }
-.bdg .suppr:hover { color:var(--brique); background:#F6E9E7; }
+.bdg .legende {
+  display: flex; flex-wrap: wrap; gap: calc(var(--pas) * 2.5) calc(var(--pas) * 3);
+  margin: calc(var(--pas) * 2.5) auto 0; max-width: 1040px;
+}
+.bdg .puce {
+  display: flex; align-items: baseline; gap: var(--pas);
+  padding: 0; border: none; border-radius: 0; text-align: left;
+}
+.bdg .puce[data-actif="1"] .puce-val { text-decoration: underline; text-underline-offset: 3px; }
+.bdg .pastille { width: 8px; height: 8px; border-radius: 1px; flex: none; transform: translateY(-1px); }
+.bdg .puce-lib {
+  font-size: 11px; color: var(--sur-encre-doux); letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bdg .puce-val { font-size: 14px; font-weight: 600; color: var(--sur-encre); }
 
-.bdg .etiq { display:inline-block; font-size:11px; padding:2px 7px; border-radius:3px; background:#EDF1F3; color:var(--ardoise); }
-.bdg .etiq.perso { background:#E8EDF7; color:var(--indigo); }
+/* ─── Onglets ───────────────────────────────────────────────────────────
+   Soulignés plutôt qu'en pastilles : la page reste continue sous eux. */
+.bdg .onglets {
+  display: flex; gap: calc(var(--pas) * 3); background: var(--encre);
+  overflow-x: auto; scrollbar-width: none;
+  padding: calc(var(--pas) * 2) var(--marge-page) 0;
+  justify-content: flex-start;
+  box-shadow: inset 0 -1px 0 var(--filet-encre);
+}
+.bdg .onglets::-webkit-scrollbar { display: none; }
+.bdg .onglet {
+  padding: 0 0 calc(var(--pas) * 1.5); font-size: 13.5px; font-weight: 500;
+  color: var(--sur-encre-doux); white-space: nowrap;
+  border-bottom: 2px solid transparent; border-radius: 0;
+  transition: color .15s, border-color .15s;
+}
+.bdg .onglet:hover { color: var(--sur-encre); }
+.bdg .onglet[data-actif="1"] { color: var(--sur-encre); border-bottom-color: var(--sur-encre); font-weight: 600; }
 
-/* Formulaires */
-.bdg .forme { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
-.bdg .champ { display:flex; flex-direction:column; gap:4px; }
-.bdg .champ-lib { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--doux); }
+/* ─── Sections ──────────────────────────────────────────────────────────
+   Ce qui s'appelait « carte » n'est plus une boîte : un titre, un filet,
+   du contenu qui respire. La page est le support, pas le fond. */
+.bdg .zone { padding: calc(var(--pas) * 4) var(--marge-page) 0; max-width: 1040px; margin: 0 auto; }
+
+.bdg .carte {
+  background: none; border: none; border-radius: 0;
+  margin-bottom: calc(var(--pas) * 5.5);
+}
+.bdg .carte-tete {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: calc(var(--pas) * 2); padding: 0 0 calc(var(--pas) * 1.5);
+  border-bottom: 1px solid var(--texte); flex-wrap: wrap;
+}
+.bdg .carte-titre {
+  font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--texte);
+}
+.bdg .carte-note { font-size: 12.5px; color: var(--texte-doux); line-height: 1.45; }
+.bdg .corps { padding: calc(var(--pas) * 2) 0; }
+
+/* ─── Lignes ────────────────────────────────────────────────────────────
+   Une écriture par ligne, un filet fin entre elles, le montant à droite. */
+.bdg .ligne {
+  display: flex; align-items: center; gap: calc(var(--pas) * 2);
+  padding: calc(var(--pas) * 1.75) 0; border-bottom: 1px solid var(--filet-fin);
+}
+.bdg .ligne:last-child { border-bottom: none; }
+.bdg .ligne:hover .suppr { opacity: 1; }
+.bdg .ligne-lib { font-weight: 500; letter-spacing: -0.005em; }
+.bdg .ligne-meta { font-size: 12.5px; color: var(--texte-doux); margin-top: 2px; }
+.bdg .pousse { margin-left: auto; }
+.bdg .montant { font-weight: 600; font-size: 15.5px; }
+.bdg .montant.pos { color: var(--reste); }
+.bdg .suppr {
+  opacity: 0; color: var(--texte-tres-doux); font-size: 18px; line-height: 1;
+  padding: 2px 6px; border-radius: 3px; transition: opacity .15s, color .15s, background .15s;
+}
+.bdg .suppr:hover { color: var(--credits); background: var(--survol); }
+/* Sans survol — au doigt — la croix doit rester atteignable. */
+@media (hover: none) { .bdg .suppr { opacity: 0.55; } }
+
+.bdg .etiq {
+  display: inline-block; font-size: 10.5px; padding: 2px 6px; border-radius: 2px;
+  background: var(--survol); color: var(--texte-doux);
+  letter-spacing: 0.04em; vertical-align: 1px;
+}
+.bdg .etiq.perso { background: transparent; color: var(--epargne); box-shadow: inset 0 0 0 1px currentColor; }
+
+/* ─── Formulaires ───────────────────────────────────────────────────── */
+.bdg .forme { display: flex; flex-wrap: wrap; gap: calc(var(--pas) * 1.5); align-items: flex-end; }
+/* Formulaire empilé — écrans de connexion. Les champs y reprennent leur
+   hauteur naturelle : la base flexible du mobile ne vaut que couchée. */
+.bdg .forme.pile { flex-direction: column; align-items: stretch; }
+.bdg .forme.pile > .champ { flex: 0 0 auto; }
+.bdg .champ { display: flex; flex-direction: column; gap: 5px; }
+.bdg .champ-lib {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--texte-tres-doux);
+}
 .bdg input.saisie, .bdg select.saisie {
-  border:1px solid var(--trait); border-radius:5px; padding:8px 10px; background:var(--craie);
-  min-width:0; height:36px;
+  border: 1px solid var(--filet); border-radius: 3px; padding: 8px 10px;
+  background: var(--craie); color: var(--texte); min-width: 0; height: 38px;
+  transition: border-color .15s;
 }
-.bdg input.saisie:focus, .bdg select.saisie:focus { border-color:var(--indigo); outline:none; }
-.bdg .btn { background:var(--encre); color:var(--craie); padding:9px 15px; border-radius:5px; font-size:13px; font-weight:600; height:36px; }
-.bdg .btn:hover { background:#22364A; }
-.bdg .btn.fant { background:none; color:var(--ardoise); border:1px solid var(--trait); }
-.bdg .btn.fant:hover { background:#EDF1F3; color:var(--encre); }
-.bdg .btn.mini { height:30px; padding:0 11px; font-size:12px; }
-.bdg .bascule { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ardoise); height:36px; padding:0 4px; }
+.bdg input.saisie:focus, .bdg select.saisie:focus { border-color: var(--texte); outline: none; }
+.bdg input.saisie:disabled, .bdg select.saisie:disabled { opacity: .55; cursor: not-allowed; }
+.bdg input.saisie::placeholder { color: var(--texte-tres-doux); }
 
-/* Jauges */
-.bdg .jauge { height:7px; background:#EDF1F3; border-radius:4px; overflow:hidden; margin-top:9px; }
-.bdg .jauge-fill { height:100%; border-radius:4px; transition:width .6s cubic-bezier(.22,1,.36,1); }
-
-.bdg .grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:14px; }
-.bdg .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-.bdg .stat-lib { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--doux); }
-.bdg .stat-val { font-size:21px; font-weight:600; margin-top:2px; }
-.bdg .avis { font-size:12px; padding:7px 11px; border-radius:5px; margin-top:10px; }
-.bdg .avis.ok { background:#E7F2EE; color:var(--caisse); }
-.bdg .avis.alerte { background:#F9EBE3; color:#9A5A18; }
-.bdg .vide { padding:26px 16px; text-align:center; color:var(--doux); font-size:13px; }
-.bdg table.amort { width:100%; border-collapse:collapse; font-size:13px; }
-.bdg table.amort th { text-align:right; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--doux); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--trait); }
-.bdg table.amort th:first-child, .bdg table.amort td:first-child { text-align:left; }
-.bdg table.amort td { text-align:right; padding:6px 8px; border-bottom:1px solid #EDF1F3; }
-
-@media (max-width: 620px) {
-  .bdg .zone { padding:18px 14px 0; }
-  .bdg .entete { padding:18px 14px 22px; }
-  .bdg .duo { grid-template-columns:1fr; }
-  .bdg .solde { text-align:left; }
-  .bdg .seg-pct { font-size:10px; }
-  .bdg .champ { flex:1 1 130px; }
+.bdg .btn {
+  background: var(--action); color: var(--sur-action); padding: 0 16px; border-radius: 3px;
+  font-size: 13px; font-weight: 600; height: 38px; letter-spacing: 0.01em;
+  transition: background .15s, opacity .15s;
 }
+.bdg .btn:hover { background: var(--action-survol); }
+.bdg .btn:disabled { opacity: .45; cursor: not-allowed; }
+.bdg .btn.fant { background: none; color: var(--texte); box-shadow: inset 0 0 0 1px var(--filet); }
+.bdg .btn.fant:hover { background: var(--survol); box-shadow: inset 0 0 0 1px var(--texte-doux); }
+.bdg .btn.mini { height: 30px; padding: 0 11px; font-size: 12px; }
+
+/* Un lien s'écrit à l'encre du texte et se signale par son soulignement.
+   Le bleu de l'épargne servait ici de couleur de lien : deux sens pour une
+   même teinte, c'est un de trop. */
+.bdg .lien {
+  font-size: 13px; color: var(--texte); padding: 6px 4px;
+  text-decoration: underline; text-decoration-color: var(--texte-tres-doux);
+  text-underline-offset: 3px; transition: text-decoration-color .15s;
+}
+.bdg .lien:hover { text-decoration-color: var(--texte); }
+.bdg .bascule {
+  display: flex; align-items: center; gap: 7px; font-size: 13.5px;
+  color: var(--texte-doux); height: 38px; padding: 0 2px;
+}
+.bdg .bascule input { accent-color: var(--action); }
+
+/* ─── Jauges ────────────────────────────────────────────────────────── */
+.bdg .jauge {
+  height: 4px; background: var(--filet-fin); border-radius: 2px;
+  overflow: hidden; margin-top: calc(var(--pas) * 1.25);
+}
+.bdg .jauge-fill { height: 100%; border-radius: 2px; transition: width .55s cubic-bezier(.22,1,.36,1); }
+
+/* ─── Blocs et statistiques ─────────────────────────────────────────── */
+.bdg .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: calc(var(--pas) * 4); }
+/* Une enveloppe projet est une entrée du registre, pas une vignette : un filet
+   la coiffe, comme les sections. Encadrée, elle était le seul îlot de l'écran. */
+.bdg .projet { border-top: 1px solid var(--filet); padding-top: calc(var(--pas) * 1.5); }
+.bdg .duo { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--pas) * 5.5); }
+
+.bdg .stat-lib {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--texte-tres-doux);
+}
+.bdg .stat-val {
+  font-size: 26px; font-weight: 600; margin-top: 3px; letter-spacing: -0.03em;
+}
+
+/* Les avis restent des aplats : c'est le seul endroit où la couleur doit
+   arrêter le regard. */
+.bdg .avis {
+  font-size: 12.5px; padding: 8px 11px; border-radius: 3px;
+  margin-top: calc(var(--pas) * 1.5); line-height: 1.45;
+}
+.bdg .avis.ok { background: var(--ok-fond); color: var(--ok-texte); }
+.bdg .avis.alerte { background: var(--alerte-fond); color: var(--alerte-texte); }
+
+.bdg .vide {
+  padding: calc(var(--pas) * 4) 0; text-align: center;
+  color: var(--texte-tres-doux); font-size: 13.5px;
+}
+
+/* ─── Tableaux ──────────────────────────────────────────────────────── */
+.bdg table.amort { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bdg table.amort th {
+  text-align: right; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--texte-tres-doux); font-weight: 600;
+  padding: 0 10px calc(var(--pas)) 0; border-bottom: 1px solid var(--filet);
+}
+.bdg table.amort th:last-child, .bdg table.amort td:last-child { padding-right: 0; }
+.bdg table.amort th:first-child, .bdg table.amort td:first-child { text-align: left; }
+.bdg table.amort td {
+  text-align: right; padding: calc(var(--pas)) 10px; border-bottom: 1px solid var(--filet-fin);
+}
+.bdg table.amort tbody tr:last-child td { border-bottom: none; }
+
+/* ─── Adaptations ───────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  :root { --marge-page: 16px; }
+  .bdg .duo { grid-template-columns: 1fr; gap: calc(var(--pas) * 4); }
+  .bdg .solde { text-align: left; }
+  .bdg .entete-haut { gap: calc(var(--pas) * 2); }
+  .bdg .champ { flex: 1 1 140px; }
+  /* Les onglets débordent volontairement : un dégradé au bord dit qu'il y a
+     une suite, là où une coupe nette laisse croire à une fin. */
+  .bdg .onglets {
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .bdg .legende { gap: calc(var(--pas) * 1.75) calc(var(--pas) * 2.5); }
+  .bdg .stat-val { font-size: 23px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .bdg .seg, .bdg .jauge-fill { transition:none; }
+  .bdg .seg, .bdg .jauge-fill, .bdg .fleche, .bdg .onglet, .bdg .btn { transition: none; }
 }

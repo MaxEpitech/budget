@@ -13,7 +13,7 @@ function ACompleter({ children }) {
   return (
     <span
       className="etiq"
-      style={{ background: "#F9EBE3", color: "#9A5A18", fontWeight: 600, letterSpacing: "0.02em" }}
+      style={{ background: "var(--alerte-fond)", color: "var(--alerte-texte)", fontWeight: 600, letterSpacing: "0.02em" }}
     >
       À COMPLÉTER — {children}
     </span>

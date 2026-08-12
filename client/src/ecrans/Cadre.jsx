@@ -36,22 +36,18 @@ export default function Cadre({ titre, note, erreur, message, children, bas, lar
   );
 }
 
-// Champs empilés : .forme est horizontale par défaut, on la redresse ici.
+// Champs empilés : .forme est horizontale par défaut, .pile la redresse.
+// Le redressement passe par une classe et non par un style en ligne, parce que
+// l'adaptation mobile de .champ doit pouvoir s'annuler ici : une base flexible
+// de 140 px devient une hauteur de 140 px dès que la direction change.
 export function Colonne({ children }) {
-  return (
-    <div className="forme" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
-      {children}
-    </div>
-  );
+  return <div className="forme pile">{children}</div>;
 }
 
 // Lien discret pour passer d'un écran à l'autre.
 export function Lien({ onClick, children }) {
   return (
-    <button
-      onClick={onClick}
-      style={{ fontSize: 13, color: "var(--indigo)", textDecoration: "underline", padding: "6px 4px" }}
-    >
+    <button className="lien" onClick={onClick}>
       {children}
     </button>
   );
