@@ -64,6 +64,31 @@ export const ilYA = (iso) => {
 
 export const CATEGORIES = ["Logement", "Courses", "Transport", "Énergie", "Abonnements", "Santé", "Loisirs", "Enfants", "Assurances", "Impôts", "Autre"];
 
+// ─── Une teinte par personne ────────────────────────────────────────────
+// La couleur vient du rang dans le foyer, pas d'une colonne en base : rien à
+// migrer, rien à choisir à l'inscription, et la même personne garde la même
+// teinte d'un écran à l'autre. Ce qui est commun au foyer reste neutre —
+// c'est justement ce qui n'appartient à personne.
+export const TEINTES_MEMBRE = ["--membre-1", "--membre-2", "--membre-3", "--membre-4", "--membre-5", "--membre-6"];
+
+export const teinteMembre = (membres, pour) => {
+  if (pour == null || pour === "foyer") return "var(--depenses)";
+  const rang = membres.findIndex((m) => m.id === pour);
+  return rang < 0 ? "var(--depenses)" : `var(${TEINTES_MEMBRE[rang % TEINTES_MEMBRE.length]})`;
+};
+
+// ─── L'état d'une enveloppe ─────────────────────────────────────────────
+// La couleur change avant le dépassement : prévenir après coup n'aurait servi
+// à rien. Partagée entre l'enveloppe et les dépenses qu'elle couvre, pour que
+// les deux ne puissent pas se contredire.
+export const SEUIL_BUDGET = 0.85;
+
+export const couleurBudget = (part) => {
+  if (part > 1) return "var(--brique)";
+  if (part >= SEUIL_BUDGET) return "var(--ocre)";
+  return "var(--caisse)";
+};
+
 export const POSTES = {
   depenses: { nom: "Dépenses", var: "--ardoise" },
   credits: { nom: "Crédits", var: "--brique" },

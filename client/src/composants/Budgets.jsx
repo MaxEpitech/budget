@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
 import Jauge from "./Jauge.jsx";
-import { euro, num, CATEGORIES } from "../utiles.js";
+import { euro, num, CATEGORIES, couleurBudget } from "../utiles.js";
 
 /**
  * Enveloppes mensuelles par catégorie.
@@ -12,13 +12,8 @@ import { euro, num, CATEGORIES } from "../utiles.js";
  * qui intéresse. Chaque enveloppe est donc montrée pleine ou vide, et la couleur
  * change avant le dépassement — prévenir après coup n'aurait servi à rien.
  */
-const SEUIL_ALERTE = 0.85;
-
-function couleurDe(part) {
-  if (part > 1) return "var(--brique)";
-  if (part >= SEUIL_ALERTE) return "var(--ocre)";
-  return "var(--caisse)";
-}
+// Le seuil et les couleurs vivent dans utiles.js : les dépenses de l'onglet
+// Flux s'en servent aussi, et deux définitions finiraient par diverger.
 
 export default function Budgets({ budgets, executer }) {
   const [f, setF] = useState({ categorie: "", montant: "" });
@@ -59,7 +54,7 @@ export default function Budgets({ budgets, executer }) {
                 <span style={{ color: "var(--doux)", fontWeight: 400, fontSize: 14 }}>/ {euro(b.montant)}</span>
               </div>
             </div>
-            <Jauge pct={part * 100} couleur={couleurDe(part)} />
+            <Jauge pct={part * 100} couleur={couleurBudget(part)} />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 7, flexWrap: "wrap" }}>
               <div className="carte-note">
                 {restant >= 0

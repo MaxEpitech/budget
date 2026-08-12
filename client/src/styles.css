@@ -46,6 +46,16 @@
   --epargne: #0369A1;
   --reste: #047857;
 
+  /* Une teinte par personne du foyer, attribuée selon le rang. Six suffisent :
+     au-delà, on recommence — un foyer de sept personnes reste rare, et deux
+     teintes identiques y gêneraient moins que six teintes indistinctes. */
+  --membre-1: #7C3AED;
+  --membre-2: #0F766E;
+  --membre-3: #C2410C;
+  --membre-4: #1D4ED8;
+  --membre-5: #BE185D;
+  --membre-6: #15803D;
+
   /* La couleur des commandes, qui n'est celle d'aucun poste. */
   --accent: #4F46E5;
   --accent-survol: #4338CA;
@@ -110,6 +120,12 @@
     --epargne: #56B6F0;
     --reste: #34D399;
 
+    --membre-1: #C4B5FD;
+    --membre-2: #5EEAD4;
+    --membre-3: #FDBA74;
+    --membre-4: #93C5FD;
+    --membre-5: #F9A8D4;
+    --membre-6: #86EFAC;
     --accent: #818CF8;
     --accent-survol: #A5B0FC;
     --accent-pale: #20243A;
@@ -143,6 +159,12 @@
   --projets: #F0B357;
   --epargne: #56B6F0;
   --reste: #34D399;
+  --membre-1: #C4B5FD;
+  --membre-2: #5EEAD4;
+  --membre-3: #FDBA74;
+  --membre-4: #93C5FD;
+  --membre-5: #F9A8D4;
+  --membre-6: #86EFAC;
   --accent: #818CF8;
   --accent-survol: #A5B0FC;
   --accent-pale: #20243A;
@@ -399,7 +421,20 @@ body { background: var(--fond); color: var(--texte); }
   background: var(--survol); color: var(--texte-doux); font-weight: 500;
   vertical-align: 1px;
 }
-.bdg .etiq.perso { background: var(--accent-pale); color: var(--accent); }
+/* Étiquette teintée : la personne concernée, ou l'état de l'enveloppe. La
+   teinte arrive par --teinte, posée sur l'élément — un seul style couvre les
+   deux usages, et rien n'est écrit en dur dans les composants.
+
+   Le fond reste très pâle et c'est le liseré qui porte la couleur : un aplat
+   assez soutenu pour se voir aurait fait tomber le texte sous le seuil de
+   lisibilité. Le fond se mélange à --surface et non au parent, pour que la
+   même étiquette tienne aussi sur une carte teintée ou une ligne survolée. */
+.bdg .etiq.perso, .bdg .etiq.budget {
+  color: var(--teinte, var(--accent));
+  background: color-mix(in srgb, var(--teinte, var(--accent)) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teinte, var(--accent)) 32%, transparent);
+  font-weight: 550;
+}
 
 /* ─── Formulaires ───────────────────────────────────────────────────── */
 .bdg .forme { display: flex; flex-wrap: wrap; gap: calc(var(--pas) * 1.5); align-items: flex-end; }

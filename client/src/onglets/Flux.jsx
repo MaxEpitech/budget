@@ -5,7 +5,7 @@ import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import Budgets from "../composants/Budgets.jsx";
-import { euro, num, libelleMois, CATEGORIES } from "../utiles.js";
+import { euro, num, libelleMois, CATEGORIES, teinteMembre, couleurBudget } from "../utiles.js";
 
 const RYTHMES = [
   { cle: "mensuel", nom: "Tous les mois" },
@@ -51,6 +51,25 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
 
   const retirer = (t) => supprimer("transactions", t.id, t.libelle);
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
+
+  // Une dépense qui pioche dans une enveloppe le montre : la catégorie prend
+  // la couleur de l'enveloppe, et son taux de remplissage. Sans cela il fallait
+  // descendre jusqu'aux budgets pour savoir si une ligne posait problème.
+  const enveloppes = new Map((etat.budgets ?? []).map((b) => [b.categorie, b]));
+  const etiquetteCategorie = (t) => {
+    const b = t.type === "depense" ? enveloppes.get(t.categorie) : null;
+    if (!b) return t.categorie;
+    const part = b.montant > 0 ? b.consomme / b.montant : 0;
+    return (
+      <span
+        className="etiq budget chiffre"
+        style={{ "--teinte": couleurBudget(part) }}
+        title={`Enveloppe ${t.categorie} : ${euro(b.consomme)} sur ${euro(b.montant)}`}
+      >
+        {t.categorie} {Math.round(part * 100)}%
+      </span>
+    );
+  };
 
   const recurrents = calc.actifs.filter((t) => t.recurrent);
   const ponctuels = calc.actifs.filter((t) => !t.recurrent);
@@ -98,7 +117,8 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
             <div>
               <div className="ligne-lib">{t.libelle}</div>
               <div className="ligne-meta">
-                <span className={`etiq ${t.pour !== "foyer" ? "perso" : ""}`}>{nomDe(t.pour)}</span> · {t.categorie} · {decrireRythme(t)}
+                <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
+                {" · "}{etiquetteCategorie(t)} · {decrireRythme(t)}
               </div>
             </div>
             <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
@@ -116,7 +136,8 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
             <div>
               <div className="ligne-lib">{t.libelle}</div>
               <div className="ligne-meta">
-                <span className={`etiq ${t.pour !== "foyer" ? "perso" : ""}`}>{nomDe(t.pour)}</span> · {t.categorie}
+                <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
+                {" · "}{etiquetteCategorie(t)}
               </div>
             </div>
             <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
@@ -134,7 +155,10 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
           <div className="corps" key={m.id} style={{ borderBottom: "1px solid var(--filet-fin)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <div className="ligne-lib">{m.nom}</div>
+                <div className="ligne-lib" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="pastille" style={{ background: teinteMembre(etat.membres, m.id) }} />
+                  {m.nom}
+                </div>
                 <div className="ligne-meta">
                   Revenus {euro(m.revenu + m.bonus)} · quote-part {Math.round(m.part * 100)}% ({euro(m.du)}) · perso {euro(m.perso)}
                 </div>
@@ -144,7 +168,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
                 <div className="stat-val chiffre" style={{ color: m.reste < 0 ? "var(--brique)" : "var(--caisse)" }}>{euro(m.reste)}</div>
               </div>
             </div>
-            <Jauge pct={(m.du + m.perso) / Math.max(1, m.revenu + m.bonus) * 100} couleur="var(--ardoise)" />
+            <Jauge pct={(m.du + m.perso) / Math.max(1, m.revenu + m.bonus) * 100} couleur={teinteMembre(etat.membres, m.id)} />
           </div>
         ))}
       </Carte>

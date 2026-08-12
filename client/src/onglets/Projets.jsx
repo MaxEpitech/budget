@@ -6,7 +6,7 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
-import { euro, euroPrecis, num, libelleMois, libelleDate, decalerMois, ecartMois } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, libelleDate, decalerMois, ecartMois, teinteMembre } from "../utiles.js";
 
 export default function Projets({ etat, mois, executer, modifier, supprimer }) {
   const [f, setF] = useState({ libelle: "", objectif: "", echeance: decalerMois(mois, 12), versement: "" });
@@ -15,6 +15,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
   const [contributeurs, setContributeurs] = useState({});
   const contributeurDe = (id) => contributeurs[id] ?? "foyer";
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
+  const teinteDe = (cle) => teinteMembre(etat.membres, cle);
 
   const ajouter = () => {
     if (!f.libelle.trim() || num(f.objectif) <= 0) return;
@@ -86,7 +87,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
                       </button>
                     )}
                   </div>
-                  {historique === p.id && <Historique versements={p.versements} nomDe={nomDe} />}
+                  {historique === p.id && <Historique versements={p.versements} nomDe={nomDe} teinteDe={teinteDe} />}
                 </div>
               );
             })}
@@ -112,7 +113,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
 
 // Mouvements de l'enveloppe, du plus récent au plus ancien (ordre servi par l'API),
 // avec qui a mis au pot et le cumul par contributeur.
-function Historique({ versements, nomDe }) {
+function Historique({ versements, nomDe, teinteDe }) {
   const total = versements.reduce((s, v) => s + v.montant, 0);
 
   // Cumul par contributeur, dans l'ordre d'apparition dans l'historique.
@@ -128,7 +129,7 @@ function Historique({ versements, nomDe }) {
       {versements.map((v) => (
         <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
           <span className="ligne-meta">
-            <span className={`etiq ${v.pour !== "foyer" ? "perso" : ""}`}>{nomDe(v.pour)}</span> · {libelleDate(v.date)}
+            <span className="etiq perso" style={{ "--teinte": teinteDe(v.pour) }}>{nomDe(v.pour)}</span> · {libelleDate(v.date)}
           </span>
           <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>
         </div>
@@ -137,7 +138,10 @@ function Historique({ versements, nomDe }) {
         {parContributeur.length > 1 &&
           parContributeur.map((c) => (
             <div key={c.pour} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "2px 0" }}>
-              <span className="ligne-meta">{nomDe(c.pour)}</span>
+              <span className="ligne-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span className="pastille" style={{ background: teinteDe(c.pour) }} />
+                {nomDe(c.pour)}
+              </span>
               <span className="chiffre" style={{ fontSize: 13 }}>{euroPrecis(c.montant)}</span>
             </div>
           ))}

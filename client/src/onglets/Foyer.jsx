@@ -8,7 +8,7 @@ import Carte from "../composants/Carte.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
 import Acces from "../composants/Acces.jsx";
 import Sessions from "../composants/Sessions.jsx";
-import { euro, num, moisCle, decalerMois } from "../utiles.js";
+import { euro, num, moisCle, decalerMois, teinteMembre } from "../utiles.js";
 
 // Supprime transactions, crédits, projets et placements (les membres restent).
 async function toutSupprimer() {
@@ -171,9 +171,11 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
 
   return (
     <>
-      <Carte titre="Les deux revenus" note="Salaires nets mensuels du foyer">
+      <Carte titre={etat.membres.length === 1 ? "Le revenu" : `Les ${etat.membres.length} revenus`} note="Salaires nets mensuels du foyer">
         {etat.membres.map((m) => (
           <div className="ligne" key={m.id}>
+            {/* La même teinte que dans « Qui paie quoi » et sur les étiquettes. */}
+            <span className="pastille" style={{ background: teinteMembre(etat.membres, m.id) }} />
             <Champ libelle="Prénom" valeur={m.nom} onChange={(v) => modifierMembre(m.id, { nom: v })} largeur={150} />
             <Champ libelle="Revenu net /mois" valeur={String(m.revenu)} onChange={(v) => modifierMembre(m.id, { revenu: num(v) })} largeur={130} />
             <div className="pousse" style={{ textAlign: "right" }}>
