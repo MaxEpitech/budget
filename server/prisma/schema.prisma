@@ -138,20 +138,21 @@ model Invitation {
 }
 
 model Membre {
-  id            String        @id @default(cuid())
-  nom           String
-  revenuMensuel Int // centimes
-  foyer         Foyer         @relation(fields: [foyerId], references: [id], onDelete: Cascade)
-  foyerId       Int
-  transactions  Transaction[]
-  versements    Versement[]
-  invitations   Invitation[]
+  id                  String               @id @default(cuid())
+  nom                 String
+  revenuMensuel       Int // centimes
+  foyer               Foyer                @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyerId             Int
+  transactions        Transaction[]
+  versements          Versement[]
+  invitations         Invitation[]
   // Le compte qui incarne ce membre, s'il en a un. Supprimer le compte ne
   // supprime pas le membre : ses transactions et son revenu restent au budget.
-  utilisateur   Utilisateur?  @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
-  utilisateurId String?       @unique
-  creeLe        DateTime      @default(now())
-  modifieLe     DateTime      @updatedAt
+  utilisateur         Utilisateur?         @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
+  utilisateurId       String?              @unique
+  creeLe              DateTime             @default(now())
+  modifieLe           DateTime             @updatedAt
+  mouvementPlacements MouvementPlacement[]
 
   @@index([foyerId])
 }
@@ -270,17 +271,39 @@ model LimiteCadence {
 }
 
 model Placement {
-  id               String   @id @default(cuid())
+  id               String               @id @default(cuid())
   libelle          String
   valeur           Int // centimes
   versementMensuel Int // centimes
   rendement        Float // rendement annuel, en %
   // Plafond de versements (livrets réglementés) ; null = pas de plafond.
   plafond          Int? // centimes
-  foyer            Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  mouvements       MouvementPlacement[]
+  foyer            Foyer                @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId          Int
-  creeLe           DateTime @default(now())
-  modifieLe        DateTime @updatedAt
+  creeLe           DateTime             @default(now())
+  modifieLe        DateTime             @updatedAt
 
   @@index([foyerId])
+}
+
+// Ce qu'on verse ou retire d'un support, acte par acte. Les intérêts n'y
+// figurent pas : ils ne sont l'acte de personne, et se lisent dans l'écart
+// entre la valeur du support et la somme des mouvements.
+model MouvementPlacement {
+  id          String    @id @default(cuid())
+  placement   Placement @relation(fields: [placementId], references: [id], onDelete: Cascade)
+  placementId String
+  type        String // "versement" | "retrait"
+  montant     Int // centimes, toujours positif : le type porte le sens
+  // Ce que valait le support juste après. Impossible à recalculer plus tard :
+  // la valeur bouge aussi sans mouvement, quand la banque verse ses intérêts.
+  valeurApres Int // centimes
+  // Qui a versé : null = mouvement du foyer, sinon le membre concerné.
+  membre      Membre?   @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId    String?
+  date        DateTime  @default(now())
+  creeLe      DateTime  @default(now())
+
+  @@index([placementId])
 }

@@ -72,6 +72,14 @@ export const VersementSchema = z.object({
   pour: chaine("pour").default("foyer"),
 });
 
+// Un mouvement de support : ce qu'on y verse ou ce qu'on en retire.
+export const MouvementSchema = z.object({
+  type: z.enum(["versement", "retrait"], "type : « versement » ou « retrait » attendu"),
+  montant: montantPositif("montant"),
+  // Qui a versé : "foyer" par défaut, ou l'id d'un membre.
+  pour: chaine("pour").default("foyer"),
+});
+
 export const PlacementSchema = z.object({
   libelle: chaine("libellé"),
   valeur: positifOuNul("valeur"),

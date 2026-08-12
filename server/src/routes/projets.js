@@ -60,4 +60,23 @@ routeur.post("/:id/versements", valider(VersementSchema), attraper(async (req, r
   res.status(201).json(versementVersApi(versement));
 }));
 
+/**
+ * Retirer un versement de l'historique.
+ *
+ * L'épargne du projet étant la somme de ses versements, elle se corrige d'
+ * elle-même : rien à recalculer, rien qui puisse diverger. C'est tout
+ * l'intérêt de ne jamais avoir figé ce total.
+ *
+ * Le filtre porte sur le projet ET le foyer : un identifiant venu d'ailleurs se
+ * comporte exactement comme un identifiant inexistant.
+ */
+routeur.delete("/:id/versements/:versementId", attraper(async (req, res) => {
+  const foyerId = await foyerCourant(req);
+  const supprimes = await prisma.versement.deleteMany({
+    where: { id: req.params.versementId, projetId: req.params.id, projet: { foyerId } },
+  });
+  if (supprimes.count === 0) return res.status(404).json({ erreur: "Versement introuvable" });
+  res.status(204).end();
+}));
+
 export default routeur;

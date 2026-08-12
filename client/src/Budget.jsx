@@ -387,7 +387,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
         {onglet === "historique" && <Historique mois={mois} />}
         {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
         {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
-        {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} supprimer={supprimer} />}
+        {onglet === "epargne" && <Epargne etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} onCompteSupprime={onSessionExpiree} ouvrirPage={ouvrirPage} />}
       </div>
     </div>

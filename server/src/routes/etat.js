@@ -32,7 +32,9 @@ routeur.get("/", attraper(async (req, res) => {
     prisma.transaction.findMany({ where: { foyerId, OR: [{ recurrent: true }, { mois }] }, orderBy: { id: "desc" } }),
     prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
-    prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    // Les mouvements viennent avec : c'est eux qui disent si le versement
+    // mensuel annoncé a réellement eu lieu ce mois-ci.
+    prisma.placement.findMany({ where: { foyerId }, include: { mouvements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
     prisma.budget.findMany({ where: { foyerId }, orderBy: { categorie: "asc" } }),
   ]);
 

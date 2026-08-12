@@ -110,6 +110,16 @@ export const projetVersDb = (d) => {
 };
 
 /* ─── Placement ─── */
+// `pour` : "foyer" ou l'id du membre qui a versé (membreId en base).
+export const mouvementVersApi = (m) => ({
+  id: m.id,
+  type: m.type,
+  montant: enEuros(m.montant),
+  valeurApres: enEuros(m.valeurApres),
+  date: m.date,
+  pour: m.membreId ?? "foyer",
+});
+
 export const placementVersApi = (p) => ({
   id: p.id,
   libelle: p.libelle,
@@ -117,6 +127,10 @@ export const placementVersApi = (p) => ({
   versement: enEuros(p.versementMensuel),
   rendement: p.rendement,
   plafond: p.plafond == null ? null : enEuros(p.plafond),
+  // Les mouvements accompagnent toujours le support : c'est leur somme qui dit
+  // ce qui a réellement été mis de côté, quand la valeur, elle, comprend aussi
+  // les intérêts.
+  mouvements: (p.mouvements ?? []).map(mouvementVersApi),
 });
 
 export const placementVersDb = (d) => {

@@ -6,7 +6,7 @@ import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
-import { euro, euroPrecis, num, libelleMois, libelleDate, decalerMois, ecartMois, teinteMembre } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, libelleDate, moisCle, decalerMois, ecartMois, teinteMembre, verseCeMois } from "../utiles.js";
 
 export default function Projets({ etat, mois, executer, modifier, supprimer }) {
   const [f, setF] = useState({ libelle: "", objectif: "", echeance: decalerMois(mois, 12), versement: "" });
@@ -48,6 +48,12 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
               const requis = restant / moisRestants;
               const suffisant = p.versement >= requis - 0.5;
               const pct = (p.epargne / Math.max(1, p.objectif)) * 100;
+              // Le budget compte ce versement tous les mois ; encore faut-il
+              // qu'il ait eu lieu. Sur un mois passé le constat reste vrai, mais
+              // n'appelle plus d'action : on ne verse qu'aujourd'hui, et
+              // antidater un versement mentirait sur la date du mouvement.
+              const manquant = p.versement > 0 && !verseCeMois(p.versements, mois) && restant > 0;
+              const aRelancer = manquant && mois === moisCle();
               return (
                 <div key={p.id} className="projet">
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -66,6 +72,11 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
                       ? `À ${euro(p.versement)}/mois, l'objectif est tenu.`
                       : `Il faudrait ${euro(requis)}/mois (soit ${euro(requis - p.versement)} de plus).`}
                   </div>
+                  {manquant && (
+                    <div className="avis alerte">
+                      Rien versé en {libelleMois(mois).toLowerCase()}.
+                    </div>
+                  )}
                   <div className="forme" style={{ marginTop: 10 }}>
                     <Champ libelle="Versement /mois" valeur={String(p.versement)} onChange={(v) => modifier("projets", p.id, { versement: num(v) })} largeur={110} />
                     <Champ libelle="Échéance" valeur={p.echeance} onChange={(v) => v && modifier("projets", p.id, { echeance: v })} largeur={130} type="month" />
@@ -73,7 +84,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
                       options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-                    <button className="btn mini" onClick={() => verser(p)}>
+                    <button className={`btn mini ${aRelancer ? "" : "fant"}`} onClick={() => verser(p)}>
                       Verser {euro(p.versement)}
                     </button>
                     {!suffisant && (
@@ -87,7 +98,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
                       </button>
                     )}
                   </div>
-                  {historique === p.id && <Historique versements={p.versements} nomDe={nomDe} teinteDe={teinteDe} />}
+                  {historique === p.id && <Historique projet={p} nomDe={nomDe} teinteDe={teinteDe} executer={executer} />}
                 </div>
               );
             })}
@@ -113,7 +124,8 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
 
 // Mouvements de l'enveloppe, du plus récent au plus ancien (ordre servi par l'API),
 // avec qui a mis au pot et le cumul par contributeur.
-function Historique({ versements, nomDe, teinteDe }) {
+function Historique({ projet, nomDe, teinteDe, executer }) {
+  const versements = projet.versements;
   const total = versements.reduce((s, v) => s + v.montant, 0);
 
   // Cumul par contributeur, dans l'ordre d'apparition dans l'historique.
@@ -127,11 +139,17 @@ function Historique({ versements, nomDe, teinteDe }) {
   return (
     <div style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--trait)" }}>
       {versements.map((v) => (
-        <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+        <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "3px 0" }}>
           <span className="ligne-meta">
             <span className="etiq perso" style={{ "--teinte": teinteDe(v.pour) }}>{nomDe(v.pour)}</span> · {libelleDate(v.date)}
           </span>
-          <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>
+            {/* L'épargne du projet étant la somme des versements, la retirer
+                corrige le total sans qu'aucun recalcul soit nécessaire. */}
+            <button className="suppr" onClick={() => executer(() => api.supprimerVersement(projet.id, v.id))}
+              aria-label={`Supprimer le versement du ${libelleDate(v.date)}`}>×</button>
+          </span>
         </div>
       ))}
       <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px solid var(--filet-fin)" }}>

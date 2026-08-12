@@ -3,14 +3,15 @@ import { useState, useMemo } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
-import { euro, num, libelleMois, moisCle, decalerMois } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, libelleDate, moisCle, decalerMois, verseCeMois, teinteMembre } from "../utiles.js";
 import { projeterPlafonne, verseAvecPlafond, moisAvantPlafond } from "../finance.js";
 
 // Un plafond vide ou nul signifie « pas de plafond ».
 const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
 
-export default function Epargne({ etat, executer, modifier, supprimer }) {
+export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
   const [horizon, setHorizon] = useState(10);
+  const [ouvert, setOuvert] = useState(null);
   const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "" });
 
   const ajouter = () => {
@@ -82,8 +83,16 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
           // Découvrir le plafond une fois dedans est trop tard : les versements
           // versés au-delà sont refusés par la banque. On annonce la date.
           const echeance = atteint ? null : moisAvantPlafond(p.valeur, p.versement, p.rendement, p.plafond);
+          // Le budget annonce ce versement tous les mois ; encore faut-il qu'il
+          // ait eu lieu.
+          const aVerse = verseCeMois(p.mouvements, mois);
+          const manquant = p.versement > 0 && !aVerse && !atteint;
+          // Sur un mois passé, le constat reste vrai mais n'appelle plus
+          // d'action : on ne verse qu'aujourd'hui.
+          const aRelancer = manquant && mois === moisCle();
           return (
-            <div className="ligne" key={p.id}>
+            <div key={p.id}>
+            <div className="ligne">
               <div style={{ minWidth: 140 }}>
                 <div className="ligne-lib">
                   {p.libelle}{" "}
@@ -99,6 +108,12 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
                     {echeance <= 12 ? " — moins d'un an." : `, dans ${Math.round(echeance / 12)} ans.`}
                   </div>
                 )}
+                {manquant && (
+                  <div className="avis alerte" style={{ marginTop: 6 }}>
+                    Aucun versement en {libelleMois(mois).toLowerCase()}, alors que le budget en compte{" "}
+                    {euro(p.versement)}.
+                  </div>
+                )}
               </div>
               <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
                 <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />
@@ -107,6 +122,23 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
                 <Champ libelle="Plafond" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur={100} placeholder="aucun" />
               </div>
               <button className="suppr" onClick={() => supprimer("placements", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
+            </div>
+
+            <div className="corps" style={{ paddingTop: 0, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {p.versement > 0 && !atteint && (
+                <button className={`btn mini ${aRelancer ? "" : "fant"}`}
+                  onClick={() => executer(() => api.mouvementer(p.id, "versement", p.versement))}>
+                  Verser {euro(p.versement)}
+                </button>
+              )}
+              <button className="btn fant mini" onClick={() => setOuvert(ouvert === p.id ? null : p.id)}>
+                {ouvert === p.id ? "Masquer" : `Mouvements (${p.mouvements?.length ?? 0})`}
+              </button>
+            </div>
+
+            {ouvert === p.id && (
+              <Mouvements placement={p} membres={etat.membres} executer={executer} />
+            )}
             </div>
           );
         })}
@@ -150,5 +182,70 @@ function Courbe({ points }) {
         ) : null
       )}
     </svg>
+  );
+}
+
+/**
+ * Historique d'un support : ce qui a été versé, ce qui a été retiré.
+ *
+ * Les intérêts n'y figurent pas — ils ne sont l'acte de personne, et se lisent
+ * dans l'écart entre la valeur du support et le cumul des mouvements. Cet écart
+ * n'est pas pour autant un gain : il contient aussi ce que le support valait
+ * avant qu'on commence à le suivre. Le texte le dit plutôt que de laisser croire
+ * à une performance.
+ */
+function Mouvements({ placement, membres, executer }) {
+  const [f, setF] = useState({ montant: "", type: "versement", pour: "foyer" });
+  const mouvements = placement.mouvements ?? [];
+
+  const nomDe = (cle) => (cle === "foyer" ? "Foyer" : membres.find((m) => m.id === cle)?.nom || "—");
+  const verse = mouvements.reduce((s, m) => s + (m.type === "retrait" ? -m.montant : m.montant), 0);
+
+  const enregistrer = () => {
+    if (num(f.montant) <= 0) return;
+    executer(() => api.mouvementer(placement.id, f.type, num(f.montant), f.pour));
+    setF({ ...f, montant: "" });
+  };
+
+  return (
+    <div className="corps" style={{ background: "var(--survol)" }}>
+      <div className="forme">
+        <Champ libelle="Montant" valeur={f.montant} onChange={(v) => setF({ ...f, montant: v })} largeur={110} placeholder="0" onEntree={enregistrer} />
+        <Champ libelle="Sens" valeur={f.type} onChange={(v) => setF({ ...f, type: v })} largeur={130}
+          options={[{ v: "versement", l: "Versement" }, { v: "retrait", l: "Retrait" }]} />
+        <Champ libelle="Qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={120}
+          options={[{ v: "foyer", l: "Foyer" }, ...membres.map((m) => ({ v: m.id, l: m.nom }))]} />
+        <button className="btn mini" onClick={enregistrer}>Enregistrer</button>
+      </div>
+
+      {mouvements.length === 0 && (
+        <div className="vide">Aucun mouvement enregistré sur ce support.</div>
+      )}
+
+      {mouvements.map((m) => (
+        <div key={m.id} className="ligne" style={{ paddingLeft: 0, paddingRight: 0 }}>
+          <span className="ligne-meta">
+            <span className="etiq perso" style={{ "--teinte": teinteMembre(membres, m.pour) }}>{nomDe(m.pour)}</span>
+            {" · "}{libelleDate(m.date)}
+          </span>
+          <span className="pousse chiffre" style={{ fontWeight: 600, color: m.type === "retrait" ? "var(--brique)" : "var(--caisse)" }}>
+            {m.type === "retrait" ? "−" : "+"}{euroPrecis(m.montant)}
+          </span>
+          <span className="ligne-meta" style={{ minWidth: 92, textAlign: "right" }}>
+            solde {euro(m.valeurApres)}
+          </span>
+          <button className="suppr" onClick={() => executer(() => api.supprimerMouvement(placement.id, m.id))}
+            aria-label="Supprimer ce mouvement">×</button>
+        </div>
+      ))}
+
+      {mouvements.length > 0 && (
+        <div className="carte-note" style={{ marginTop: 10 }}>
+          {euro(verse)} de mouvements enregistrés. La valeur du support, {euro(placement.valeur)},
+          comprend aussi ce qui s'y trouvait avant le premier mouvement et les intérêts versés
+          depuis. Supprimer un mouvement retire son effet de cette valeur.
+        </div>
+      )}
+    </div>
   );
 }

@@ -73,11 +73,14 @@ export const api = {
   modifierProjet: (id, patch, options) => requete(`/projets/${id}`, "PUT", patch, options),
   supprimerProjet: (id, options) => requete(`/projets/${id}`, "DELETE", undefined, options),
   verser: (id, montant, pour = "foyer") => requete(`/projets/${id}/versements`, "POST", { montant, pour }),
+  supprimerVersement: (projetId, versementId) => requete(`/projets/${projetId}/versements/${versementId}`, "DELETE"),
 
   placements: () => requete("/placements"),
   creerPlacement: (p) => requete("/placements", "POST", p),
   modifierPlacement: (id, patch, options) => requete(`/placements/${id}`, "PUT", patch, options),
   supprimerPlacement: (id, options) => requete(`/placements/${id}`, "DELETE", undefined, options),
+  mouvementer: (id, type, montant, pour = "foyer") => requete(`/placements/${id}/mouvements`, "POST", { type, montant, pour }),
+  supprimerMouvement: (placementId, mouvementId) => requete(`/placements/${placementId}/mouvements/${mouvementId}`, "DELETE"),
 
   membres: () => requete("/membres"),
   creerMembre: (m) => requete("/membres", "POST", m),

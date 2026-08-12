@@ -64,6 +64,15 @@ export const ilYA = (iso) => {
 
 export const CATEGORIES = ["Logement", "Courses", "Transport", "Énergie", "Abonnements", "Santé", "Loisirs", "Enfants", "Assurances", "Impôts", "Autre"];
 
+// ─── Le versement du mois a-t-il eu lieu ? ──────────────────────────────
+// Le budget annonce un versement mensuel sur les projets et sur l'épargne.
+// Sans cette vérification il pourrait l'annoncer pendant des mois sans qu'un
+// euro ait bougé : c'est une intention, pas un prélèvement automatique.
+export const verseCeMois = (mouvements, mois) =>
+  (mouvements ?? []).some(
+    (m) => (m.type ?? "versement") === "versement" && moisCle(new Date(m.date)) === mois
+  );
+
 // ─── Une teinte par personne ────────────────────────────────────────────
 // La couleur vient du rang dans le foyer, pas d'une colonne en base : rien à
 // migrer, rien à choisir à l'inscription, et la même personne garde la même
