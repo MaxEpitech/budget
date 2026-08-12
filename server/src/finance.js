@@ -32,6 +32,31 @@ export function capitalRestant(capital, tauxAnnuel, dureeMois, k) {
 }
 
 /**
+ * Ce que le crédit coûte en tout : la somme des mensualités moins le capital
+ * emprunté. C'est le seul chiffre qui répond à « combien me coûte cet
+ * emprunt » — la mensualité, elle, ne dit que ce qu'il pèse chaque mois.
+ */
+export function coutTotal(capital, tauxAnnuel, dureeMois) {
+  if (!capital || !dureeMois) return 0;
+  return mensualite(capital, tauxAnnuel, dureeMois) * dureeMois - capital;
+}
+
+/**
+ * Intérêts déjà payés après k échéances.
+ *
+ * Versé en tout moins capital effectivement remboursé. Le calcul passe par le
+ * capital restant plutôt que par une somme échéance par échéance : les deux
+ * donnent le même résultat, mais celui-ci ne dérive pas sur 300 mois.
+ */
+export function interetsPayes(capital, tauxAnnuel, dureeMois, k) {
+  const echeances = Math.max(0, Math.min(k, dureeMois));
+  if (!echeances) return 0;
+  const verse = mensualite(capital, tauxAnnuel, dureeMois) * echeances;
+  const rembourse = capital - capitalRestant(capital, tauxAnnuel, dureeMois, echeances);
+  return Math.max(0, verse - rembourse);
+}
+
+/**
  * Projection d'épargne sur n mois : valeur actuelle + versements mensuels capitalisés.
  * V(1+r)^n + P((1+r)^n − 1)/r ; cas r = 0 → V + P×n.
  */
@@ -77,6 +102,34 @@ export function projeterPlafonne(valeur, versement, rendement, mois, plafond) {
 export function verseAvecPlafond(valeur, versement, rendement, mois, plafond) {
   if (plafond == null) return valeur + versement * mois;
   return simulerPlafonne(valeur, versement, rendement, mois, plafond).verse;
+}
+
+/**
+ * Dans combien de mois le plafond sera-t-il atteint ?
+ *
+ * Renvoie 0 s'il l'est déjà, null s'il ne le sera jamais (pas de plafond, ou
+ * rien qui fasse monter la valeur). Prévenir après coup ne servirait à rien :
+ * les versements versés au-delà du plafond sont refusés par la banque, et
+ * c'est précisément ce qu'on veut voir venir.
+ *
+ * Le calcul est itératif comme la simulation : une formule fermée existerait,
+ * mais elle divergerait de simulerPlafonne au centime près, et deux vérités
+ * pour un même plafond seraient pires qu'une boucle.
+ */
+const HORIZON_PLAFOND = 12 * 60; // soixante ans : au-delà, l'échéance n'informe plus
+
+export function moisAvantPlafond(valeur, versement, rendement, plafond) {
+  if (plafond == null) return null;
+  if (valeur >= plafond) return 0;
+  const r = rendement / 100 / 12;
+  if (versement <= 0 && r <= 0) return null;
+  let v = valeur;
+  for (let i = 1; i <= HORIZON_PLAFOND; i++) {
+    const apresInterets = v * (1 + r);
+    v = apresInterets + Math.max(0, Math.min(versement, plafond - apresInterets));
+    if (v >= plafond) return i;
+  }
+  return null;
 }
 
 // Nombre de mois entre deux clés « YYYY-MM ».

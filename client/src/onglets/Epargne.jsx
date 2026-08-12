@@ -3,8 +3,8 @@ import { useState, useMemo } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
-import { euro, num } from "../utiles.js";
-import { projeterPlafonne, verseAvecPlafond } from "../finance.js";
+import { euro, num, libelleMois, moisCle, decalerMois } from "../utiles.js";
+import { projeterPlafonne, verseAvecPlafond, moisAvantPlafond } from "../finance.js";
 
 // Un plafond vide ou nul signifie « pas de plafond ».
 const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
@@ -79,6 +79,9 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
         {etat.placements.length === 0 && <div className="vide">Aucun support d'épargne enregistré.</div>}
         {etat.placements.map((p) => {
           const atteint = p.plafond != null && p.valeur >= p.plafond;
+          // Découvrir le plafond une fois dedans est trop tard : les versements
+          // versés au-delà sont refusés par la banque. On annonce la date.
+          const echeance = atteint ? null : moisAvantPlafond(p.valeur, p.versement, p.rendement, p.plafond);
           return (
             <div className="ligne" key={p.id}>
               <div style={{ minWidth: 140 }}>
@@ -90,6 +93,12 @@ export default function Epargne({ etat, executer, modifier, supprimer }) {
                   {p.rendement}% par an · {euro(projeterPlafonne(p.valeur, p.versement, p.rendement, horizon * 12, p.plafond))} dans {horizon} ans
                   {p.plafond != null && ` · plafond ${euro(p.plafond)}`}
                 </div>
+                {echeance != null && (
+                  <div className={`avis ${echeance <= 12 ? "alerte" : "ok"}`} style={{ marginTop: 6 }}>
+                    Plafond atteint en {libelleMois(decalerMois(moisCle(), echeance)).toLowerCase()}
+                    {echeance <= 12 ? " — moins d'un an." : `, dans ${Math.round(echeance / 12)} ans.`}
+                  </div>
+                )}
               </div>
               <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
                 <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />

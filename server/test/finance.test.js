@@ -6,6 +6,9 @@ import assert from "node:assert/strict";
 import {
   mensualite,
   capitalRestant,
+  coutTotal,
+  interetsPayes,
+  moisAvantPlafond,
   projeter,
   projeterPlafonne,
   echeanceCeMois,
@@ -83,6 +86,62 @@ test("capital restant : décroissant et borné à [0, capital]", () => {
   }
 });
 
+/* ─── Coût d'un crédit ─── */
+
+test("coût total de référence : 14 000 € à 3,9 % sur 60 mois → 1 432 €", () => {
+  proche(coutTotal(14000, 3.9, 60), 1432, 1, "coût total");
+});
+
+test("coût total à taux zéro : rien", () => {
+  assert.equal(coutTotal(10000, 0, 60), 0);
+});
+
+test("coût total nul si capital ou durée absents", () => {
+  assert.equal(coutTotal(0, 3.9, 60), 0);
+  assert.equal(coutTotal(14000, 3.9, 0), 0);
+});
+
+test("intérêts payés : rien avant la première échéance", () => {
+  assert.equal(interetsPayes(14000, 3.9, 60, 0), 0);
+  assert.equal(interetsPayes(14000, 3.9, 60, -3), 0);
+});
+
+test("intérêts payés au terme : le coût total du crédit", () => {
+  proche(interetsPayes(14000, 3.9, 60, 60), coutTotal(14000, 3.9, 60), 1e-6, "intérêts au terme");
+});
+
+test("intérêts payés au-delà du terme : plafonnés au coût total", () => {
+  proche(interetsPayes(14000, 3.9, 60, 900), coutTotal(14000, 3.9, 60), 1e-6, "intérêts au-delà");
+});
+
+test("intérêts payés : cohérents avec l'amortissement simulé mois par mois", () => {
+  const capital = 105000, taux = 3.5, duree = 300, k = 26;
+  const r = taux / 100 / 12;
+  const M = mensualite(capital, taux, duree);
+  let restant = capital, cumul = 0;
+  for (let i = 0; i < k; i++) {
+    const interet = restant * r;
+    cumul += interet;
+    restant -= M - interet;
+  }
+  proche(interetsPayes(capital, taux, duree, k), cumul, 0.01, "intérêts payés");
+});
+
+test("intérêts payés : croissants, et toujours sous le coût total", () => {
+  const total = coutTotal(105000, 3.5, 300);
+  let precedent = -1;
+  for (let k = 0; k <= 300; k += 10) {
+    const paye = interetsPayes(105000, 3.5, 300, k);
+    assert.ok(paye >= precedent, `intérêts payés en recul à k=${k}`);
+    assert.ok(paye <= total + 1e-6, `intérêts payés au-dessus du coût total à k=${k}`);
+    precedent = paye;
+  }
+});
+
+test("intérêts payés à taux zéro : rien, à toute échéance", () => {
+  assert.equal(interetsPayes(12000, 0, 24, 12), 0);
+});
+
 /* ─── Projection d'épargne ─── */
 
 test("projection à rendement nul : valeur + versement × mois", () => {
@@ -151,6 +210,45 @@ test("cumul versé : jamais supérieur à la valeur projetée à rendement posit
     const verse = verseAvecPlafond(V, P, rdt, mois, plafond);
     assert.ok(valeur >= verse, `mois ${mois} : valeur ${valeur} < versé ${verse}`);
   }
+});
+
+/* ─── Échéance de plafond ─── */
+
+test("plafond : null quand il n'y en a pas", () => {
+  assert.equal(moisAvantPlafond(1000, 100, 2, null), null);
+});
+
+test("plafond : zéro quand il est déjà atteint ou dépassé", () => {
+  assert.equal(moisAvantPlafond(23000, 150, 2.4, 22950), 0);
+  assert.equal(moisAvantPlafond(22950, 150, 2.4, 22950), 0);
+});
+
+test("plafond sans intérêts : le nombre de versements qui manquent", () => {
+  // 1 000 € + 100 €/mois vers 1 500 € → cinq versements.
+  assert.equal(moisAvantPlafond(1000, 100, 0, 1500), 5);
+});
+
+test("plafond : null si rien ne fait monter la valeur", () => {
+  assert.equal(moisAvantPlafond(1000, 0, 0, 5000), null);
+});
+
+test("plafond atteint par les seuls intérêts, sans versement", () => {
+  const mois = moisAvantPlafond(1000, 0, 12, 1010);
+  assert.ok(mois !== null && mois >= 1 && mois <= 12, `atteint en ${mois} mois`);
+});
+
+test("plafond : l'échéance annoncée concorde avec la projection plafonnée", () => {
+  const valeur = 8400, versement = 150, rendement = 2.4, plafond = 22950;
+  const mois = moisAvantPlafond(valeur, versement, rendement, plafond);
+  assert.ok(mois > 0, "échéance attendue");
+  assert.ok(
+    projeterPlafonne(valeur, versement, rendement, mois - 1, plafond) < plafond,
+    "le plafond serait déjà atteint un mois plus tôt"
+  );
+  assert.ok(
+    projeterPlafonne(valeur, versement, rendement, mois, plafond) >= plafond,
+    "le plafond n'est pas atteint à l'échéance annoncée"
+  );
 });
 
 /* ─── Échéances des lignes récurrentes ─── */

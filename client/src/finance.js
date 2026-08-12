@@ -21,6 +21,21 @@ export function capitalRestant(capital, tauxAnnuel, dureeMois, k) {
   return Math.max(0, capital * f - M * ((f - 1) / r));
 }
 
+// Ce que le crédit coûte en tout : la somme des mensualités moins le capital
+export function coutTotal(capital, tauxAnnuel, dureeMois) {
+  if (!capital || !dureeMois) return 0;
+  return mensualite(capital, tauxAnnuel, dureeMois) * dureeMois - capital;
+}
+
+// Intérêts déjà payés après k échéances : versé en tout moins capital remboursé
+export function interetsPayes(capital, tauxAnnuel, dureeMois, k) {
+  const echeances = Math.max(0, Math.min(k, dureeMois));
+  if (!echeances) return 0;
+  const verse = mensualite(capital, tauxAnnuel, dureeMois) * echeances;
+  const rembourse = capital - capitalRestant(capital, tauxAnnuel, dureeMois, echeances);
+  return Math.max(0, verse - rembourse);
+}
+
 // Projection épargne : valeur + versements mensuels capitalisés
 export function projeter(valeur, versement, rendement, mois) {
   const r = rendement / 100 / 12;
@@ -54,6 +69,25 @@ export function projeterPlafonne(valeur, versement, rendement, mois, plafond) {
 export function verseAvecPlafond(valeur, versement, rendement, mois, plafond) {
   if (plafond == null) return valeur + versement * mois;
   return simulerPlafonne(valeur, versement, rendement, mois, plafond).verse;
+}
+
+// Dans combien de mois le plafond sera-t-il atteint ? 0 s'il l'est déjà,
+// null s'il ne le sera jamais. Itératif comme la simulation, pour ne pas
+// diverger d'elle au centime près.
+const HORIZON_PLAFOND = 12 * 60;
+
+export function moisAvantPlafond(valeur, versement, rendement, plafond) {
+  if (plafond == null) return null;
+  if (valeur >= plafond) return 0;
+  const r = rendement / 100 / 12;
+  if (versement <= 0 && r <= 0) return null;
+  let v = valeur;
+  for (let i = 1; i <= HORIZON_PLAFOND; i++) {
+    const apresInterets = v * (1 + r);
+    v = apresInterets + Math.max(0, Math.min(versement, plafond - apresInterets));
+    if (v >= plafond) return i;
+  }
+  return null;
 }
 
 // Nombre de mois entre deux clés « YYYY-MM ».
@@ -148,6 +182,18 @@ export function totauxDuMois({ membres = [], transactions = [], credits = [], pr
  * Reste à vivre du foyer :
  * revenus − dépenses − mensualités crédits − versements projets − versements placements.
  */
+// Part des charges communes qui revient à une personne.
+export function quotePart(revenu, totalRevenus, nbMembres, repartition) {
+  if (repartition === "moitie") return 1 / nbMembres;
+  return totalRevenus ? revenu / totalRevenus : 0;
+}
+
+// Versement mensuel nécessaire pour tenir l'objectif d'un projet.
+export function versementRequis(objectif, epargne, moisRestants) {
+  const restant = Math.max(0, objectif - epargne);
+  return restant / Math.max(1, moisRestants);
+}
+
 export function resteAVivre({ revenus, depenses, mensualitesCredits, versementsProjets, versementsPlacements }) {
   return revenus - depenses - mensualitesCredits - versementsProjets - versementsPlacements;
 }
