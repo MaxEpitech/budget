@@ -25,6 +25,7 @@ export const membreVersDb = (d) => {
 /* ─── Transaction — `pour` : "foyer" ou l'id d'un membre (membreId en base) ─── */
 export const transactionVersApi = (t) => ({
   id: t.id,
+  date: t.date,
   type: t.type,
   libelle: t.libelle,
   montant: enEuros(t.montant),
@@ -43,6 +44,10 @@ export const transactionVersDb = (d) => ({
   recurrent: d.recurrent,
   // Comme dans le prototype : une ligne récurrente n'est rattachée à aucun mois.
   mois: d.recurrent ? null : d.mois,
+  // Une ligne ponctuelle porte une date réelle ; à défaut de jour saisi, le
+  // premier du mois. Une récurrente n'en a pas : elle revient tous les mois,
+  // elle n'arrive pas un jour précis.
+  date: d.recurrent ? null : (d.date ? new Date(d.date) : new Date(`${d.mois}-01T00:00:00.000Z`)),
 });
 
 /* ─── Crédit ─── */

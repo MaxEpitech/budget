@@ -7,6 +7,7 @@ import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
 import Acces from "../composants/Acces.jsx";
+import Sessions from "../composants/Sessions.jsx";
 import { euro, num, moisCle, decalerMois } from "../utiles.js";
 
 // Supprime transactions, crédits, projets et placements (les membres restent).
@@ -216,6 +217,7 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
             <button className="btn fant mini" onClick={onDeconnexion}>Se déconnecter</button>
           </div>
         </div>
+        <Sessions />
         <div className="corps" style={{ borderTop: "1px solid var(--trait-pale, #EDF1F3)" }}>
           <div className="carte-note">
             Vos données vous appartiennent : vous pouvez les emporter, et faire disparaître ce compte

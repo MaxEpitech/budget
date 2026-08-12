@@ -48,6 +48,20 @@ export const libelleMois = (cle) => {
 export const libelleDate = (iso) =>
   new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
+// « il y a trois minutes », « hier » : une date exacte n'apprend rien quand on
+// cherche seulement à reconnaître sa propre connexion.
+export const ilYA = (iso) => {
+  const secondes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (secondes < 60) return "à l'instant";
+  const minutes = Math.round(secondes / 60);
+  if (minutes < 60) return `il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
+  const heures = Math.round(minutes / 60);
+  if (heures < 24) return `il y a ${heures} heure${heures > 1 ? "s" : ""}`;
+  const jours = Math.round(heures / 24);
+  if (jours < 31) return `il y a ${jours} jour${jours > 1 ? "s" : ""}`;
+  return `le ${libelleDate(iso)}`;
+};
+
 export const CATEGORIES = ["Logement", "Courses", "Transport", "Énergie", "Abonnements", "Santé", "Loisirs", "Enfants", "Assurances", "Impôts", "Autre"];
 
 export const POSTES = {

@@ -118,7 +118,7 @@ routeur.post("/inscription", cadenceEmailIp, cadenceEmail, valider(InscriptionSc
   }
 
   if (!confirmationRequise) {
-    poserCookieSession(res, await ouvrirSession(utilisateur.id));
+    poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
     return res.status(201).json(profil(utilisateur));
   }
 
@@ -143,7 +143,7 @@ routeur.post("/validation", cadenceJeton, valider(JetonSchema), attraper(async (
   // Ouvrir la session dans la foulée évite de redemander le mot de passe juste
   // après avoir cliqué. Qui intercepte cet email pourrait de toute façon
   // réinitialiser le mot de passe : la commodité ne coûte rien de plus.
-  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
   res.json(profil(utilisateur));
 }));
 
@@ -179,7 +179,7 @@ routeur.post("/connexion", cadenceConnexionIp, cadenceConnexion, valider(Connexi
     });
   }
 
-  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
   res.json(profil(utilisateur));
 }));
 
@@ -234,7 +234,7 @@ routeur.post("/reinitialiser", cadenceJeton, valider(ReinitialisationSchema), at
   // Un mot de passe change souvent parce qu'on le croit compromis : toutes les
   // sessions ouvertes ailleurs tombent, y compris celles d'un éventuel intrus.
   await fermerToutesLesSessions(utilisateur.id);
-  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
   res.json(profil(utilisateur));
 }));
 
@@ -323,7 +323,7 @@ routeur.post("/invitation", cadenceJeton, valider(AccepterInvitationSchema), att
       return deplace;
     });
 
-    poserCookieSession(res, await ouvrirSession(utilisateur.id));
+    poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
     return res.json(profil(utilisateur));
   }
 
@@ -352,8 +352,47 @@ routeur.post("/invitation", cadenceJeton, valider(AccepterInvitationSchema), att
     return cree;
   });
 
-  poserCookieSession(res, await ouvrirSession(utilisateur.id));
+  poserCookieSession(res, await ouvrirSession(utilisateur.id, req.headers["user-agent"]));
   res.status(201).json(profil(utilisateur));
+}));
+
+/* ─── Ses sessions ───────────────────────────────────────────────────────── */
+
+/**
+ * Les sessions ouvertes de son compte.
+ *
+ * Devenu un standard, et d'autant plus justifié qu'un foyer partagé multiplie
+ * les accès : voir « Chrome sur Windows, actif il y a deux minutes » est le seul
+ * moyen de repérer une connexion qu'on n'a pas ouverte.
+ */
+routeur.get("/sessions", attraper(async (req, res) => {
+  if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
+  const sessions = await prisma.session.findMany({
+    where: { utilisateurId: req.utilisateur.id, expireLe: { gt: new Date() } },
+    orderBy: { derniereActivite: "desc" },
+    select: { id: true, appareil: true, creeLe: true, derniereActivite: true },
+  });
+  res.json(
+    sessions.map((s) => ({
+      ...s,
+      // Se fermer soi-même depuis cette liste n'aurait aucun sens : c'est ce que
+      // fait le bouton « Se déconnecter ».
+      actuelle: s.id === req.utilisateur.sessionId,
+    })),
+  );
+}));
+
+routeur.delete("/sessions/:id", attraper(async (req, res) => {
+  if (!req.utilisateur) return res.status(401).json({ erreur: "Connexion requise" });
+  if (req.params.id === req.utilisateur.sessionId) {
+    return res.status(400).json({ erreur: "Pour fermer celle-ci, déconnectez-vous." });
+  }
+  // Bornée au compte : une session d'un autre compte est introuvable, pas refusée.
+  const { count } = await prisma.session.deleteMany({
+    where: { id: req.params.id, utilisateurId: req.utilisateur.id },
+  });
+  if (count === 0) return res.status(404).json({ erreur: "Session introuvable" });
+  res.status(204).end();
 }));
 
 /* ─── Compte courant ─────────────────────────────────────────────────────── */

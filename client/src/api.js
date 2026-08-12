@@ -53,6 +53,8 @@ export const api = {
   reinitialiser: (jeton, motDePasse) => requete("/auth/reinitialiser", "POST", { jeton, motDePasse }),
   mesDonnees: () => requete("/auth/mes-donnees"),
   supprimerCompte: (motDePasse) => requete("/auth/moi", "DELETE", { motDePasse }),
+  sessions: () => requete("/auth/sessions"),
+  fermerSession: (id) => requete(`/auth/sessions/${id}`, "DELETE"),
 
   /* ─── Budget ─── */
   etat: (mois) => requete(`/etat?mois=${encodeURIComponent(mois)}`),

@@ -26,6 +26,8 @@ export const TransactionSchema = z
     pour: chaine("pour").default("foyer"),
     recurrent: z.boolean("recurrent : booléen attendu").default(false),
     mois: MoisSchema.nullish(),
+    // Jour réel de l'opération. Facultatif : le premier du mois fait foi à défaut.
+    date: z.iso.datetime({ offset: true }).or(z.iso.date()).nullish(),
   })
   .superRefine((d, ctx) => {
     if (!d.recurrent && !d.mois) {

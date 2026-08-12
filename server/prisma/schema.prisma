@@ -54,15 +54,15 @@ model Foyer {
 // l'application est bâtie autour de deux revenus, les deux personnes doivent
 // pouvoir s'y connecter. L'email est stocké normalisé en minuscules.
 model Utilisateur {
-  id             String      @id @default(cuid())
-  email          String      @unique
+  id             String    @id @default(cuid())
+  email          String    @unique
   motDePasseHash String
   // Null tant que l'adresse n'a pas été confirmée : la connexion est refusée.
   emailValideLe  DateTime?
-  foyer          Foyer       @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyer          Foyer     @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId        Int
-  role           RoleFoyer   @default(proprietaire)
-  creeLe         DateTime    @default(now())
+  role           RoleFoyer @default(proprietaire)
+  creeLe         DateTime  @default(now())
   jetons         Jeton[]
   sessions       Session[]
   // Le membre du budget que ce compte incarne, s'il y en a un : un membre peut
@@ -89,12 +89,17 @@ model Jeton {
 
 // Sessions en base plutôt que JWT : révocables (déconnexion, changement de mot de passe).
 model Session {
-  id            String      @id @default(cuid())
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
-  utilisateurId String
-  jetonHache    String      @unique
-  expireLe      DateTime
-  creeLe        DateTime    @default(now())
+  id               String      @id @default(cuid())
+  utilisateur      Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  utilisateurId    String
+  jetonHache       String      @unique
+  expireLe         DateTime
+  creeLe           DateTime    @default(now())
+  // De quoi reconnaître ses propres appareils dans la liste des sessions.
+  // Volontairement pas d'adresse IP : elle n'aide personne à s'y retrouver, et
+  // ce serait une donnée personnelle de plus à conserver et à justifier.
+  appareil         String?
+  derniereActivite DateTime    @default(now())
 
   @@index([utilisateurId])
 }
@@ -134,6 +139,8 @@ model Membre {
   // supprime pas le membre : ses transactions et son revenu restent au budget.
   utilisateur   Utilisateur?  @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
   utilisateurId String?       @unique
+  creeLe        DateTime      @default(now())
+  modifieLe     DateTime      @updatedAt
 
   @@index([foyerId])
 }
@@ -146,6 +153,12 @@ model Transaction {
   categorie String
   recurrent Boolean         @default(false)
   mois      String? // YYYY-MM, null si récurrente
+  // Date réelle de l'opération, pour les lignes ponctuelles. Le mois reste : il
+  // sert au filtrage et n'a pas à disparaître. Une ligne récurrente n'a pas de
+  // date — elle revient tous les mois, elle n'arrive pas un jour précis.
+  date      DateTime?
+  creeLe    DateTime        @default(now())
+  modifieLe DateTime        @updatedAt
   // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
   membre    Membre?         @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId  String?
@@ -156,14 +169,16 @@ model Transaction {
 }
 
 model Credit {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   libelle   String
   capital   Int // centimes
   taux      Float // taux annuel, en %
   dureeMois Int
   moisDebut String // YYYY-MM de la première échéance
-  foyer     Foyer  @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyer     Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId   Int
+  creeLe    DateTime @default(now())
+  modifieLe DateTime @updatedAt
 
   @@index([foyerId])
 }
@@ -177,6 +192,8 @@ model Projet {
   versements       Versement[]
   foyer            Foyer       @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId          Int
+  creeLe           DateTime    @default(now())
+  modifieLe        DateTime    @updatedAt
 
   @@index([foyerId])
 }
@@ -192,6 +209,7 @@ model Versement {
   // Qui a mis au pot : null = versement du foyer, sinon le membre concerné.
   membre   Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId String?
+  creeLe   DateTime @default(now())
 }
 
 // Compteurs de la limitation de cadence.
@@ -208,15 +226,17 @@ model LimiteCadence {
 }
 
 model Placement {
-  id               String @id @default(cuid())
+  id               String   @id @default(cuid())
   libelle          String
   valeur           Int // centimes
   versementMensuel Int // centimes
   rendement        Float // rendement annuel, en %
   // Plafond de versements (livrets réglementés) ; null = pas de plafond.
   plafond          Int? // centimes
-  foyer            Foyer  @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  foyer            Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId          Int
+  creeLe           DateTime @default(now())
+  modifieLe        DateTime @updatedAt
 
   @@index([foyerId])
 }
