@@ -90,6 +90,17 @@ export const BudgetSchema = z.object({
   montant: montantPositif("montant"),
 });
 
+/* ─── Agrégation bancaire ─── */
+
+export const InitierAgregationSchema = z.object({
+  // Identifiant de banque fourni par GoCardless, par exemple « BNP_PARIBAS_BNPAFRPP ».
+  institutionId: chaine("banque").max(120, "banque : identifiant trop long"),
+});
+
+export const ActiverAgregationSchema = z.object({
+  active: z.boolean("active : booléen attendu"),
+});
+
 const RoleValeur = z.enum(["proprietaire", "membre"], "rôle : « proprietaire » ou « membre » attendu");
 
 export const RoleSchema = z.object({ role: RoleValeur });

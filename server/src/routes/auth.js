@@ -11,6 +11,7 @@ import { confirmationEmailRequise } from "../auth/reglages.js";
 import { lireInvitation, consommerInvitation } from "../auth/invitations.js";
 import { cadenceConnexion, cadenceConnexionIp, cadenceEmail, cadenceEmailIp, cadenceJeton } from "../auth/cadence.js";
 import { envoyerEmail } from "../email/envoyer.js";
+import { revoquerConsentement } from "../banque/consentement.js";
 import {
   gabaritValidation,
   gabaritInscriptionExistante,
@@ -426,6 +427,13 @@ routeur.get("/mes-donnees", attraper(async (req, res) => {
   res.json({
     exporteLe: new Date().toISOString(),
     compte: { email: req.utilisateur.email, creeLe: req.utilisateur.creeLe },
+    // Ce qui est conservé de la liaison bancaire : son état, et la date de la
+    // dernière synchronisation. Aucune opération n'est stockée.
+    banque: {
+      reliee: Boolean(req.utilisateur.goCardlessAccountId),
+      synchronisationActive: req.utilisateur.agregationActive,
+      synchroniseLe: req.utilisateur.agregationSynchroLe,
+    },
     foyer: { repartition: foyer.repartition },
     membres: membres.map(membreVersApi),
     transactions: transactions.map(transactionVersApi),
@@ -470,6 +478,7 @@ routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), att
   });
 
   if (autres.length === 0) {
+    await revoquerConsentement(req.utilisateur.goCardlessRequisitionId);
     await prisma.foyer.delete({ where: { id: foyerId } });
     effacerCookieSession(res);
     return res.status(204).end();
@@ -482,6 +491,7 @@ routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), att
     });
   }
 
+  await revoquerConsentement(req.utilisateur.goCardlessRequisitionId);
   await prisma.utilisateur.delete({ where: { id: req.utilisateur.id } });
   effacerCookieSession(res);
   res.status(204).end();

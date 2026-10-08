@@ -7,6 +7,7 @@ import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./ut
 import Flux from "./onglets/Flux.jsx";
 import Historique from "./onglets/Historique.jsx";
 import Credits from "./onglets/Credits.jsx";
+import Emprunt from "./onglets/Emprunt.jsx";
 import Projets from "./onglets/Projets.jsx";
 import Epargne from "./onglets/Epargne.jsx";
 import Foyer from "./onglets/Foyer.jsx";
@@ -16,6 +17,7 @@ const ONGLETS = [
   { id: "flux", nom: "Flux" },
   { id: "historique", nom: "Historique" },
   { id: "credits", nom: "Crédits" },
+  { id: "emprunt", nom: "Emprunt" },
   { id: "projets", nom: "Projets" },
   { id: "epargne", nom: "Épargne" },
   { id: "foyer", nom: "Foyer" },
@@ -42,7 +44,11 @@ const DELAI_ANNULATION = 6000;
 export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrirPage }) {
   const [etat, setEtat] = useState(null);
   const [mois, setMois] = useState(moisCle());
-  const [onglet, setOnglet] = useState("flux");
+  // Au retour de la banque (`?banque=retour`), on rouvre l'onglet d'où l'on
+  // était parti : c'est lui qui confirme la liaison.
+  const [onglet, setOnglet] = useState(() =>
+    new URLSearchParams(window.location.search).has("banque") ? "emprunt" : "flux",
+  );
   const [posteActif, setPosteActif] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(false);
@@ -382,6 +388,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
         {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
         {onglet === "historique" && <Historique mois={mois} />}
         {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
+        {onglet === "emprunt" && <Emprunt etat={etat} calc={calc} compte={compte} signaler={signaler} />}
         {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "epargne" && <Epargne etat={etat} executer={executer} modifier={modifier} supprimer={supprimer} />}
         {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} onCompteSupprime={onSessionExpiree} ouvrirPage={ouvrirPage} />}

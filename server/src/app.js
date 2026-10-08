@@ -20,6 +20,7 @@ import projets from "./routes/projets.js";
 import placements from "./routes/placements.js";
 import budgets from "./routes/budgets.js";
 import foyer from "./routes/foyer.js";
+import gocardless from "./routes/gocardless.js";
 
 const app = express();
 
@@ -60,7 +61,7 @@ app.use("/api/auth", auth);
 // cadence bornée. Chacune lit ensuite son foyer via foyerCourant(req), qui
 // refuse de répondre sans session.
 //
-// Le montage passe par une boucle plutôt que par sept lignes répétées : oublier
+// Le montage passe par une boucle plutôt que par autant de lignes répétées : oublier
 // exigerAuth sur une nouvelle route ouvrirait un foyer à tout le monde, et c'est
 // exactement le genre d'omission qu'une liste rend impossible.
 const ROUTES_METIER = [
@@ -73,6 +74,7 @@ const ROUTES_METIER = [
   ["/api/placements", placements],
   ["/api/budgets", budgets],
   ["/api/foyer", foyer],
+  ["/api/gocardless", gocardless],
 ];
 
 for (const [chemin, routeur] of ROUTES_METIER) {
