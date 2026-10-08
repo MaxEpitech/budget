@@ -93,6 +93,10 @@ export const api = {
   /* ─── Synchronisation bancaire ───
      Aucune de ces routes ne prend d'identifiant de compte : le serveur ne
      connaît que celui de la session. */
+  // Identifiants GoCardless du foyer : la clé part, mais ne revient jamais.
+  banqueConfiguration: () => requete("/gocardless/configuration"),
+  banqueConfigurer: (secretId, secretKey) => requete("/gocardless/configuration", "PUT", { secretId, secretKey }),
+  banqueDeconfigurer: () => requete("/gocardless/configuration", "DELETE"),
   banqueStatut: () => requete("/gocardless/statut"),
   banqueInstitutions: (pays = "FR") => requete(`/gocardless/institutions?pays=${encodeURIComponent(pays)}`),
   banqueInitier: (institutionId) => requete("/gocardless/initiate", "POST", { institutionId }),

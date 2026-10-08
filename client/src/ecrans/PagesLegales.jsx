@@ -95,6 +95,11 @@ export function Confidentialite({ allerVers }) {
           Dissocier la banque, ou supprimer le compte, retire l'accès et efface ces totaux.
         </p>
         <p style={paragraphe}>
+          <strong>Si votre foyer enregistre ses identifiants GoCardless</strong> — la clé est
+          conservée chiffrée, avec une clé de chiffrement tenue hors de la base, et n'est plus
+          jamais affichée.
+        </p>
+        <p style={paragraphe}>
           <strong>Dans votre navigateur</strong> — ce que vous saisissez dans l'onglet Emprunt
           reste sur votre appareil et n'est pas envoyé au service.
         </p>

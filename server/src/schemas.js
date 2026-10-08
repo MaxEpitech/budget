@@ -97,6 +97,15 @@ export const InitierAgregationSchema = z.object({
   institutionId: chaine("banque").max(120, "banque : identifiant trop long"),
 });
 
+// Identifiants GoCardless d'un foyer, tels que le portail les délivre.
+const secret = (champ) =>
+  z.string(`${champ} requis`).trim().min(8, `${champ} : valeur trop courte`).max(300, `${champ} : valeur trop longue`);
+
+export const IdentifiantsAgregationSchema = z.object({
+  secretId: secret("Secret ID"),
+  secretKey: secret("Secret key"),
+});
+
 export const ActiverAgregationSchema = z.object({
   active: z.boolean("active : booléen attendu"),
 });

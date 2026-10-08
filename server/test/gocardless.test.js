@@ -48,7 +48,8 @@ after(async () => {
 beforeEach(() => {
   if (!banque) return;
   configurer();
-  Object.assign(banque.etat, { statutRequisition: "CR", panneComptes: null, appels: [], requisitionsSupprimees: [] });
+  process.env.CLE_CHIFFREMENT = "une phrase de chiffrement pour les essais seulement";
+  Object.assign(banque.etat, { statutRequisition: "CR", panneComptes: null, appels: [], requisitionsSupprimees: [], comptesUtilises: [] });
   banque.etat.operations = [
     { bookingDate: "2026-07-28", transactionAmount: { amount: "2450.00" }, remittanceInformationUnstructured: "SALAIRE JUILLET" },
     { bookingDate: "2026-08-28", transactionAmount: { amount: "2450.00" }, remittanceInformationUnstructured: "SALAIRE AOUT" },
@@ -332,5 +333,183 @@ testIntegration("l'export de ses données mentionne l'état de la liaison, pas s
     assert.equal(exporte.banque.reliee, true);
     assert.equal(exporte.banque.synchronisationActive, true);
     assert.ok(!JSON.stringify(exporte).includes("compte-principal"));
+  });
+});
+
+/* ─── Identifiants GoCardless saisis par le foyer ────────────────────────── */
+
+const DU_FOYER = { secretId: "id-du-foyer-1234", secretKey: "cle-secrete-du-foyer" };
+
+const sansIdentifiantsDInstallation = () => {
+  delete process.env.GOCARDLESS_SECRET_ID;
+  delete process.env.GOCARDLESS_SECRET_KEY;
+};
+
+/** Un second compte du même foyer, simple membre. */
+async function ajouterMembre(contexte) {
+  const email = contexte.email.replace("essai-", "essai-membre-");
+  await contexte.prisma.utilisateur.create({
+    data: {
+      email,
+      motDePasseHash: contexte.utilisateur.motDePasseHash,
+      emailValideLe: new Date(),
+      foyerId: contexte.foyer.id,
+      role: "membre",
+    },
+  });
+  return { ...contexte, email };
+}
+
+testIntegration("le propriétaire configure GoCardless depuis l'interface, sans variable d'hébergement", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    const client = await clientConnecte(serveur.base, contexte);
+
+    const avant = await client.appel("/gocardless/configuration");
+    assert.deepEqual(avant.corps, { enregistrementPossible: true, source: null, secretId: null, peutModifier: true });
+    assert.equal((await client.appel("/gocardless/statut")).corps.disponible, false);
+
+    const pose = await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+    assert.equal(pose.code, 200);
+    assert.deepEqual(pose.corps, { enregistrementPossible: true, source: "foyer", secretId: "••••1234", peutModifier: true });
+    assert.equal((await client.appel("/gocardless/statut")).corps.disponible, true);
+
+    // Le parcours bancaire passe désormais par le compte GoCardless du foyer.
+    await relier(client);
+    assert.equal((await client.appel("/gocardless/financial-data")).code, 200);
+    assert.ok(banque.etat.comptesUtilises.length > 0);
+    assert.ok(banque.etat.comptesUtilises.every((id) => id === DU_FOYER.secretId), "aucun appel sous un autre compte");
+  });
+});
+
+testIntegration("la clé n'est jamais rendue, ni stockée en clair", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    const client = await clientConnecte(serveur.base, contexte);
+    const pose = await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+
+    const enBase = await contexte.prisma.foyer.findUnique({ where: { id: contexte.foyer.id } });
+    assert.equal(enBase.goCardlessSecretId, DU_FOYER.secretId);
+    assert.ok(enBase.goCardlessSecretKeyChiffre.startsWith("v1."));
+    assert.ok(!enBase.goCardlessSecretKeyChiffre.includes(DU_FOYER.secretKey));
+
+    const partout = JSON.stringify([
+      pose.corps,
+      (await client.appel("/gocardless/configuration")).corps,
+      (await client.appel("/gocardless/statut")).corps,
+      (await client.appel("/auth/mes-donnees")).corps,
+    ]);
+    assert.ok(!partout.includes(DU_FOYER.secretKey), "la clé ne ressort par aucune route");
+    assert.ok(!partout.includes(DU_FOYER.secretId), "l'identifiant ne ressort que masqué");
+  });
+});
+
+testIntegration("des identifiants refusés par GoCardless ne sont pas enregistrés", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    const client = await clientConnecte(serveur.base, contexte);
+
+    const refus = await client.appel("/gocardless/configuration", "PUT", { secretId: "id-du-foyer-1234", secretKey: "mauvaise-cle" });
+    // 400 et non 401 : le client lirait un 401 comme une session tombée.
+    assert.equal(refus.code, 400);
+    assert.equal(refus.corps.motif, "identifiants-refuses");
+    assert.equal((await client.appel("/gocardless/configuration")).corps.source, null);
+    assert.equal((await client.appel("/gocardless/configuration", "PUT", { secretId: "x", secretKey: "" })).code, 400);
+  });
+});
+
+testIntegration("un simple membre voit l'état du réglage mais ne peut pas y toucher", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    const proprietaire = await clientConnecte(serveur.base, contexte);
+    await proprietaire.appel("/gocardless/configuration", "PUT", DU_FOYER);
+
+    const membre = await clientConnecte(serveur.base, await ajouterMembre(contexte));
+    const vu = await membre.appel("/gocardless/configuration");
+    assert.deepEqual(vu.corps, { enregistrementPossible: true, source: "foyer", secretId: "••••1234", peutModifier: false });
+    assert.equal((await membre.appel("/gocardless/configuration", "PUT", DU_FOYER)).code, 403);
+    assert.equal((await membre.appel("/gocardless/configuration", "DELETE")).code, 403);
+    // Il profite en revanche des identifiants du foyer pour relier SA banque.
+    assert.equal((await membre.appel("/gocardless/statut")).corps.disponible, true);
+    assert.equal((await proprietaire.appel("/gocardless/configuration")).corps.source, "foyer");
+  });
+});
+
+testIntegration("les identifiants d'un foyer ne servent qu'à lui", async () => {
+  await avecFoyer(async (mien) => {
+    await avecFoyer(async (voisin) => {
+      sansIdentifiantsDInstallation();
+      await (await clientConnecte(serveur.base, voisin)).appel("/gocardless/configuration", "PUT", DU_FOYER);
+
+      const client = await clientConnecte(serveur.base, mien);
+      assert.equal((await client.appel("/gocardless/configuration")).corps.source, null);
+      assert.equal((await client.appel("/gocardless/statut")).corps.disponible, false);
+      assert.equal((await client.appel("/gocardless/institutions")).code, 503);
+      assert.equal(banque.etat.comptesUtilises.length, 0, "aucun appel n'est parti sous le compte du voisin");
+    });
+  });
+});
+
+testIntegration("sans clé de chiffrement, rien ne s'enregistre", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    delete process.env.CLE_CHIFFREMENT;
+    const client = await clientConnecte(serveur.base, contexte);
+
+    assert.equal((await client.appel("/gocardless/configuration")).corps.enregistrementPossible, false);
+    const refus = await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+    assert.equal(refus.code, 503);
+    assert.equal(refus.corps.motif, "chiffrement-indisponible");
+    const enBase = await contexte.prisma.foyer.findUnique({ where: { id: contexte.foyer.id } });
+    assert.equal(enBase.goCardlessSecretKeyChiffre, null);
+  });
+});
+
+testIntegration("une clé de chiffrement changée rend les identifiants absents, pas faux", async () => {
+  await avecFoyer(async (contexte) => {
+    sansIdentifiantsDInstallation();
+    const client = await clientConnecte(serveur.base, contexte);
+    await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+
+    process.env.CLE_CHIFFREMENT = "une tout autre phrase de chiffrement, changée depuis";
+    assert.equal((await client.appel("/gocardless/configuration")).corps.source, null);
+    assert.equal((await client.appel("/gocardless/institutions")).code, 503);
+  });
+});
+
+testIntegration("les identifiants du foyer passent avant ceux de l'installation", async () => {
+  await avecFoyer(async (contexte) => {
+    const client = await clientConnecte(serveur.base, contexte);
+    assert.equal((await client.appel("/gocardless/configuration")).corps.source, "installation");
+
+    await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+    await client.appel("/gocardless/institutions");
+    assert.equal(banque.etat.comptesUtilises.at(-1), DU_FOYER.secretId);
+
+    // Les retirer fait retomber sur ceux de l'installation.
+    const retire = await client.appel("/gocardless/configuration", "DELETE");
+    assert.equal(retire.corps.source, "installation");
+    await client.appel("/gocardless/institutions");
+    assert.equal(banque.etat.comptesUtilises.at(-1), "id-essai");
+  });
+});
+
+testIntegration("changer ou retirer les identifiants défait les liaisons du foyer", async () => {
+  await avecFoyer(async (contexte) => {
+    const client = await clientConnecte(serveur.base, contexte);
+    await relier(client); // sous les identifiants de l'installation
+    const requisition = (await compteEnBase(contexte)).goCardlessRequisitionId;
+
+    await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
+    // Le consentement est retiré sous le compte qui l'avait ouvert.
+    assert.deepEqual(banque.etat.requisitionsSupprimees, [requisition]);
+    const apres = await compteEnBase(contexte);
+    assert.deepEqual([apres.goCardlessRequisitionId, apres.goCardlessAccountId, apres.agregationActive], [null, null, false]);
+    assert.equal((await client.appel("/gocardless/statut")).corps.reliee, false);
+
+    await relier(client); // cette fois sous ceux du foyer
+    assert.equal((await client.appel("/gocardless/configuration", "DELETE")).code, 200);
+    assert.equal((await compteEnBase(contexte)).goCardlessAccountId, null);
+    assert.equal(banque.etat.requisitionsSupprimees.length, 2);
   });
 });

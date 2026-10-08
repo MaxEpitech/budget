@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
+import ReglagesBanque from "../composants/ReglagesBanque.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
 import Acces from "../composants/Acces.jsx";
 import Sessions from "../composants/Sessions.jsx";
@@ -208,6 +209,8 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
       </Carte>
 
       <Acces membres={etat.membres} />
+
+      <ReglagesBanque />
 
       <Carte titre="Compte">
         <div className="corps">
