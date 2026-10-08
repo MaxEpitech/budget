@@ -31,6 +31,10 @@ const app = express();
 app.set("trust proxy", 1);
 
 app.use(journaliserRequetes);
+// Un relevé bancaire pèse plus que les 100 ko admis par défaut : ces deux
+// routes, et elles seules, acceptent davantage. Le lecteur général qui suit ne
+// retraite pas un corps déjà lu.
+app.use(["/api/banque/releve", "/api/transactions/import"], express.json({ limit: "4mb" }));
 app.use(express.json());
 app.use(cookieParser());
 // Renseigne l'utilisateur connecté quand un cookie de session valide est
@@ -92,6 +96,9 @@ app.use("/api", (_req, res) => res.status(404).json({ erreur: "Route inconnue" }
 app.use((err, req, res, _next) => {
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ erreur: "Corps JSON invalide" });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ erreur: "Fichier trop volumineux : exportez une période plus courte." });
   }
   journal.erreur("erreur non rattrapée", {
     identifiant: req.identifiant,

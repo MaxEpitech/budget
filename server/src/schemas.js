@@ -90,6 +90,33 @@ export const BudgetSchema = z.object({
   montant: montantPositif("montant"),
 });
 
+/* ─── Relevé bancaire importé ─── */
+
+// Le contenu du fichier, déjà décodé en texte par le navigateur.
+export const ReleveSchema = z.object({
+  nom: z.string().trim().max(200).optional(),
+  contenu: z.string("fichier requis").min(1, "Le fichier est vide.").max(3_000_000, "Fichier trop volumineux : exportez une période plus courte."),
+});
+
+// Les opérations retenues dans l'aperçu, renvoyées pour entrer dans le flux.
+export const ImportTransactionsSchema = z.object({
+  pour: chaine("pour").default("foyer"),
+  operations: z
+    .array(
+      z.object({
+        cle: z.string("clé requise").regex(/^[0-9a-f]{32}$/, "clé d'opération invalide"),
+        date: z.iso.date("date : format AAAA-MM-JJ attendu"),
+        type: z.enum(["revenu", "depense"], "type : « revenu » ou « depense » attendu"),
+        libelle: chaine("libellé").max(200, "libellé trop long"),
+        montant: montantPositif("montant"),
+        categorie: chaine("catégorie").max(60, "catégorie trop longue"),
+      }),
+      "opérations requises",
+    )
+    .min(1, "Aucune opération à importer.")
+    .max(2000, "Trop d'opérations d'un coup : importez une période plus courte."),
+});
+
 /* ─── Agrégation bancaire ─── */
 
 export const InitierAgregationSchema = z.object({

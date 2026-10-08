@@ -40,7 +40,7 @@ export function montantEnCentimes(montant) {
 
 // Tout ce qui, dans une opération, peut porter un libellé — les banques ne
 // s'accordent pas sur le champ à remplir.
-function libelle(operation) {
+export function libelle(operation) {
   return normaliser(
     [
       operation.remittanceInformationUnstructured,
@@ -65,6 +65,17 @@ function cleRecurrence(operation) {
   const beneficiaire = normaliser(operation.creditorName);
   if (beneficiaire) return beneficiaire;
   return libelle(operation).replace(/[0-9]+/g, " ").replace(/[^a-z ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Cette opération est-elle un revenu d'activité ? Un crédit dont le libellé
+ * contient un des mots-clés — la même règle que dans l'analyse.
+ */
+export function estRevenuReconnu(operation, motsCles = MOTS_CLES_REVENUS) {
+  const centimes = montantEnCentimes(operation?.transactionAmount?.amount);
+  if (centimes === null || centimes <= 0) return false;
+  const texte = libelle(operation);
+  return motsCles.map(normaliser).some((cle) => cle && texte.includes(cle));
 }
 
 const moisDe = (operation) => String(operation.bookingDate ?? operation.valueDate ?? "").slice(0, 7);

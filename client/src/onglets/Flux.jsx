@@ -5,6 +5,7 @@ import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
 import Budgets from "../composants/Budgets.jsx";
+import ImportReleve from "../composants/ImportReleve.jsx";
 import { euro, num, libelleMois, CATEGORIES, teinteMembre, couleurBudget } from "../utiles.js";
 
 const RYTHMES = [
@@ -109,6 +110,8 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
           )}
         </div>
       </Carte>
+
+      <ImportReleve membres={etat.membres} executer={executer} />
 
       <Carte titre="Lignes régulières" note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci`}>
         {recurrents.length === 0 && <div className="vide">Aucune ligne récurrente. Les charges fixes se saisissent une fois pour toutes.</div>}
