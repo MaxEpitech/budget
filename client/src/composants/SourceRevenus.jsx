@@ -11,13 +11,16 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
 import { euro, ilYA } from "../utiles.js";
-import { analyserFichier, FORMATS_RELEVE } from "../releve.js";
+import { lireFichier, analyserReleve, FORMATS_RELEVE } from "../releve.js";
 
 /**
  * @param saisie    l'état du simulateur (lecture) : `source`, `banque`, `foyer`
  * @param onChange  fusionne un fragment dans cet état
  * @param signaler  remonte une erreur à l'application (session tombée comprise)
  */
+// À qui peut être le compte d'un relevé, vu du simulateur.
+const TITULAIRES = { principal: "Compte de l'emprunteur principal", co: "Compte du co-emprunteur", commun: "Compte commun" };
+
 const REFUS = "La banque n'a pas confirmé l'accès. Vous pouvez relancer la connexion.";
 
 /** Revient-on de la banque ? Chaque prestataire a sa forme d'adresse de retour. */
@@ -154,23 +157,49 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       setMessage({ ton: "ok", texte: "Banque dissociée : l'accès à vos comptes a été retiré." });
     });
 
-  // Estimation à partir d'un relevé : les deux champs sont remplis, et restent
-  // modifiables — c'est une aide à la saisie, pas une source à part.
+  // Estimation à partir de relevés : une aide à la saisie, pas une source à
+  // part — les champs sont remplis, et restent modifiables.
+  //
+  // Avec des comptes séparés il y a un relevé par personne. Chacun a donc sa
+  // case : le revenu va à son titulaire, et les charges s'additionnent. Les
+  // garder par titulaire permet de réimporter un relevé sans le compter deux fois.
   const champFichier = useRef(null);
+  const [titulaire, setTitulaire] = useState("principal");
+  const releves = saisie.releves ?? {};
+
+  const appliquerReleves = (suivants) => {
+    const somme = (...valeurs) => Math.round(valeurs.reduce((s, v) => s + (v ?? 0), 0) * 100) / 100;
+    const foyer = { ...saisie.foyer };
+    // Un compte commun reçoit souvent les deux salaires : ils rejoignent le
+    // revenu de l'emprunteur principal, le total du foyer étant ce qui compte.
+    if (suivants.principal || suivants.commun) foyer.principal = String(somme(suivants.principal?.revenus, suivants.commun?.revenus));
+    if (suivants.co) foyer.co = String(suivants.co.revenus);
+    if (Object.keys(suivants).length > 0) foyer.charges = String(somme(...Object.values(suivants).map((r) => r.charges)));
+    onChange({ foyer, releves: suivants });
+  };
+
   const estimerDepuisReleve = (e) => {
     const fichier = e.target.files?.[0];
     e.target.value = "";
     if (!fichier) return;
     agir(async () => {
-      const r = await analyserFichier(fichier);
+      const r = await analyserReleve(await lireFichier(fichier));
       if (!vivant.current) return;
-      onChange({ foyer: { ...saisie.foyer, principal: String(r.foyer.emprunteurPrincipalNet), charges: String(r.foyer.chargesCourantesFixes) } });
-      const resume = `Rempli depuis ${r.nom ?? "le relevé"} (${r.periode.jours} jours) : ${r.detail.nbRevenus} versement${r.detail.nbRevenus > 1 ? "s" : ""} de salaire, ${r.detail.nbChargesRecurrentes} dépense${r.detail.nbChargesRecurrentes > 1 ? "s" : ""} récurrente${r.detail.nbChargesRecurrentes > 1 ? "s" : ""}.`;
+      appliquerReleves({
+        ...releves,
+        [titulaire]: { nom: r.nom ?? "relevé", revenus: r.foyer.emprunteurPrincipalNet, charges: r.foyer.chargesCourantesFixes, jours: r.periode.jours },
+      });
+      const resume = `Relevé lu (${r.periode.jours} jours) : ${r.detail.nbRevenus} versement${r.detail.nbRevenus > 1 ? "s" : ""} de salaire, ${r.detail.nbChargesRecurrentes} dépense${r.detail.nbChargesRecurrentes > 1 ? "s" : ""} récurrente${r.detail.nbChargesRecurrentes > 1 ? "s" : ""}.`;
       setMessage({
         ton: r.avertissements.length ? "alerte" : "ok",
         texte: [resume, ...r.avertissements, "Corrigez les montants si besoin. Pour ajouter ces opérations au budget, importez le relevé depuis l'onglet Flux."].join(" "),
       });
     });
+  };
+
+  const retirerReleve = (cle) => {
+    const { [cle]: _retire, ...restants } = releves;
+    appliquerReleves(restants);
   };
 
   const majFoyer = (champ) => (v) => onChange({ foyer: { ...saisie.foyer, [champ]: v } });
@@ -252,11 +281,33 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
         </div>
 
         {!lectureSeule && (
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 14 }}>
             <input ref={champFichier} type="file" accept={FORMATS_RELEVE} onChange={estimerDepuisReleve} hidden />
-            <button className="lien" onClick={() => champFichier.current?.click()} disabled={occupe}>
-              Estimer depuis un relevé bancaire (CSV, OFX, QIF)
-            </button>
+            <div className="forme">
+              <Champ
+                libelle="Estimer depuis le relevé du" valeur={titulaire} onChange={setTitulaire} largeur={250} disabled={occupe}
+                options={Object.entries(TITULAIRES).map(([v, l]) => ({ v, l }))}
+              />
+              <button className="btn fant" onClick={() => champFichier.current?.click()} disabled={occupe}>
+                Choisir un relevé (CSV, OFX, QIF)
+              </button>
+            </div>
+            {Object.keys(releves).length > 0 && (
+              <div className="carte-note" style={{ marginTop: 8 }}>
+                {Object.entries(releves).map(([cle, r]) => (
+                  <div key={cle} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>
+                      {TITULAIRES[cle]} — {r.nom} : {euro(r.revenus)} de revenus, {euro(r.charges)} de charges par mois
+                    </span>
+                    <button className="suppr" style={{ opacity: 1 }} onClick={() => retirerReleve(cle)} aria-label={`Retirer le relevé : ${TITULAIRES[cle]}`}>×</button>
+                  </div>
+                ))}
+                <div style={{ marginTop: 4 }}>
+                  Avec des comptes séparés, ajoutez le relevé de chacun : les revenus vont à leur titulaire, les
+                  charges s'additionnent.
+                </div>
+              </div>
+            )}
           </div>
         )}
 

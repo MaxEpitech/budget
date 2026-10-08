@@ -16,10 +16,17 @@ const LIBELLE_MAXIMUM = 200;
  * opérations strictement identiques le même jour — deux cafés au même prix —
  * que rien d'autre ne sépare.
  *
+ * Le titulaire du compte entre dans la clé quand ce n'est pas le foyer : deux
+ * personnes aux comptes séparés peuvent avoir, le même jour, la même opération
+ * — le même abonnement au même prix — et ce sont bien deux dépenses.
+ *
+ * @param titulaire "foyer" pour un compte commun, sinon l'id du membre
  * @returns montants en centimes ; `salaire` signale un crédit reconnu comme
  *   revenu d'activité, déjà compté dans les revenus des membres du foyer.
  */
-export function preparerOperations(operations) {
+export function preparerOperations(operations, titulaire = "foyer") {
+  // Rien n'est ajouté pour le foyer : les clés des imports déjà faits restent valables.
+  const marque = titulaire === "foyer" ? "" : `|${titulaire}`;
   const rangs = new Map();
   const lignes = [];
   for (const o of operations) {
@@ -32,7 +39,7 @@ export function preparerOperations(operations) {
     rangs.set(identite, rang + 1);
 
     lignes.push({
-      cle: createHash("sha256").update(`${identite}|${rang}`).digest("hex").slice(0, 32),
+      cle: createHash("sha256").update(`${identite}|${rang}${marque}`).digest("hex").slice(0, 32),
       date: o.bookingDate,
       type: centimes > 0 ? "revenu" : "depense",
       libelle: texte.slice(0, LIBELLE_MAXIMUM),

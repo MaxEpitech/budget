@@ -28,6 +28,7 @@ function saisieInitiale(etat, calc) {
   return {
     source: "manuel", // "manuel" | "banque"
     banque: null, // chiffres lus depuis la banque, quand elle est reliée
+    releves: {}, // estimations tirées de relevés importés, par titulaire du compte
     foyer: {
       principal: premier ? String(premier.revenu) : "",
       co: second ? String(second.revenu) : "",
@@ -110,6 +111,7 @@ export default function Emprunt({ etat, calc, compte, signaler }) {
     return {
       ...initiale,
       source: gardee.source === "banque" ? "banque" : "manuel",
+      releves: gardee.releves ?? {},
       foyer: { ...initiale.foyer, ...gardee.foyer },
       immo: { ...initiale.immo, ...gardee.immo },
       conso: { ...initiale.conso, ...gardee.conso },

@@ -159,6 +159,16 @@ test("chaque opération reçoit une clé stable, deux identiques le même jour r
   assert.ok(lignes.some((l) => l.cle === autre[0].cle));
 });
 
+test("le titulaire du compte entre dans la clé, sauf pour le compte commun", () => {
+  const abonnement = { bookingDate: "2026-09-05", transactionAmount: { amount: "-13.49" }, remittanceInformationUnstructured: "PRLV NETFLIX" };
+  const [commun] = preparerOperations([abonnement]);
+  const [camille] = preparerOperations([abonnement], "membre-camille");
+  const [sacha] = preparerOperations([abonnement], "membre-sacha");
+  assert.equal(new Set([commun.cle, camille.cle, sacha.cle]).size, 3, "le même abonnement sur deux comptes, ce sont deux dépenses");
+  assert.equal(preparerOperations([abonnement], "foyer")[0].cle, commun.cle, "les imports déjà faits pour le foyer restent reconnus");
+  assert.equal(preparerOperations([abonnement], "membre-camille")[0].cle, camille.cle);
+});
+
 test("les lignes préparées portent type, montant positif, catégorie et repère de salaire", () => {
   const lignes = preparerOperations([
     { bookingDate: "2026-09-28", transactionAmount: { amount: "2450.00" }, remittanceInformationUnstructured: "VIR SALAIRE ACME" },
@@ -336,5 +346,41 @@ testIntegration("fichiers refusés : illisible, trop court, trop gros, entrées 
     ]) {
       assert.equal((await client.appel("/transactions/import", "POST", { operations })).code, 400);
     }
+  });
+});
+
+testIntegration("comptes séparés : la même opération chez deux personnes donne deux lignes, chacune à son nom", async () => {
+  await avecFoyer(async (contexte) => {
+    const client = await clientConnecte(serveur.base, contexte);
+    const camille = (await client.appel("/membres", "POST", { nom: "Camille", revenu: 2450 })).corps;
+    const sacha = (await client.appel("/membres", "POST", { nom: "Sacha", revenu: 1980 })).corps;
+    const releve = "Date;Libellé;Montant\n05/09/2026;PRLV NETFLIX;-13,49\n17/09/2026;CB CARREFOUR MARKET;-62,40\n";
+
+    const importer = async (pour) => {
+      const apercu = (await client.appel("/banque/releve", "POST", { contenu: releve, pour })).corps;
+      assert.equal(apercu.pour, pour);
+      return { apercu, resultat: (await client.appel("/transactions/import", "POST", { pour, operations: aImporter(apercu) })).corps };
+    };
+
+    assert.equal((await importer(camille.id)).resultat.ajoutees, 2);
+    // Le relevé de Sacha contient les mêmes écritures : rien n'y est « déjà importé ».
+    const deSacha = await importer(sacha.id);
+    assert.equal(deSacha.apercu.operations.filter((o) => o.dejaImportee).length, 0);
+    assert.equal(deSacha.resultat.ajoutees, 2);
+    // Réimporter celui de Camille, en revanche, ne double rien.
+    const rejoue = await importer(camille.id);
+    assert.equal(rejoue.apercu.operations.filter((o) => o.dejaImportee).length, 2);
+    assert.deepEqual(rejoue.apercu.operations.filter((o) => !o.dejaImportee), []);
+
+    const etat = (await client.appel("/etat?mois=2026-09")).corps;
+    assert.deepEqual(
+      etat.transactions.map((t) => [t.libelle, t.pour]).sort(),
+      [["CB CARREFOUR MARKET", camille.id], ["CB CARREFOUR MARKET", sacha.id], ["PRLV NETFLIX", camille.id], ["PRLV NETFLIX", sacha.id]].sort(),
+    );
+    // Des dépenses personnelles : elles pèsent sur le reste de chacun, pas sur les charges communes.
+    assert.deepEqual(etat.parMembre.map((m) => [m.nom, m.perso]).sort(), [["Camille", 75.89], ["Sacha", 75.89]]);
+
+    // Un titulaire qui n'est pas du foyer est refusé dès la lecture.
+    assert.equal((await client.appel("/banque/releve", "POST", { contenu: releve, pour: "membre-inconnu" })).code, 400);
   });
 });

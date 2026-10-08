@@ -7,7 +7,7 @@ import { useState, useRef, useMemo } from "react";
 import { api } from "../api.js";
 import Carte from "./Carte.jsx";
 import Champ from "./Champ.jsx";
-import { analyserFichier, FORMATS_RELEVE } from "../releve.js";
+import { lireFichier, analyserReleve, FORMATS_RELEVE } from "../releve.js";
 import { euroPrecis, libelleMois, CATEGORIES } from "../utiles.js";
 
 // Le serveur accepte 2 000 opérations par envoi.
@@ -23,20 +23,20 @@ const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 export default function ImportReleve({ membres, executer }) {
   const [apercu, setApercu] = useState(null); // réponse du serveur
   const [lignes, setLignes] = useState([]); // opérations, avec `retenue` et la catégorie choisie
+  // À qui est le compte du relevé. Choisi avant le fichier, modifiable ensuite :
+  // il décide de l'attribution des lignes ET de ce qui compte comme doublon.
   const [pour, setPour] = useState("foyer");
+  const [fichier, setFichier] = useState(null); // { nom, contenu } du relevé en cours d'aperçu
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState(null); // { ton, texte, lots? }
   const champFichier = useRef(null);
 
-  const choisir = async (e) => {
-    const fichier = e.target.files?.[0];
-    // Remis à vide pour que rechoisir le même fichier redéclenche la lecture.
-    e.target.value = "";
-    if (!fichier) return;
+  const analyser = async (lu, titulaire) => {
     setOccupe(true);
     setMessage(null);
     try {
-      const r = await analyserFichier(fichier);
+      const r = await analyserReleve(lu, titulaire);
+      setFichier(lu);
       setApercu(r);
       // Par défaut, tout sauf ce qui ferait doublon : les lignes déjà importées,
       // et les salaires — déjà comptés dans les revenus des membres du foyer.
@@ -48,11 +48,34 @@ export default function ImportReleve({ membres, executer }) {
     }
   };
 
+  const choisir = async (e) => {
+    const choisi = e.target.files?.[0];
+    // Remis à vide pour que rechoisir le même fichier redéclenche la lecture.
+    e.target.value = "";
+    if (!choisi) return;
+    try {
+      await analyser(await lireFichier(choisi), pour);
+    } catch (err) {
+      setMessage({ ton: "alerte", texte: err.message });
+    }
+  };
+
+  // Changer de titulaire pendant l'aperçu relit le relevé : ce qui est « déjà
+  // dans le flux » dépend du compte dont il s'agit.
+  const changerTitulaire = (v) => {
+    setPour(v);
+    if (fichier) analyser(fichier, v);
+  };
+
+  const titulaires = [{ v: "foyer", l: "Compte commun (foyer)" }, ...membres.map((m) => ({ v: m.id, l: `Compte de ${m.nom}` }))];
+  const nomTitulaire = pour === "foyer" ? "le foyer" : membres.find((m) => m.id === pour)?.nom ?? "ce membre";
+
   const retenues = useMemo(() => lignes.filter((l) => l.retenue && !l.dejaImportee), [lignes]);
   const majLigne = (cle, patch) => setLignes((avant) => avant.map((l) => (l.cle === cle ? { ...l, ...patch } : l)));
   const toutes = (retenue) => setLignes((avant) => avant.map((l) => (l.dejaImportee ? l : { ...l, retenue })));
   const fermer = () => {
     setApercu(null);
+    setFichier(null);
     setLignes([]);
   };
 
@@ -73,7 +96,7 @@ export default function ImportReleve({ membres, executer }) {
         setMessage({
           ton: "ok",
           texte: ajoutees > 0
-            ? `${pluriel(ajoutees, "opération")} ajoutée${ajoutees > 1 ? "s" : ""} au flux, ${etendue}. Naviguez entre les mois pour les retrouver.`
+            ? `${pluriel(ajoutees, "opération")} ajoutée${ajoutees > 1 ? "s" : ""} au flux pour ${nomTitulaire}, ${etendue}. Naviguez entre les mois pour les retrouver.`
             : "Ces opérations étaient déjà dans le flux : rien n'a été ajouté.",
           lots,
         });
@@ -124,11 +147,17 @@ export default function ImportReleve({ membres, executer }) {
         </div>
       )}
 
-      {!apercu && !message && (
-        <div className="corps">
+      {!apercu && (
+        <div className="corps" style={message ? { paddingTop: 0 } : undefined}>
+          {membres.length > 0 && (
+            <div className="forme" style={{ marginBottom: 10 }}>
+              <Champ libelle="Ce relevé est celui du" valeur={pour} onChange={changerTitulaire} largeur={240} options={titulaires} disabled={occupe} />
+            </div>
+          )}
           <div className="carte-note">
             Les opérations sont d'abord affichées : vous choisissez celles qui entrent dans le flux, et leur
             catégorie. Réimporter un relevé déjà traité n'ajoute rien en double.
+            {membres.length > 1 && " Avec des comptes séparés, importez le relevé de chacun en indiquant à qui il appartient : ses dépenses lui seront attribuées."}
           </div>
         </div>
       )}
@@ -153,10 +182,7 @@ export default function ImportReleve({ membres, executer }) {
               décochez les opérations qui les répéteraient.
             </div>
             <div className="forme" style={{ marginTop: 12 }}>
-              <Champ
-                libelle="Attribuer à" valeur={pour} onChange={setPour} largeur={150}
-                options={[{ v: "foyer", l: "Foyer" }, ...membres.map((m) => ({ v: m.id, l: m.nom }))]}
-              />
+              <Champ libelle="Ce relevé est celui du" valeur={pour} onChange={changerTitulaire} largeur={240} options={titulaires} disabled={occupe} />
               <button className="btn fant mini" onClick={() => toutes(true)}>Tout cocher</button>
               <button className="btn fant mini" onClick={() => toutes(false)}>Tout décocher</button>
             </div>

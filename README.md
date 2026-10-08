@@ -128,6 +128,13 @@ endroits :
 - **onglet Emprunt** — il préremplit le revenu et les charges courantes, qui
   restent modifiables.
 
+Avec des comptes séparés, on indique à qui est le compte du relevé. Dans le
+flux, ses lignes sont attribuées à ce membre — des dépenses personnelles, qui
+pèsent sur son reste et non sur les charges communes — et le titulaire entre
+dans l'empreinte des opérations : le même abonnement prélevé le même jour chez
+deux personnes donne bien deux lignes. Dans l'onglet Emprunt, chaque relevé
+remplit le revenu de son titulaire, et les charges s'additionnent.
+
 `POST /api/banque/releve` lit et analyse le fichier sans rien enregistrer ;
 `POST /api/transactions/import` fait entrer les opérations validées, et
 `DELETE /api/transactions/import/:lot` annule un import. Chaque opération porte

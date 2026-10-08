@@ -101,7 +101,7 @@ export const api = {
   banqueConfigurer: (identifiants) => requete("/banque/configuration", "PUT", identifiants),
   banqueDeconfigurer: () => requete("/banque/configuration", "DELETE"),
   // Relevé téléchargé depuis la banque : lu et analysé, jamais enregistré tel quel.
-  banqueReleve: (nom, contenu) => requete("/banque/releve", "POST", { nom, contenu }),
+  banqueReleve: (nom, contenu, pour = "foyer") => requete("/banque/releve", "POST", { nom, contenu, pour }),
   banqueStatut: () => requete("/banque/statut"),
   banqueInstitutions: (pays = "FR") => requete(`/banque/institutions?pays=${encodeURIComponent(pays)}`),
   banqueInitier: (institutionId) => requete("/banque/initiate", "POST", { institutionId }),

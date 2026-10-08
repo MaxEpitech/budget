@@ -157,6 +157,12 @@ routeur.get("/statut", (req, res) => res.json(statutDe(req)));
  * (`POST /api/transactions/import`).
  */
 routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
+  const { pour } = req.donnees;
+  // Le titulaire doit être le foyer, ou l'un de SES membres.
+  if (pour !== "foyer" && !(await prisma.membre.findFirst({ where: { id: pour, foyerId: req.utilisateur.foyerId }, select: { id: true } }))) {
+    return res.status(400).json({ erreur: "pour : membre inconnu" });
+  }
+
   let lu;
   try {
     lu = lireReleve(req.donnees.contenu);
@@ -175,7 +181,7 @@ routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
     jours: recent.jours,
   };
 
-  const lignes = preparerOperations(lu.operations);
+  const lignes = preparerOperations(lu.operations, pour);
   const connues = new Set(
     (
       await prisma.transaction.findMany({
@@ -200,6 +206,7 @@ routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
     source: "releve",
     format: lu.format,
     nom: req.donnees.nom ?? null,
+    pour,
     lignesIgnorees: lu.ignorees,
     avertissements,
     operations: lignes.map((l) => ({ ...l, montant: enEuros(l.montant), dejaImportee: connues.has(l.cle) })),
