@@ -1,17 +1,24 @@
-// Identifiants GoCardless du foyer : de quoi proposer la synchronisation
-// bancaire sans toucher à l'hébergement.
+// Identifiants du foyer chez son prestataire bancaire : de quoi proposer la
+// synchronisation sans toucher à l'hébergement.
 //
-// La clé n'est jamais relue depuis le serveur : une fois enregistrée, l'écran
-// n'en connaît plus que l'existence. Pour la changer, on la ressaisit.
+// Deux prestataires possibles, un seul à la fois : Enable Banking, ouvert aux
+// particuliers pour leurs propres comptes, et GoCardless, qui n'accepte plus de
+// nouvelles inscriptions mais sert encore ceux qui y ont déjà un compte.
+//
+// Aucun secret n'est relu depuis le serveur : une fois enregistré, l'écran n'en
+// connaît plus que l'existence. Pour le changer, on le ressaisit.
 import { useState, useEffect } from "react";
 import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
 import BoutonConfirme from "./BoutonConfirme.jsx";
 
+const NOMS = { enablebanking: "Enable Banking", gocardless: "GoCardless" };
+const VIDE = { fournisseur: "enablebanking", appId: "", clePrivee: "", fichier: "", secretId: "", secretKey: "" };
+
 export default function ReglagesBanque() {
   const [config, setConfig] = useState(null); // null : pas encore connu
-  const [f, setF] = useState({ secretId: "", secretKey: "" });
+  const [f, setF] = useState(VIDE);
   const [edition, setEdition] = useState(false);
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState(null); // { ton: "ok" | "alerte", texte }
@@ -29,10 +36,13 @@ export default function ReglagesBanque() {
     setOccupe(true);
     setMessage(null);
     try {
-      setConfig(await action());
-      setF({ secretId: "", secretKey: "" });
+      const c = await action();
+      setConfig(c);
+      setF(VIDE);
       setEdition(false);
-      setMessage({ ton: "ok", texte: reussite });
+      // Identifiants acceptés mais réglage incomplet chez le prestataire : c'est
+      // lui qu'il faut lire, pas un simple « enregistré ».
+      setMessage(c.avertissement ? { ton: "alerte", texte: c.avertissement } : { ton: "ok", texte: reussite });
     } catch (err) {
       setMessage({ ton: "alerte", texte: err.message });
     } finally {
@@ -40,11 +50,30 @@ export default function ReglagesBanque() {
     }
   };
 
+  // La clé privée est un fichier .pem : le lire ici évite d'avoir à en copier le
+  // contenu à la main. Il ne quitte le navigateur qu'à l'enregistrement.
+  const lireFichier = async (e) => {
+    const fichier = e.target.files?.[0];
+    if (!fichier) return;
+    // Enable Banking nomme le fichier d'après l'identifiant de l'application :
+    // autant le préremplir.
+    const devine = /^([0-9a-f-]{36})\.pem$/i.exec(fichier.name)?.[1];
+    const clePrivee = await fichier.text();
+    setF((avant) => ({ ...avant, clePrivee, fichier: fichier.name, appId: avant.appId || devine || "" }));
+  };
+
+  const eb = f.fournisseur === "enablebanking";
+  const complet = eb ? f.appId.trim() && f.clePrivee.trim() : f.secretId.trim() && f.secretKey.trim();
+
   const enregistrer = () => {
-    if (!f.secretId.trim() || !f.secretKey.trim()) return;
+    if (!complet) return;
     agir(
-      () => api.banqueConfigurer(f.secretId.trim(), f.secretKey.trim()),
-      "Identifiants vérifiés auprès de GoCardless et enregistrés. La synchronisation se règle dans l'onglet Emprunt.",
+      () => api.banqueConfigurer(
+        eb
+          ? { fournisseur: "enablebanking", appId: f.appId.trim(), clePrivee: f.clePrivee.trim() }
+          : { fournisseur: "gocardless", secretId: f.secretId.trim(), secretKey: f.secretKey.trim() },
+      ),
+      `Identifiants vérifiés auprès de ${NOMS[f.fournisseur]} et enregistrés. La synchronisation se règle dans l'onglet Emprunt.`,
     );
   };
 
@@ -61,16 +90,15 @@ export default function ReglagesBanque() {
     <Carte
       titre="Synchronisation bancaire"
       note={
-        duFoyer ? `Identifiants GoCardless du foyer enregistrés (${config.secretId})`
-        : config.source === "installation" ? "Assurée par les identifiants GoCardless de l'installation"
+        duFoyer ? `${NOMS[config.fournisseur]} — identifiants du foyer enregistrés (${config.identifiant})`
+        : config.source === "installation" ? `Assurée par les identifiants ${NOMS[config.fournisseur]} de l'installation`
         : "Non configurée — les revenus et charges se saisissent à la main"
       }
     >
       <div className="corps">
         <div className="carte-note">
-          Pour lire revenus et charges sur un compte bancaire, le foyer a besoin de ses propres identifiants
-          GoCardless Bank Account Data : un « Secret ID » et une « Secret key », à créer dans le portail
-          GoCardless, rubrique User secrets. Ils servent à tous les comptes du foyer.
+          Pour lire revenus et charges sur un compte bancaire, le foyer passe par un prestataire agréé, auprès
+          duquel il crée ses propres identifiants. Ils servent à tous les comptes du foyer.
         </div>
 
         {message && <div className={`avis ${message.ton}`} role={message.ton === "alerte" ? "alert" : "status"}>{message.texte}</div>}
@@ -86,25 +114,69 @@ export default function ReglagesBanque() {
         )}
 
         {formulaire && (
-          <div className="forme" style={{ marginTop: 14 }}>
-            <Champ
-              libelle="Secret ID" valeur={f.secretId} onChange={(v) => setF({ ...f, secretId: v })} largeur={280}
-              onEntree={enregistrer} attributs={{ autoComplete: "off", spellCheck: false }}
-            />
-            <Champ
-              libelle="Secret key" type="password" valeur={f.secretKey} onChange={(v) => setF({ ...f, secretKey: v })} largeur={280}
-              onEntree={enregistrer} attributs={{ autoComplete: "new-password" }}
-            />
-            <button className="btn" onClick={enregistrer} disabled={occupe || !f.secretId.trim() || !f.secretKey.trim()}>
-              {occupe ? "Vérification…" : "Vérifier et enregistrer"}
-            </button>
-            {edition && <button className="btn fant" onClick={() => setEdition(false)} disabled={occupe}>Annuler</button>}
-            <div className="carte-note" style={{ flexBasis: "100%" }}>
-              Les identifiants sont essayés auprès de GoCardless avant d'être gardés. La clé est chiffrée en
-              base et ne sera plus jamais affichée.
-              {duFoyer && " Les remplacer défait les banques déjà reliées par les comptes du foyer : il faudra les relier de nouveau."}
+          <>
+            <div className="forme" style={{ marginTop: 14 }}>
+              <Champ
+                libelle="Prestataire" valeur={f.fournisseur} onChange={(v) => setF({ ...VIDE, fournisseur: v })} largeur={280}
+                options={[{ v: "enablebanking", l: "Enable Banking" }, { v: "gocardless", l: "GoCardless (comptes existants)" }]}
+              />
             </div>
-          </div>
+
+            {eb ? (
+              <>
+                <ol className="carte-note" style={{ margin: "12px 0 0", paddingLeft: 18, lineHeight: 1.6 }}>
+                  <li>Créez une application dans le panneau Enable Banking, en environnement de production.</li>
+                  <li>
+                    Déclarez-y cette adresse de retour (« redirect URL ») :{" "}
+                    <code style={{ userSelect: "all", wordBreak: "break-all" }}>{config.redirections.enablebanking}</code>
+                  </li>
+                  <li>Liez vos comptes bancaires à l'application : en mode restreint, seuls ceux-là sont lisibles.</li>
+                  <li>Indiquez ci-dessous l'identifiant de l'application et le fichier .pem téléchargé à sa création.</li>
+                </ol>
+                <div className="forme" style={{ marginTop: 14 }}>
+                  <Champ
+                    libelle="Identifiant de l'application" valeur={f.appId} onChange={(v) => setF({ ...f, appId: v })} largeur={330}
+                    placeholder="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" attributs={{ autoComplete: "off", spellCheck: false }}
+                  />
+                  <label className="champ">
+                    <span className="champ-lib">Clé privée (fichier .pem)</span>
+                    <input type="file" accept=".pem,.key,application/x-pem-file" onChange={lireFichier} style={{ height: 42, paddingTop: 9, fontSize: 13, maxWidth: 280 }} />
+                  </label>
+                </div>
+                {f.fichier && <div className="carte-note" style={{ marginTop: 6 }}>Clé chargée depuis {f.fichier}.</div>}
+              </>
+            ) : (
+              <>
+                <div className="carte-note" style={{ marginTop: 12 }}>
+                  GoCardless Bank Account Data n'accepte plus de nouvelles inscriptions. Ce choix ne sert que si
+                  vous y avez déjà un compte : le « Secret ID » et la « Secret key » se créent dans son portail,
+                  rubrique User secrets.
+                </div>
+                <div className="forme" style={{ marginTop: 14 }}>
+                  <Champ
+                    libelle="Secret ID" valeur={f.secretId} onChange={(v) => setF({ ...f, secretId: v })} largeur={280}
+                    onEntree={enregistrer} attributs={{ autoComplete: "off", spellCheck: false }}
+                  />
+                  <Champ
+                    libelle="Secret key" type="password" valeur={f.secretKey} onChange={(v) => setF({ ...f, secretKey: v })} largeur={280}
+                    onEntree={enregistrer} attributs={{ autoComplete: "new-password" }}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="forme" style={{ marginTop: 14 }}>
+              <button className="btn" onClick={enregistrer} disabled={occupe || !complet}>
+                {occupe ? "Vérification…" : "Vérifier et enregistrer"}
+              </button>
+              {edition && <button className="btn fant" onClick={() => { setEdition(false); setF(VIDE); }} disabled={occupe}>Annuler</button>}
+              <div className="carte-note" style={{ flexBasis: "100%" }}>
+                Les identifiants sont essayés auprès du prestataire avant d'être gardés. Le secret est chiffré en
+                base et ne sera plus jamais affiché.
+                {duFoyer && " Les remplacer défait les banques déjà reliées par les comptes du foyer : il faudra les relier de nouveau."}
+              </div>
+            </div>
+          </>
         )}
 
         {config.peutModifier && duFoyer && !edition && (

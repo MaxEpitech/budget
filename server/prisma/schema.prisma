@@ -67,6 +67,12 @@ model Foyer {
   // suffit donc pas à la relire.
   goCardlessSecretId         String?
   goCardlessSecretKeyChiffre String?
+
+  // Application Enable Banking du foyer, l'autre prestataire possible — un
+  // foyer n'en a qu'un à la fois. L'identifiant d'application est public ; la
+  // clé privée (PEM) qui signe les requêtes est chiffrée, comme ci-dessus.
+  enableBankingAppId            String?
+  enableBankingClePriveeChiffre String?
 }
 
 // Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
@@ -101,6 +107,12 @@ model Utilisateur {
   goCardlessRequisitionId String?
   // Compte bancaire relié ; null tant que le consentement n'a pas abouti.
   goCardlessAccountId     String?
+  // Les mêmes repères quand le foyer passe par Enable Banking. `Etat` est la
+  // valeur aléatoire d'une demande en cours : le retour de la banque doit la
+  // présenter, ce qui prouve qu'il répond bien à la demande de CE compte.
+  enableBankingEtat       String?
+  enableBankingSessionId  String?
+  enableBankingAccountId  String?
   // Synthèse de la dernière synchronisation, en JSON (montants en centimes).
   // Du texte plutôt qu'une colonne Json : un null y reste un null ordinaire, ce
   // que la restauration d'une sauvegarde rejoue sans cas particulier.

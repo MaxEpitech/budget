@@ -93,17 +93,21 @@ export const api = {
   /* ─── Synchronisation bancaire ───
      Aucune de ces routes ne prend d'identifiant de compte : le serveur ne
      connaît que celui de la session. */
-  // Identifiants GoCardless du foyer : la clé part, mais ne revient jamais.
-  banqueConfiguration: () => requete("/gocardless/configuration"),
-  banqueConfigurer: (secretId, secretKey) => requete("/gocardless/configuration", "PUT", { secretId, secretKey }),
-  banqueDeconfigurer: () => requete("/gocardless/configuration", "DELETE"),
-  banqueStatut: () => requete("/gocardless/statut"),
-  banqueInstitutions: (pays = "FR") => requete(`/gocardless/institutions?pays=${encodeURIComponent(pays)}`),
-  banqueInitier: (institutionId) => requete("/gocardless/initiate", "POST", { institutionId }),
-  banqueConfirmer: () => requete("/gocardless/callback"),
-  banqueActiver: (active) => requete("/gocardless", "PUT", { active }),
-  banqueDonnees: () => requete("/gocardless/financial-data"),
-  banqueDissocier: () => requete("/gocardless", "DELETE"),
+  // Identifiants du foyer chez son prestataire : le secret part, mais ne revient jamais.
+  banqueConfiguration: () => requete("/banque/configuration"),
+  banqueConfigurer: (identifiants) => requete("/banque/configuration", "PUT", identifiants),
+  banqueDeconfigurer: () => requete("/banque/configuration", "DELETE"),
+  banqueStatut: () => requete("/banque/statut"),
+  banqueInstitutions: (pays = "FR") => requete(`/banque/institutions?pays=${encodeURIComponent(pays)}`),
+  banqueInitier: (institutionId) => requete("/banque/initiate", "POST", { institutionId }),
+  // `retour` : ce que la banque a ajouté à l'adresse de retour (code, state, error).
+  banqueConfirmer: (retour = {}) => {
+    const params = new URLSearchParams(Object.entries(retour).filter(([, v]) => v));
+    return requete(`/banque/callback${params.size ? `?${params}` : ""}`);
+  },
+  banqueActiver: (active) => requete("/banque", "PUT", { active }),
+  banqueDonnees: () => requete("/banque/financial-data"),
+  banqueDissocier: () => requete("/banque", "DELETE"),
 
   /* ─── Foyer partagé ─── */
   acces: () => requete("/foyer/acces"),

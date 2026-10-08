@@ -1,9 +1,13 @@
-// Agrégation bancaire facultative, via GoCardless Bank Account Data (DSP2).
+// Synchronisation bancaire facultative (DSP2), via le prestataire du foyer :
+// Enable Banking ou GoCardless Bank Account Data.
 //
 // Parcours : le client choisit une banque (`/institutions`), demande un lien de
 // consentement (`/initiate`), part s'authentifier chez sa banque, revient sur
 // l'application qui confirme la liaison (`/callback`), puis lit les chiffres
 // tirés de ses opérations (`/financial-data`).
+//
+// Ce fichier ne sait pas parler aux prestataires : il passe par leur façade
+// commune (banque/fournisseurs.js), choisie d'après les identifiants du foyer.
 //
 // ─── Qui est concerné ─────────────────────────────────────────────────────
 // Toujours le compte de la session, jamais un identifiant reçu du client. Une
@@ -11,64 +15,60 @@
 // demander les données bancaires d'un autre en changeant un paramètre : ici il
 // n'y a simplement rien à changer.
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
-import { InitierAgregationSchema, ActiverAgregationSchema, IdentifiantsAgregationSchema } from "../schemas.js";
+import { InitierAgregationSchema, ActiverAgregationSchema, IdentifiantsAgregationSchema, RetourBanqueSchema } from "../schemas.js";
 import { syntheseBancaireVersApi } from "../conversion.js";
 import { journal } from "../journal.js";
 import { urlApplication } from "../email/gabarits.js";
-import {
-  ErreurGoCardless,
-  verifierIdentifiants,
-  listerInstitutions,
-  creerRequisition,
-  lireRequisition,
-  lireSoldes,
-  lireTransactions,
-} from "../banque/gocardless.js";
-import { revoquerConsentement, defaireLiaisonsDuFoyer, LIAISON_VIDE } from "../banque/consentement.js";
-import { identifiantsDuFoyer, enregistrerIdentifiants, effacerIdentifiants, masquer } from "../banque/identifiants.js";
+import { ErreurBanque, identifiantsRefuses } from "../banque/erreurs.js";
+import { FOURNISSEURS, fournisseurDe, LIAISON_VIDE } from "../banque/fournisseurs.js";
+import { revoquerConsentement, defaireLiaisonsDuFoyer } from "../banque/consentement.js";
+import { identifiantsDuFoyer, enregistrerIdentifiants, effacerIdentifiants, identifiantPublic, masquer } from "../banque/identifiants.js";
 import { chiffrementDisponible } from "../banque/chiffrement.js";
 import { analyserOperations, soldePrincipal, JOURS_ANALYSES } from "../banque/analyse.js";
 
 const routeur = Router();
 
 // Durée pendant laquelle une synthèse est resservie sans réinterroger la
-// banque. GoCardless n'autorise qu'une poignée d'appels par jour et par compte :
-// sans cette retenue, quelques rechargements de page épuiseraient le quota.
+// banque. Les banques n'autorisent qu'une poignée de lectures par jour et par
+// compte : sans cette retenue, quelques rechargements épuiseraient le quota.
 const FRAICHEUR_MS = 6 * 60 * 60 * 1000;
-
-// Adresse de retour après l'authentification chez la banque. Elle pointe sur le
-// client, qui appelle ensuite `/callback` : la session voyage ainsi dans une
-// requête de même origine, quelle que soit la politique du cookie.
-const adresseDeRetour = () => `${urlApplication()}/?banque=retour`;
 
 /* ─── Aides ────────────────────────────────────────────────────────────── */
 
 /** Ce que le client a besoin de savoir pour afficher le bon écran. */
-const statutDe = (req, u = req.utilisateur) => ({
-  // Faux quand ni le foyer ni l'installation n'ont d'identifiants GoCardless :
-  // seule la saisie manuelle est alors proposée.
-  disponible: Boolean(req.identifiantsBanque),
-  active: Boolean(u.agregationActive && u.goCardlessAccountId),
-  reliee: Boolean(u.goCardlessAccountId),
-  // Un consentement a été demandé mais n'a pas encore abouti.
-  enAttente: Boolean(u.goCardlessRequisitionId && !u.goCardlessAccountId),
-  synchroniseLe: u.agregationSynchroLe ?? null,
-});
+const statutDe = (req, u = req.utilisateur) => {
+  const f = req.fournisseur;
+  return {
+    // Faux quand ni le foyer ni l'installation n'ont d'identifiants : seule la
+    // saisie manuelle est alors proposée.
+    disponible: Boolean(f),
+    fournisseur: f ? req.identifiantsBanque.fournisseur : null,
+    active: Boolean(f && u.agregationActive && f.reliee(u)),
+    reliee: Boolean(f?.reliee(u)),
+    // Un consentement a été demandé mais n'a pas encore abouti.
+    enAttente: Boolean(f?.enAttente(u)),
+    synchroniseLe: u.agregationSynchroLe ?? null,
+  };
+};
 
 const majCompte = (req, data) => prisma.utilisateur.update({ where: { id: req.utilisateur.id }, data });
 
-// Les identifiants GoCardless dépendent du foyer : ils sont lus une fois par
-// requête, puis passés à chaque appel. `null` s'il n'y en a aucun.
-routeur.use(attraper(async (req, _res, suite) => {
+// Les identifiants dépendent du foyer : ils sont lus une fois par requête, avec
+// la façade du prestataire correspondant. `null` s'il n'y en a aucun.
+const chargerIdentifiants = async (req) => {
   req.identifiantsBanque = await identifiantsDuFoyer(req.utilisateur.foyerId);
+  req.fournisseur = fournisseurDe(req.identifiantsBanque);
+};
+
+routeur.use(attraper(async (req, _res, suite) => {
+  await chargerIdentifiants(req);
   suite();
 }));
 
 const exigerConfiguration = (req, res, suite) => {
-  if (req.identifiantsBanque) return suite();
+  if (req.fournisseur) return suite();
   res.status(503).json({
     erreur: "La synchronisation bancaire n'est pas configurée pour ce foyer.",
     motif: "agregation-indisponible",
@@ -82,25 +82,31 @@ const exigerProprietaire = (req, res, suite) => {
   res.status(403).json({ erreur: "Seul un propriétaire du foyer peut faire cela." });
 };
 
-/** Ce que l'écran de réglage montre des identifiants : jamais la clé. */
-const configurationDe = (req) => ({
-  // Sans clé de chiffrement sur le serveur, rien ne peut être enregistré.
-  enregistrementPossible: chiffrementDisponible(),
-  // "foyer" : saisis ici · "installation" : fournis par l'hébergement · null : aucun.
-  source: req.identifiantsBanque?.source ?? null,
-  secretId: req.identifiantsBanque?.source === "foyer" ? masquer(req.identifiantsBanque.secretId) : null,
-  peutModifier: req.utilisateur.role === "proprietaire",
-});
+/** Ce que l'écran de réglage montre des identifiants : jamais un secret. */
+const configurationDe = (req) => {
+  const duFoyer = req.identifiantsBanque?.source === "foyer";
+  return {
+    // Sans clé de chiffrement sur le serveur, rien ne peut être enregistré.
+    enregistrementPossible: chiffrementDisponible(),
+    // "foyer" : saisis ici · "installation" : fournis par l'hébergement · null : aucun.
+    source: req.identifiantsBanque?.source ?? null,
+    fournisseur: req.identifiantsBanque?.fournisseur ?? null,
+    identifiant: duFoyer ? masquer(identifiantPublic(req.identifiantsBanque)) : null,
+    peutModifier: req.utilisateur.role === "proprietaire",
+    // L'adresse de retour à déclarer chez chaque prestataire qui l'exige.
+    redirections: { enablebanking: FOURNISSEURS.enablebanking.redirection(urlApplication()) },
+  };
+};
 
 /**
- * Traduit une erreur GoCardless en réponse lisible.
+ * Traduit l'erreur d'un prestataire en réponse lisible.
  *
  * Ses 401 et 403 ne sont JAMAIS relayés tels quels : le client les lirait comme
  * une session tombée et renverrait vers la connexion, alors que c'est la banque
  * qui refuse, pas nous.
  */
 function repondreErreurBanque(req, res, e) {
-  journal.alerte("appel GoCardless en échec", { identifiant: req.identifiant, statut: e.statut, detail: e.message });
+  journal.alerte("appel au prestataire bancaire en échec", { identifiant: req.identifiant, statut: e.statut, code: e.code, detail: e.message });
   if (e.statut === 429) {
     return res.status(429).json({
       erreur: "La banque limite le nombre de synchronisations par jour. Réessayez plus tard.",
@@ -110,13 +116,13 @@ function repondreErreurBanque(req, res, e) {
   res.status(502).json({ erreur: "Le service bancaire n'a pas répondu comme prévu. Réessayez dans un instant.", motif: "banque-indisponible" });
 }
 
-/** Comme `attraper`, mais les erreurs GoCardless deviennent une réponse 502/429. */
+/** Comme `attraper`, mais les erreurs d'un prestataire deviennent une réponse 502/429. */
 const avecBanque = (fn) =>
   attraper(async (req, res, suite) => {
     try {
       await fn(req, res, suite);
     } catch (e) {
-      if (!(e instanceof ErreurGoCardless)) throw e;
+      if (!(e instanceof ErreurBanque)) throw e;
       repondreErreurBanque(req, res, e);
     }
   });
@@ -136,17 +142,17 @@ function lireSynthese(u) {
 
 routeur.get("/statut", (req, res) => res.json(statutDe(req)));
 
-/* ─── Identifiants GoCardless du foyer ─────────────────────────────────── */
+/* ─── Identifiants du foyer chez son prestataire ───────────────────────── */
 
 routeur.get("/configuration", (req, res) => res.json(configurationDe(req)));
 
 /**
- * Enregistre les identifiants GoCardless du foyer.
+ * Enregistre les identifiants du foyer chez un prestataire.
  *
- * Ils sont essayés auprès de GoCardless avant d'être gardés : une faute de
- * frappe se voit tout de suite, ici, plutôt qu'au moment de relier une banque.
- * Les liaisons ouvertes sous les identifiants précédents sont défaites — elles
- * appartiennent à un autre compte GoCardless et ne répondraient plus.
+ * Ils sont essayés auprès de lui avant d'être gardés : une faute de frappe se
+ * voit tout de suite, ici, plutôt qu'au moment de relier une banque. Les
+ * liaisons ouvertes sous les identifiants précédents sont défaites — elles
+ * appartiennent à un autre compte, voire à un autre prestataire.
  */
 routeur.put("/configuration", exigerProprietaire, valider(IdentifiantsAgregationSchema), attraper(async (req, res) => {
   if (!chiffrementDisponible()) {
@@ -156,12 +162,15 @@ routeur.put("/configuration", exigerProprietaire, valider(IdentifiantsAgregation
     });
   }
 
+  const fournisseur = FOURNISSEURS[req.donnees.fournisseur];
+  let avertissement;
   try {
-    await verifierIdentifiants(req.donnees);
+    avertissement = await fournisseur.verifier(req.donnees, urlApplication());
   } catch (e) {
-    if (!(e instanceof ErreurGoCardless)) throw e;
-    if (e.statut === 401 || e.statut === 403) {
-      return res.status(400).json({ erreur: "GoCardless refuse ces identifiants. Vérifiez le Secret ID et la Secret key.", motif: "identifiants-refuses" });
+    if (!(e instanceof ErreurBanque)) throw e;
+    if (e.code === "CLE_ILLISIBLE") return res.status(400).json({ erreur: e.message, motif: "identifiants-refuses" });
+    if (identifiantsRefuses(e)) {
+      return res.status(400).json({ erreur: `${fournisseur.nom} refuse ces identifiants. Vérifiez-les, puis réessayez.`, motif: "identifiants-refuses" });
     }
     return repondreErreurBanque(req, res, e);
   }
@@ -169,8 +178,8 @@ routeur.put("/configuration", exigerProprietaire, valider(IdentifiantsAgregation
   const foyerId = req.utilisateur.foyerId;
   await defaireLiaisonsDuFoyer(foyerId);
   await enregistrerIdentifiants(foyerId, req.donnees);
-  req.identifiantsBanque = await identifiantsDuFoyer(foyerId);
-  res.json(configurationDe(req));
+  await chargerIdentifiants(req);
+  res.json({ ...configurationDe(req), avertissement: avertissement ?? null });
 }));
 
 /** Retire les identifiants du foyer, et les liaisons ouvertes avec eux. */
@@ -180,7 +189,7 @@ routeur.delete("/configuration", exigerProprietaire, attraper(async (req, res) =
     await defaireLiaisonsDuFoyer(foyerId);
     await effacerIdentifiants(foyerId);
   }
-  req.identifiantsBanque = await identifiantsDuFoyer(foyerId);
+  await chargerIdentifiants(req);
   res.json(configurationDe(req));
 }));
 
@@ -190,7 +199,7 @@ routeur.delete("/configuration", exigerProprietaire, attraper(async (req, res) =
 routeur.get("/institutions", exigerConfiguration, avecBanque(async (req, res) => {
   const pays = String(req.query.pays ?? "FR");
   if (!/^[a-zA-Z]{2}$/.test(pays)) return res.status(400).json({ erreur: "pays : code à deux lettres attendu" });
-  res.json(await listerInstitutions(req.identifiantsBanque, pays));
+  res.json(await req.fournisseur.listerBanques(req.identifiantsBanque, pays));
 }));
 
 /**
@@ -198,51 +207,66 @@ routeur.get("/institutions", exigerConfiguration, avecBanque(async (req, res) =>
  *
  * Une demande précédente, aboutie ou non, est d'abord retirée : en laisser
  * traîner une ouvrirait un consentement que plus rien ne référence ici.
+ *
+ * L'adresse de retour pointe sur le client, qui appelle ensuite `/callback` :
+ * la session voyage ainsi dans une requête de même origine, quelle que soit la
+ * politique du cookie.
  */
 routeur.post("/initiate", exigerConfiguration, valider(InitierAgregationSchema), avecBanque(async (req, res) => {
-  await revoquerConsentement(req.identifiantsBanque, req.utilisateur.goCardlessRequisitionId);
+  await revoquerConsentement(req.identifiantsBanque, req.utilisateur);
 
-  const requisition = await creerRequisition(req.identifiantsBanque, {
-    institutionId: req.donnees.institutionId,
-    redirection: adresseDeRetour(),
-    // GoCardless exige une référence unique par demande ; elle ne sert à rien
-    // d'autre, d'où un simple identifiant aléatoire.
-    reference: randomUUID(),
-  });
+  let demande;
+  try {
+    demande = await req.fournisseur.ouvrir(req.identifiantsBanque, { banque: req.donnees.institutionId, app: urlApplication() });
+  } catch (e) {
+    if (e instanceof ErreurBanque && e.statut === 400) return res.status(400).json({ erreur: "Cette banque n'est pas reconnue par le prestataire." });
+    throw e;
+  }
 
-  await majCompte(req, { ...LIAISON_VIDE, goCardlessRequisitionId: requisition.id });
-  res.status(201).json({ link: requisition.lien });
+  await majCompte(req, { ...LIAISON_VIDE, ...demande.colonnes });
+  res.status(201).json({ link: demande.lien });
 }));
+
+const RAISONS_REFUS = {
+  "aucun-compte":
+    "La banque a répondu, mais aucun compte n'est accessible. En mode restreint, seuls les comptes que vous avez liés à votre application dans le panneau Enable Banking le sont.",
+};
 
 /**
  * B. Retour de la banque : confirme la liaison et retient le compte principal.
  *
- * Appelée par le client une fois revenu sur l'application. Sans effet si la
- * liaison est déjà faite ; si l'utilisateur a rebroussé chemin chez sa banque,
- * la demande reste simplement en attente et peut être reprise.
+ * Appelée par le client une fois revenu sur l'application, avec ce que la
+ * banque a ajouté à l'adresse de retour (`code`, `state`, `error`). Sans effet
+ * si la liaison est déjà faite ; si l'utilisateur a rebroussé chemin chez sa
+ * banque, la demande reste simplement en attente et peut être relancée.
  */
 routeur.get("/callback", exigerConfiguration, avecBanque(async (req, res) => {
   const u = req.utilisateur;
-  if (!u.goCardlessRequisitionId) {
+  const f = req.fournisseur;
+  if (f.reliee(u)) return res.json(statutDe(req));
+  if (!f.enAttente(u)) {
     return res.status(409).json({ erreur: "Aucune connexion bancaire n'est en cours.", motif: "aucune-demande" });
   }
-  if (u.goCardlessAccountId) return res.json(statutDe(req));
 
-  const requisition = await lireRequisition(req.identifiantsBanque, u.goCardlessRequisitionId);
+  const retour = RetourBanqueSchema.safeParse(req.query);
+  if (!retour.success) return res.status(400).json({ erreur: "Retour de la banque illisible." });
 
-  if (requisition.statut === "LN" && requisition.comptes.length > 0) {
-    // Le premier compte fait office de compte principal.
-    const modifie = await majCompte(req, { goCardlessAccountId: requisition.comptes[0], agregationActive: true });
+  const issue = await f.confirmer(req.identifiantsBanque, u, {
+    code: retour.data.code,
+    etat: retour.data.state,
+    erreur: retour.data.error,
+  });
+
+  if (issue.etat === "reliee") {
+    const modifie = await majCompte(req, { ...issue.colonnes, agregationActive: true });
     return res.json(statutDe(req, modifie));
   }
-
-  if (requisition.statut === "RJ" || requisition.statut === "EX") {
-    // Refusée ou expirée : elle n'aboutira plus, autant repartir d'une page blanche.
-    await revoquerConsentement(req.identifiantsBanque, u.goCardlessRequisitionId);
+  if (issue.etat === "refusee") {
+    // Elle n'aboutira plus : autant repartir d'une page blanche.
+    await revoquerConsentement(req.identifiantsBanque, u);
     const modifie = await majCompte(req, LIAISON_VIDE);
-    return res.json({ ...statutDe(req, modifie), refusee: true });
+    return res.json({ ...statutDe(req, modifie), refusee: true, raison: RAISONS_REFUS[issue.raison] ?? null });
   }
-
   res.json(statutDe(req));
 }));
 
@@ -252,7 +276,7 @@ routeur.get("/callback", exigerConfiguration, avecBanque(async (req, res) => {
  * pour changer d'avis.
  */
 routeur.put("/", valider(ActiverAgregationSchema), attraper(async (req, res) => {
-  if (req.donnees.active && !req.utilisateur.goCardlessAccountId) {
+  if (req.donnees.active && !req.fournisseur?.reliee(req.utilisateur)) {
     return res.status(409).json({ erreur: "Reliez d'abord un compte bancaire.", motif: "aucun-compte" });
   }
   const modifie = await majCompte(req, { agregationActive: req.donnees.active });
@@ -268,7 +292,7 @@ routeur.put("/", valider(ActiverAgregationSchema), attraper(async (req, res) => 
  */
 routeur.get("/financial-data", exigerConfiguration, avecBanque(async (req, res) => {
   const u = req.utilisateur;
-  if (!u.goCardlessAccountId || !u.agregationActive) {
+  if (!req.fournisseur.reliee(u) || !u.agregationActive) {
     return res.status(409).json({ erreur: "La synchronisation bancaire n'est pas active.", motif: "agregation-inactive" });
   }
 
@@ -281,21 +305,18 @@ routeur.get("/financial-data", exigerConfiguration, avecBanque(async (req, res) 
   const du = jour(new Date(maintenant.getTime() - JOURS_ANALYSES * 24 * 60 * 60 * 1000));
   const au = jour(maintenant);
 
-  let operations, soldes;
+  let lu;
   try {
-    [operations, soldes] = await Promise.all([
-      lireTransactions(req.identifiantsBanque, u.goCardlessAccountId, du, au),
-      lireSoldes(req.identifiantsBanque, u.goCardlessAccountId),
-    ]);
+    lu = await req.fournisseur.lire(req.identifiantsBanque, u, du, au);
   } catch (e) {
-    if (!(e instanceof ErreurGoCardless) || !connue) throw e;
-    journal.alerte("synthèse bancaire resservie", { identifiant: req.identifiant, statut: e.statut });
+    if (!(e instanceof ErreurBanque) || !connue) throw e;
+    journal.alerte("synthèse bancaire resservie", { identifiant: req.identifiant, statut: e.statut, code: e.code });
     return res.json(syntheseBancaireVersApi(connue, { synchroniseLe: u.agregationSynchroLe, perime: true }));
   }
 
   const synthese = {
-    ...analyserOperations(operations, { jours: JOURS_ANALYSES }),
-    solde: soldePrincipal(soldes),
+    ...analyserOperations(lu.operations, { jours: JOURS_ANALYSES }),
+    solde: soldePrincipal(lu.soldes),
     du,
     au,
     jours: JOURS_ANALYSES,
@@ -306,7 +327,7 @@ routeur.get("/financial-data", exigerConfiguration, avecBanque(async (req, res) 
 
 /** Défait la liaison : consentement retiré chez la banque, identifiants effacés. */
 routeur.delete("/", attraper(async (req, res) => {
-  await revoquerConsentement(req.identifiantsBanque, req.utilisateur.goCardlessRequisitionId);
+  await revoquerConsentement(req.identifiantsBanque, req.utilisateur);
   await majCompte(req, LIAISON_VIDE);
   res.status(204).end();
 }));

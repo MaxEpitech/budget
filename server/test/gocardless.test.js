@@ -150,7 +150,7 @@ testIntegration("parcours complet : consentement, retour de la banque, puis chif
 
     const donnees = await client.appel("/gocardless/financial-data");
     assert.equal(donnees.code, 200);
-    assert.equal(donnees.corps.source, "gocardless");
+    assert.equal(donnees.corps.source, "banque");
     assert.equal(donnees.corps.perime, false);
     assert.deepEqual(donnees.corps.foyer, { emprunteurPrincipalNet: 2450, chargesCourantesFixes: 900 });
     assert.equal(donnees.corps.solde, 1520.37);
@@ -345,6 +345,11 @@ const sansIdentifiantsDInstallation = () => {
   delete process.env.GOCARDLESS_SECRET_KEY;
 };
 
+// Le réglage tel que l'écran le lit, sans l'adresse de retour (elle dépend du
+// port du serveur d'essai).
+const reglage = ({ enregistrementPossible, source, fournisseur, identifiant, peutModifier }) =>
+  ({ enregistrementPossible, source, fournisseur, identifiant, peutModifier });
+
 /** Un second compte du même foyer, simple membre. */
 async function ajouterMembre(contexte) {
   const email = contexte.email.replace("essai-", "essai-membre-");
@@ -366,12 +371,12 @@ testIntegration("le propriétaire configure GoCardless depuis l'interface, sans 
     const client = await clientConnecte(serveur.base, contexte);
 
     const avant = await client.appel("/gocardless/configuration");
-    assert.deepEqual(avant.corps, { enregistrementPossible: true, source: null, secretId: null, peutModifier: true });
+    assert.deepEqual(reglage(avant.corps), { enregistrementPossible: true, source: null, fournisseur: null, identifiant: null, peutModifier: true });
     assert.equal((await client.appel("/gocardless/statut")).corps.disponible, false);
 
     const pose = await client.appel("/gocardless/configuration", "PUT", DU_FOYER);
     assert.equal(pose.code, 200);
-    assert.deepEqual(pose.corps, { enregistrementPossible: true, source: "foyer", secretId: "••••1234", peutModifier: true });
+    assert.deepEqual(reglage(pose.corps), { enregistrementPossible: true, source: "foyer", fournisseur: "gocardless", identifiant: "••••1234", peutModifier: true });
     assert.equal((await client.appel("/gocardless/statut")).corps.disponible, true);
 
     // Le parcours bancaire passe désormais par le compte GoCardless du foyer.
@@ -426,7 +431,7 @@ testIntegration("un simple membre voit l'état du réglage mais ne peut pas y to
 
     const membre = await clientConnecte(serveur.base, await ajouterMembre(contexte));
     const vu = await membre.appel("/gocardless/configuration");
-    assert.deepEqual(vu.corps, { enregistrementPossible: true, source: "foyer", secretId: "••••1234", peutModifier: false });
+    assert.deepEqual(reglage(vu.corps), { enregistrementPossible: true, source: "foyer", fournisseur: "gocardless", identifiant: "••••1234", peutModifier: false });
     assert.equal((await membre.appel("/gocardless/configuration", "PUT", DU_FOYER)).code, 403);
     assert.equal((await membre.appel("/gocardless/configuration", "DELETE")).code, 403);
     // Il profite en revanche des identifiants du foyer pour relier SA banque.
