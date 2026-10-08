@@ -15,6 +15,9 @@ export async function demarrerFausseBanque() {
     // Code HTTP à renvoyer sur les routes de compte, pour simuler une panne.
     panneComptes: null,
     appels: [],
+    identifiantsValides: [["id-essai", "cle-essai"], ["id-du-foyer-1234", "cle-secrete-du-foyer"]],
+    // Sous quel compte GoCardless chaque appel authentifié est arrivé.
+    comptesUtilises: [],
     requisitionsSupprimees: [],
     derniereRequisition: null,
   };
@@ -32,12 +35,15 @@ export async function demarrerFausseBanque() {
     };
 
     if (chemin === "/token/new/") {
-      if (corps?.secret_id !== "id-essai" || corps?.secret_key !== "cle-essai") {
-        return repondre(401, { summary: "Authentication failed" });
-      }
-      return repondre(200, { access: "jeton-essai", access_expires: 86400 });
+      // Deux comptes GoCardless distincts : celui de l'installation, et celui
+      // qu'un foyer saisit dans l'interface.
+      const valide = etat.identifiantsValides.some(([id, cle]) => corps?.secret_id === id && corps?.secret_key === cle);
+      if (!valide) return repondre(401, { summary: "Authentication failed" });
+      return repondre(200, { access: `jeton-${corps.secret_id}`, access_expires: 86400 });
     }
-    if (req.headers.authorization !== "Bearer jeton-essai") return repondre(401, { summary: "Invalid token" });
+    const jetonRecu = String(req.headers.authorization ?? "").replace("Bearer jeton-", "");
+    if (!etat.identifiantsValides.some(([id]) => id === jetonRecu)) return repondre(401, { summary: "Invalid token" });
+    etat.comptesUtilises.push(jetonRecu);
 
     if (chemin === "/institutions/") {
       return repondre(200, [

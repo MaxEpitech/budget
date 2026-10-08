@@ -174,7 +174,8 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
             Activer la synchronisation bancaire automatique (via GoCardless)
             {statut && !statut.disponible && (
               <span style={{ display: "block", fontSize: 12.5, color: "var(--doux)" }}>
-                Non configurée sur cette installation — la saisie manuelle reste disponible.
+                Pas encore configurée pour ce foyer : un propriétaire peut saisir les identifiants
+                GoCardless dans l'onglet Foyer. La saisie manuelle reste disponible.
               </span>
             )}
           </span>

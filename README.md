@@ -86,12 +86,29 @@ Ce module est le seul écrit en TypeScript. Vite le lit tel quel ; `tsc` ne sert
 qu'à vérifier les types, au début de `npm test`.
 
 Revenus et charges se saisissent à la main, ou se lisent sur le compte bancaire
-via **GoCardless Bank Account Data** — facultatif à deux titres : chacun peut
-le refuser, et sans `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` la bascule
-n'est simplement pas proposée.
+via **GoCardless Bank Account Data** — facultatif : chacun peut le refuser, et
+sans identifiants GoCardless la bascule n'est simplement pas proposée.
+
+Ces identifiants viennent de deux endroits, dans cet ordre :
+
+1. **le foyer** — un propriétaire les saisit dans l'onglet Foyer. Ils sont
+   essayés auprès de GoCardless avant d'être gardés, puis la clé est chiffrée en
+   base (AES-256-GCM) avec `CLE_CHIFFREMENT`, qui ne vit que sur l'hébergeur :
+   une copie de la base ne suffit pas à la relire. Elle n'est plus jamais
+   affichée ;
+2. **l'installation** — `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY`, pour
+   les foyers qui n'ont pas saisi les leurs.
+
+Changer ou retirer les identifiants d'un foyer défait les banques reliées par
+ses comptes : une liaison ouverte sous un compte GoCardless est inutilisable
+depuis un autre. Changer `CLE_CHIFFREMENT` rend illisibles les identifiants déjà
+enregistrés ; les foyers les ressaisissent.
 
 | Route | Rôle |
 |---|---|
+| `GET /api/gocardless/configuration` | D'où viennent les identifiants du foyer (jamais la clé) |
+| `PUT /api/gocardless/configuration` | Propriétaire : vérifie puis enregistre `{ secretId, secretKey }` |
+| `DELETE /api/gocardless/configuration` | Propriétaire : retire les identifiants et les liaisons du foyer |
 | `GET /api/gocardless/statut` | Où en est la liaison du compte connecté |
 | `GET /api/gocardless/institutions` | Banques proposées (`?pays=FR`) |
 | `POST /api/gocardless/initiate` | Ouvre le consentement, renvoie `{ link }` vers la banque |
@@ -194,7 +211,8 @@ La commande de build applique les migrations avant de construire le client :
 | `APP_URL` | Adresse publique, base des liens envoyés par email. À défaut, l'adresse du déploiement en cours est utilisée |
 | `CONFIRMATION_EMAIL_REQUISE` | `0` ou `1`, voir plus haut |
 | `RESEND_API_KEY` | Seulement si les emails doivent réellement partir |
-| `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY` | Seulement pour proposer la synchronisation bancaire |
+| `CLE_CHIFFREMENT` | Pour que les foyers puissent enregistrer leurs identifiants GoCardless depuis l'interface. Au moins 32 caractères, à ne jamais changer ensuite |
+| `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY` | Facultatif : identifiants communs aux foyers qui n'ont pas saisi les leurs |
 
 **Ne pas définir `PORT` ni `PORT_CLIENT`** : ces variables ne servent qu'au
 lanceur de développement et n'auraient là-bas que des effets parasites.

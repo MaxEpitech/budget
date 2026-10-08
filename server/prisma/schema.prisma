@@ -59,6 +59,14 @@ model Foyer {
   projets      Projet[]
   placements   Placement[]
   budgets      Budget[]
+
+  // Identifiants GoCardless du foyer, saisis par son propriétaire. Facultatifs :
+  // sans eux, ce sont ceux de l'installation qui servent, s'il y en a.
+  // L'identifiant n'est pas un secret à lui seul ; la clé, si. Elle est chiffrée
+  // avec CLE_CHIFFREMENT, qui ne vit pas en base : une copie de celle-ci ne
+  // suffit donc pas à la relire.
+  goCardlessSecretId         String?
+  goCardlessSecretKeyChiffre String?
 }
 
 // Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
