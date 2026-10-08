@@ -86,44 +86,59 @@ Ce module est le seul écrit en TypeScript. Vite le lit tel quel ; `tsc` ne sert
 qu'à vérifier les types, au début de `npm test`.
 
 Revenus et charges se saisissent à la main, ou se lisent sur le compte bancaire
-via **GoCardless Bank Account Data** — facultatif : chacun peut le refuser, et
-sans identifiants GoCardless la bascule n'est simplement pas proposée.
+par l'intermédiaire d'un prestataire agréé — facultatif : chacun peut le
+refuser, et un foyer sans prestataire ne voit simplement pas la bascule.
 
-Ces identifiants viennent de deux endroits, dans cet ordre :
+Deux prestataires sont pris en charge, un seul à la fois par foyer :
 
-1. **le foyer** — un propriétaire les saisit dans l'onglet Foyer. Ils sont
-   essayés auprès de GoCardless avant d'être gardés, puis la clé est chiffrée en
-   base (AES-256-GCM) avec `CLE_CHIFFREMENT`, qui ne vit que sur l'hébergeur :
-   une copie de la base ne suffit pas à la relire. Elle n'est plus jamais
-   affichée ;
-2. **l'installation** — `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY`, pour
-   les foyers qui n'ont pas saisi les leurs.
+- **Enable Banking** — ouvert aux particuliers pour leurs propres comptes, en
+  mode « restreint » : seuls les comptes liés à l'application dans son panneau
+  sont lisibles. Le foyer fournit l'identifiant de son application et sa clé
+  privée (fichier `.pem`), qui signe chaque requête ;
+- **GoCardless Bank Account Data** — n'accepte plus de nouvelles inscriptions ;
+  gardé pour qui y a déjà un compte (`Secret ID` et `Secret key`).
+
+Un propriétaire les saisit dans l'onglet Foyer. Ils sont essayés auprès du
+prestataire avant d'être gardés, puis le secret est chiffré en base
+(AES-256-GCM) avec `CLE_CHIFFREMENT`, qui ne vit que sur l'hébergeur : une copie
+de la base ne suffit pas à le relire. Il n'est plus jamais affiché. À défaut
+d'identifiants propres au foyer, ceux de l'installation servent s'il y en a
+(`GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY`).
+
+Pour Enable Banking, l'adresse de retour `<APP_URL>/banque/retour` doit être
+déclarée dans l'application (« redirect URLs ») ; l'écran de réglage l'affiche,
+et prévient si elle manque. `APP_URL` doit donc porter l'adresse publique
+définitive.
 
 Changer ou retirer les identifiants d'un foyer défait les banques reliées par
-ses comptes : une liaison ouverte sous un compte GoCardless est inutilisable
-depuis un autre. Changer `CLE_CHIFFREMENT` rend illisibles les identifiants déjà
-enregistrés ; les foyers les ressaisissent.
+ses comptes : une liaison ouverte sous un compte, ou chez un prestataire, est
+inutilisable depuis un autre. Changer `CLE_CHIFFREMENT` rend illisibles les
+identifiants déjà enregistrés ; les foyers les ressaisissent.
+
+Les routes sont les mêmes quel que soit le prestataire : elles passent par une
+façade commune (`server/src/banque/fournisseurs.js`). `/api/gocardless/*`,
+l'ancien chemin, reste servi.
 
 | Route | Rôle |
 |---|---|
-| `GET /api/gocardless/configuration` | D'où viennent les identifiants du foyer (jamais la clé) |
-| `PUT /api/gocardless/configuration` | Propriétaire : vérifie puis enregistre `{ secretId, secretKey }` |
-| `DELETE /api/gocardless/configuration` | Propriétaire : retire les identifiants et les liaisons du foyer |
-| `GET /api/gocardless/statut` | Où en est la liaison du compte connecté |
-| `GET /api/gocardless/institutions` | Banques proposées (`?pays=FR`) |
-| `POST /api/gocardless/initiate` | Ouvre le consentement, renvoie `{ link }` vers la banque |
-| `GET /api/gocardless/callback` | Au retour de la banque : confirme et retient le compte principal |
-| `PUT /api/gocardless` | Bascule synchronisation / saisie manuelle, sans défaire la liaison |
-| `GET /api/gocardless/financial-data` | Revenus et charges mensuels tirés des 90 derniers jours |
-| `DELETE /api/gocardless` | Retire le consentement et efface la liaison |
+| `GET /api/banque/configuration` | Prestataire et origine des identifiants du foyer (jamais un secret) |
+| `PUT /api/banque/configuration` | Propriétaire : vérifie puis enregistre `{ fournisseur, … }` |
+| `DELETE /api/banque/configuration` | Propriétaire : retire les identifiants et les liaisons du foyer |
+| `GET /api/banque/statut` | Où en est la liaison du compte connecté |
+| `GET /api/banque/institutions` | Banques proposées (`?pays=FR`) |
+| `POST /api/banque/initiate` | Ouvre le consentement, renvoie `{ link }` vers la banque |
+| `GET /api/banque/callback` | Au retour de la banque (`code`, `state`) : confirme et retient le compte principal |
+| `PUT /api/banque` | Bascule synchronisation / saisie manuelle, sans défaire la liaison |
+| `GET /api/banque/financial-data` | Revenus et charges mensuels tirés des 90 derniers jours |
+| `DELETE /api/banque` | Retire le consentement et efface la liaison |
 
 Trois choix à connaître :
 
 - **Aucune route ne prend d'identifiant de compte.** Le compte est celui de la
   session : il n'y a rien à falsifier pour lire les données d'un autre.
 - **Aucune opération bancaire n'est stockée**, seulement les totaux de la
-  dernière lecture. Ils sont resservis pendant six heures, GoCardless plafonnant
-  les appels par jour ; si la banque ne répond pas, ils le sont aussi, marqués
+  dernière lecture. Ils sont resservis pendant six heures, les banques plafonnant
+  les lectures par jour ; si la banque ne répond pas, ils le sont aussi, marqués
   `perime`.
 - **L'analyse est volontairement simple** (`server/src/banque/analyse.js`) : est
   un revenu ce dont le libellé contient « salaire », « virement reçu », « paye »
@@ -211,8 +226,8 @@ La commande de build applique les migrations avant de construire le client :
 | `APP_URL` | Adresse publique, base des liens envoyés par email. À défaut, l'adresse du déploiement en cours est utilisée |
 | `CONFIRMATION_EMAIL_REQUISE` | `0` ou `1`, voir plus haut |
 | `RESEND_API_KEY` | Seulement si les emails doivent réellement partir |
-| `CLE_CHIFFREMENT` | Pour que les foyers puissent enregistrer leurs identifiants GoCardless depuis l'interface. Au moins 32 caractères, à ne jamais changer ensuite |
-| `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY` | Facultatif : identifiants communs aux foyers qui n'ont pas saisi les leurs |
+| `CLE_CHIFFREMENT` | Pour que les foyers puissent enregistrer leurs identifiants bancaires depuis l'interface. Au moins 32 caractères, à ne jamais changer ensuite |
+| `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY` | Facultatif : identifiants GoCardless communs aux foyers qui n'ont pas saisi les leurs |
 
 **Ne pas définir `PORT` ni `PORT_CLIENT`** : ces variables ne servent qu'au
 lanceur de développement et n'auraient là-bas que des effets parasites.
@@ -244,8 +259,8 @@ api/index.js         point d'entrée en production (fonction Vercel)
 server/src/
   app.js             construction de l'application Express, sans écoute
   index.js           serveur de développement, met app.js à l'écoute d'un port
-  routes/            etat, transactions, credits, projets, placements, membres, foyer, auth, gocardless
-  banque/            client GoCardless, analyse des opérations, retrait du consentement
+  routes/            etat, transactions, credits, projets, placements, membres, foyer, auth, banque
+  banque/            clients Enable Banking et GoCardless, leur façade commune, chiffrement, analyse des opérations
   auth/              mot de passe (scrypt), jetons, sessions, cadence, garde
   email/             transport et gabarits
   finance.js         formules financières — la référence

@@ -95,9 +95,9 @@ export function Confidentialite({ allerVers }) {
           Dissocier la banque, ou supprimer le compte, retire l'accès et efface ces totaux.
         </p>
         <p style={paragraphe}>
-          <strong>Si votre foyer enregistre ses identifiants GoCardless</strong> — la clé est
-          conservée chiffrée, avec une clé de chiffrement tenue hors de la base, et n'est plus
-          jamais affichée.
+          <strong>Si votre foyer enregistre ses identifiants chez un prestataire bancaire</strong>{" "}
+          — le secret est conservé chiffré, avec une clé de chiffrement tenue hors de la base, et n'est plus
+          jamais affiché.
         </p>
         <p style={paragraphe}>
           <strong>Dans votre navigateur</strong> — ce que vous saisissez dans l'onglet Emprunt
@@ -146,8 +146,9 @@ export function Confidentialite({ allerVers }) {
           <li><strong>Prisma</strong> — hébergement de la base de données</li>
           <li><strong>Resend</strong> — envoi des emails de confirmation et de réinitialisation</li>
           <li>
-            <strong>GoCardless</strong> — lecture de vos comptes auprès de votre banque, uniquement
-            si vous activez la synchronisation bancaire
+            <strong>Enable Banking</strong> ou <strong>GoCardless</strong>, selon le réglage de
+            votre foyer — lecture de vos comptes auprès de votre banque, uniquement si vous activez
+            la synchronisation bancaire
           </li>
         </ul>
         <p style={paragraphe}>

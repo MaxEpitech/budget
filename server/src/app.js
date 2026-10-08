@@ -20,7 +20,7 @@ import projets from "./routes/projets.js";
 import placements from "./routes/placements.js";
 import budgets from "./routes/budgets.js";
 import foyer from "./routes/foyer.js";
-import gocardless from "./routes/gocardless.js";
+import banque from "./routes/banque.js";
 
 const app = express();
 
@@ -74,7 +74,9 @@ const ROUTES_METIER = [
   ["/api/placements", placements],
   ["/api/budgets", budgets],
   ["/api/foyer", foyer],
-  ["/api/gocardless", gocardless],
+  ["/api/banque", banque],
+  // Ancien chemin, du temps où GoCardless était le seul prestataire.
+  ["/api/gocardless", banque],
 ];
 
 for (const [chemin, routeur] of ROUTES_METIER) {

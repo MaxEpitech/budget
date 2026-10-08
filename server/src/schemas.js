@@ -93,18 +93,45 @@ export const BudgetSchema = z.object({
 /* ─── Agrégation bancaire ─── */
 
 export const InitierAgregationSchema = z.object({
-  // Identifiant de banque fourni par GoCardless, par exemple « BNP_PARIBAS_BNPAFRPP ».
-  institutionId: chaine("banque").max(120, "banque : identifiant trop long"),
+  // Identifiant de banque tel que le prestataire le donne : « BNP_PARIBAS_BNPAFRPP »
+  // chez GoCardless, « FR:BNP Paribas » chez Enable Banking.
+  institutionId: chaine("banque").max(200, "banque : identifiant trop long"),
+});
+
+// Ce que la banque ajoute à l'adresse de retour (Enable Banking). Tout est
+// facultatif : GoCardless ne renvoie rien d'utile, on l'interroge directement.
+export const RetourBanqueSchema = z.object({
+  code: z.string().max(2000).optional(),
+  state: z.string().max(500).optional(),
+  error: z.string().max(200).optional(),
 });
 
 // Identifiants GoCardless d'un foyer, tels que le portail les délivre.
 const secret = (champ) =>
   z.string(`${champ} requis`).trim().min(8, `${champ} : valeur trop courte`).max(300, `${champ} : valeur trop longue`);
 
-export const IdentifiantsAgregationSchema = z.object({
-  secretId: secret("Secret ID"),
-  secretKey: secret("Secret key"),
-});
+// Un jeu d'identifiants par prestataire. Sans `fournisseur`, c'est GoCardless :
+// la forme d'origine de cette route reste acceptée.
+export const IdentifiantsAgregationSchema = z.preprocess(
+  (d) => (d && typeof d === "object" && d.fournisseur === undefined ? { ...d, fournisseur: "gocardless" } : d),
+  z.discriminatedUnion(
+    "fournisseur",
+    [
+      z.object({
+        fournisseur: z.literal("gocardless"),
+        secretId: secret("Secret ID"),
+        secretKey: secret("Secret key"),
+      }),
+      z.object({
+        fournisseur: z.literal("enablebanking"),
+        appId: secret("identifiant d'application").max(100, "identifiant d'application : valeur trop longue"),
+        // Fichier .pem entier ; une clé RSA de 4096 bits tient en 3 300 caractères.
+        clePrivee: z.string("clé privée requise").trim().min(100, "clé privée : contenu trop court").max(10000, "clé privée : contenu trop long"),
+      }),
+    ],
+    "prestataire : « gocardless » ou « enablebanking » attendu",
+  ),
+);
 
 export const ActiverAgregationSchema = z.object({
   active: z.boolean("active : booléen attendu"),

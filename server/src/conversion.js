@@ -135,7 +135,7 @@ export const budgetVersApi = (b) => ({
    Rangée sous la forme qu'attend le moteur de capacité d'emprunt du client :
    `foyer` se pose tel quel sur les champs correspondants de son entrée. */
 export const syntheseBancaireVersApi = (s, { synchroniseLe, perime = false }) => ({
-  source: "gocardless",
+  source: "banque",
   synchroniseLe,
   // Vrai quand la banque n'a pas pu être réinterrogée : les chiffres servis
   // sont ceux de la dernière synchronisation réussie.

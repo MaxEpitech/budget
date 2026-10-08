@@ -8,6 +8,7 @@ import Flux from "./onglets/Flux.jsx";
 import Historique from "./onglets/Historique.jsx";
 import Credits from "./onglets/Credits.jsx";
 import Emprunt from "./onglets/Emprunt.jsx";
+import { retourDeBanque } from "./composants/SourceRevenus.jsx";
 import Projets from "./onglets/Projets.jsx";
 import Epargne from "./onglets/Epargne.jsx";
 import Foyer from "./onglets/Foyer.jsx";
@@ -44,11 +45,9 @@ const DELAI_ANNULATION = 6000;
 export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrirPage }) {
   const [etat, setEtat] = useState(null);
   const [mois, setMois] = useState(moisCle());
-  // Au retour de la banque (`?banque=retour`), on rouvre l'onglet d'où l'on
-  // était parti : c'est lui qui confirme la liaison.
-  const [onglet, setOnglet] = useState(() =>
-    new URLSearchParams(window.location.search).has("banque") ? "emprunt" : "flux",
-  );
+  // Au retour de la banque, on rouvre l'onglet d'où l'on était parti : c'est
+  // lui qui confirme la liaison.
+  const [onglet, setOnglet] = useState(() => (retourDeBanque() ? "emprunt" : "flux"));
   const [posteActif, setPosteActif] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(false);

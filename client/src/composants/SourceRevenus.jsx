@@ -5,7 +5,7 @@
 // l'écran : où en est la liaison, la liste des banques, un appel en cours.
 //
 // La synchronisation est facultative à deux titres : l'utilisateur peut la
-// refuser, et un déploiement sans clés GoCardless ne la propose pas du tout.
+// refuser, et un foyer sans prestataire bancaire configuré ne la voit pas.
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../api.js";
 import Champ from "./Champ.jsx";
@@ -17,6 +17,13 @@ import { euro, ilYA } from "../utiles.js";
  * @param onChange  fusionne un fragment dans cet état
  * @param signaler  remonte une erreur à l'application (session tombée comprise)
  */
+const REFUS = "La banque n'a pas confirmé l'accès. Vous pouvez relancer la connexion.";
+
+/** Revient-on de la banque ? Chaque prestataire a sa forme d'adresse de retour. */
+export const retourDeBanque = () =>
+  window.location.pathname.replace(/\/+$/, "") === "/banque/retour" ||
+  new URLSearchParams(window.location.search).has("banque");
+
 export default function SourceRevenus({ saisie, onChange, signaler }) {
   const [statut, setStatut] = useState(null); // null : pas encore connu
   const [banques, setBanques] = useState(null);
@@ -63,10 +70,10 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       try {
         let s = await api.banqueStatut();
         if (s.disponible && s.enAttente) {
-          s = await api.banqueConfirmer();
-          if (s.refusee && vivant.current) {
-            setMessage({ ton: "alerte", texte: "La banque n'a pas confirmé l'accès. Vous pouvez relancer la connexion." });
-          }
+          // Ce que la banque a ajouté à l'adresse de retour, quand il y en a.
+          const retour = new URLSearchParams(window.location.search);
+          s = await api.banqueConfirmer({ code: retour.get("code"), state: retour.get("state"), error: retour.get("error") });
+          if (s.refusee && vivant.current) setMessage({ ton: "alerte", texte: s.raison ?? REFUS });
         }
         if (!vivant.current) return;
         setStatut(s);
@@ -76,11 +83,9 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
         if (vivant.current) setStatut((s) => s ?? { disponible: false });
         surErreur(err);
       } finally {
-        // Le paramètre de retour a fait son office : inutile de le laisser dans
-        // la barre d'adresse, où un rechargement le rejouerait.
-        if (new URLSearchParams(window.location.search).has("banque")) {
-          window.history.replaceState({}, "", window.location.pathname);
-        }
+        // L'adresse de retour a fait son office : inutile d'y laisser un code
+        // à usage unique, qu'un rechargement rejouerait.
+        if (retourDeBanque()) window.history.replaceState({}, "", "/");
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -136,7 +141,7 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       const s = await api.banqueConfirmer();
       setStatut(s);
       if (s.active) await chargerDonnees();
-      else if (s.refusee) setMessage({ ton: "alerte", texte: "La banque n'a pas confirmé l'accès. Vous pouvez relancer la connexion." });
+      else if (s.refusee) setMessage({ ton: "alerte", texte: s.raison ?? REFUS });
       else setMessage({ ton: "alerte", texte: "La banque n'a pas encore confirmé l'accès." });
     });
 
@@ -171,11 +176,11 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
             onChange={(e) => basculer(e.target.checked)}
           />
           <span>
-            Activer la synchronisation bancaire automatique (via GoCardless)
+            Activer la synchronisation bancaire automatique
             {statut && !statut.disponible && (
               <span style={{ display: "block", fontSize: 12.5, color: "var(--doux)" }}>
-                Pas encore configurée pour ce foyer : un propriétaire peut saisir les identifiants
-                GoCardless dans l'onglet Foyer. La saisie manuelle reste disponible.
+                Pas encore configurée pour ce foyer : un propriétaire peut la régler dans l'onglet
+                Foyer. La saisie manuelle reste disponible.
               </span>
             )}
           </span>

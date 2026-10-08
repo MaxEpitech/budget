@@ -10,6 +10,8 @@
 //
 // GOCARDLESS_BASE_URL : à ne changer que pour viser un faux serveur en test.
 
+import { ErreurBanque } from "./erreurs.js";
+
 const BASE_PAR_DEFAUT = "https://bankaccountdata.gocardless.com/api/v2";
 
 // La fonction Vercel est coupée à 15 s : mieux vaut renoncer avant, et répondre
@@ -18,17 +20,9 @@ const DELAI_MS = 10_000;
 
 const base = () => (process.env.GOCARDLESS_BASE_URL || BASE_PAR_DEFAUT).replace(/\/+$/, "");
 
-/**
- * Erreur renvoyée par GoCardless, ou survenue en lui parlant.
- * `statut` est le code HTTP reçu ; 0 quand aucune réponse n'est arrivée.
- */
-export class ErreurGoCardless extends Error {
-  constructor(message, statut = 0) {
-    super(message);
-    this.name = "ErreurGoCardless";
-    this.statut = statut;
-  }
-}
+// Nom d'origine, gardé pour ce fichier : c'est la même erreur que celle des
+// autres prestataires.
+const ErreurGoCardless = ErreurBanque;
 
 /* ─── Jeton d'accès ────────────────────────────────────────────────────────
    Valable 24 h. Gardé en mémoire le temps que vit l'instance : sur une fonction
