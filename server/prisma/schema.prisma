@@ -216,6 +216,12 @@ model Transaction {
   // sert au filtrage et n'a pas à disparaître. Une ligne récurrente n'a pas de
   // date — elle revient tous les mois, elle n'arrive pas un jour précis.
   date      DateTime?
+  // Lignes venues d'un relevé bancaire importé. La clé est l'empreinte de
+  // l'opération (date, montant, libellé, rang) : réimporter le même relevé, ou
+  // un relevé qui le chevauche, ne crée pas de doublon. Le lot réunit les
+  // lignes d'un même import, pour pouvoir l'annuler d'un geste.
+  importCle String?
+  importLot String?
   creeLe    DateTime        @default(now())
   modifieLe DateTime        @updatedAt
   // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
@@ -224,6 +230,10 @@ model Transaction {
   foyer     Foyer           @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId   Int
 
+  // L'unicité est portée par la base : deux imports simultanés du même relevé
+  // ne peuvent pas se doubler. Les lignes saisies à la main n'ont pas de clé,
+  // et ne sont donc pas concernées.
+  @@unique([foyerId, importCle])
   @@index([foyerId])
 }
 

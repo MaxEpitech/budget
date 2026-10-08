@@ -100,6 +100,11 @@ export function Confidentialite({ allerVers }) {
           jamais affiché.
         </p>
         <p style={paragraphe}>
+          <strong>Si vous importez un relevé</strong> — le fichier est lu pour en afficher les
+          opérations, puis oublié : il n'est pas conservé. Seules les opérations que vous choisissez
+          d'ajouter au flux sont enregistrées, comme des lignes saisies à la main.
+        </p>
+        <p style={paragraphe}>
           <strong>Dans votre navigateur</strong> — ce que vous saisissez dans l'onglet Emprunt
           reste sur votre appareil et n'est pas envoyé au service.
         </p>

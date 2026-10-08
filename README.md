@@ -115,6 +115,30 @@ ses comptes : une liaison ouverte sous un compte, ou chez un prestataire, est
 inutilisable depuis un autre. Changer `CLE_CHIFFREMENT` rend illisibles les
 identifiants déjà enregistrés ; les foyers les ressaisissent.
 
+### Import d'un relevé
+
+Sans prestataire ni identifiants, un relevé téléchargé depuis l'espace bancaire
+(CSV, OFX ou QIF) fait le même office, avec toutes les banques. Il sert à deux
+endroits :
+
+- **onglet Flux** — ses opérations sont affichées, puis celles que l'on retient
+  entrent dans le flux comme lignes ponctuelles, à leur date, avec une catégorie
+  proposée d'après le libellé. Les salaires sont décochés par défaut : ils sont
+  déjà comptés dans les revenus des membres ;
+- **onglet Emprunt** — il préremplit le revenu et les charges courantes, qui
+  restent modifiables.
+
+`POST /api/banque/releve` lit et analyse le fichier sans rien enregistrer ;
+`POST /api/transactions/import` fait entrer les opérations validées, et
+`DELETE /api/transactions/import/:lot` annule un import. Chaque opération porte
+une empreinte (date, montant, libellé, rang), unique par foyer en base :
+réimporter un relevé, ou un relevé qui le chevauche, n'ajoute rien en double.
+
+Le CSV n'étant pas normalisé, `server/src/banque/releve.js` devine séparateur,
+colonnes et écriture des montants ; le navigateur décode le fichier en UTF-8 ou,
+à défaut, en Windows-1252. Un relevé PDF ou Excel est refusé avec un message qui
+dit quoi télécharger à la place.
+
 Les routes sont les mêmes quel que soit le prestataire : elles passent par une
 façade commune (`server/src/banque/fournisseurs.js`). `/api/gocardless/*`,
 l'ancien chemin, reste servi.
@@ -260,7 +284,8 @@ server/src/
   app.js             construction de l'application Express, sans écoute
   index.js           serveur de développement, met app.js à l'écoute d'un port
   routes/            etat, transactions, credits, projets, placements, membres, foyer, auth, banque
-  banque/            clients Enable Banking et GoCardless, leur façade commune, chiffrement, analyse des opérations
+  banque/            clients Enable Banking et GoCardless, leur façade commune, chiffrement,
+                     lecture des relevés importés, analyse des opérations
   auth/              mot de passe (scrypt), jetons, sessions, cadence, garde
   email/             transport et gabarits
   finance.js         formules financières — la référence

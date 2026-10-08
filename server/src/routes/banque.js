@@ -17,8 +17,11 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
-import { InitierAgregationSchema, ActiverAgregationSchema, IdentifiantsAgregationSchema, RetourBanqueSchema } from "../schemas.js";
-import { syntheseBancaireVersApi } from "../conversion.js";
+import { InitierAgregationSchema, ActiverAgregationSchema, IdentifiantsAgregationSchema, RetourBanqueSchema, ReleveSchema } from "../schemas.js";
+import { syntheseBancaireVersApi, enEuros } from "../conversion.js";
+import { lireReleve, fenetreRecente, ErreurReleve } from "../banque/releve.js";
+import { preparerOperations } from "../banque/import.js";
+import { montantEnCentimes } from "../banque/analyse.js";
 import { journal } from "../journal.js";
 import { urlApplication } from "../email/gabarits.js";
 import { ErreurBanque, identifiantsRefuses } from "../banque/erreurs.js";
@@ -141,6 +144,67 @@ function lireSynthese(u) {
 /* ─── Routes ───────────────────────────────────────────────────────────── */
 
 routeur.get("/statut", (req, res) => res.json(statutDe(req)));
+
+/* ─── Relevé téléchargé depuis la banque ───────────────────────────────── */
+
+/**
+ * Lit un relevé (CSV, OFX ou QIF) et rend deux choses : les revenus et charges
+ * mensuels qu'on en tire, et ses opérations prêtes à entrer dans le flux.
+ *
+ * Aucun prestataire, aucun identifiant : c'est la voie qui marche avec toutes
+ * les banques. Rien n'est enregistré ici — le fichier est lu, analysé, oublié.
+ * Les opérations n'entrent en base que si l'utilisateur les valide ensuite
+ * (`POST /api/transactions/import`).
+ */
+routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
+  let lu;
+  try {
+    lu = lireReleve(req.donnees.contenu);
+  } catch (e) {
+    if (!(e instanceof ErreurReleve)) throw e;
+    return res.status(400).json({ erreur: e.message, motif: "releve-illisible" });
+  }
+
+  // L'estimation ne regarde que la fin du relevé ; l'import, lui, propose tout.
+  const recent = fenetreRecente(lu.operations, JOURS_ANALYSES);
+  const synthese = {
+    ...analyserOperations(recent.operations, { jours: recent.jours }),
+    solde: lu.solde === null ? null : montantEnCentimes(lu.solde),
+    du: recent.du,
+    au: recent.au,
+    jours: recent.jours,
+  };
+
+  const lignes = preparerOperations(lu.operations);
+  const connues = new Set(
+    (
+      await prisma.transaction.findMany({
+        where: { foyerId: req.utilisateur.foyerId, importCle: { in: lignes.map((l) => l.cle) } },
+        select: { importCle: true },
+      })
+    ).map((t) => t.importCle),
+  );
+
+  const avertissements = [];
+  if (recent.jours < 45) {
+    avertissements.push(
+      "Ce relevé couvre moins de deux mois : les charges qui reviennent ne peuvent pas être repérées. Exportez au moins trois mois pour une estimation fiable.",
+    );
+  }
+  if (synthese.nbRevenus === 0) {
+    avertissements.push("Aucun versement n'a été reconnu comme salaire : le revenu est à saisir à la main.");
+  }
+
+  res.json({
+    ...syntheseBancaireVersApi(synthese, { synchroniseLe: new Date() }),
+    source: "releve",
+    format: lu.format,
+    nom: req.donnees.nom ?? null,
+    lignesIgnorees: lu.ignorees,
+    avertissements,
+    operations: lignes.map((l) => ({ ...l, montant: enEuros(l.montant), dejaImportee: connues.has(l.cle) })),
+  });
+}));
 
 /* ─── Identifiants du foyer chez son prestataire ───────────────────────── */
 

@@ -63,6 +63,9 @@ export const api = {
   transactions: () => requete("/transactions"),
   creerTransaction: (t) => requete("/transactions", "POST", t),
   supprimerTransaction: (id, options) => requete(`/transactions/${id}`, "DELETE", undefined, options),
+  // Opérations d'un relevé, validées dans l'aperçu ; `lot` permet d'annuler l'import.
+  importerTransactions: (pour, operations) => requete("/transactions/import", "POST", { pour, operations }),
+  annulerImport: (lot) => requete(`/transactions/import/${encodeURIComponent(lot)}`, "DELETE"),
 
   credits: () => requete("/credits"),
   creerCredit: (c) => requete("/credits", "POST", c),
@@ -97,6 +100,8 @@ export const api = {
   banqueConfiguration: () => requete("/banque/configuration"),
   banqueConfigurer: (identifiants) => requete("/banque/configuration", "PUT", identifiants),
   banqueDeconfigurer: () => requete("/banque/configuration", "DELETE"),
+  // Relevé téléchargé depuis la banque : lu et analysé, jamais enregistré tel quel.
+  banqueReleve: (nom, contenu) => requete("/banque/releve", "POST", { nom, contenu }),
   banqueStatut: () => requete("/banque/statut"),
   banqueInstitutions: (pays = "FR") => requete(`/banque/institutions?pays=${encodeURIComponent(pays)}`),
   banqueInitier: (institutionId) => requete("/banque/initiate", "POST", { institutionId }),

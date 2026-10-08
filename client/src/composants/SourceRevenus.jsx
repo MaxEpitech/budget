@@ -11,6 +11,7 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
 import { euro, ilYA } from "../utiles.js";
+import { analyserFichier, FORMATS_RELEVE } from "../releve.js";
 
 /**
  * @param saisie    l'état du simulateur (lecture) : `source`, `banque`, `foyer`
@@ -153,6 +154,25 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       setMessage({ ton: "ok", texte: "Banque dissociée : l'accès à vos comptes a été retiré." });
     });
 
+  // Estimation à partir d'un relevé : les deux champs sont remplis, et restent
+  // modifiables — c'est une aide à la saisie, pas une source à part.
+  const champFichier = useRef(null);
+  const estimerDepuisReleve = (e) => {
+    const fichier = e.target.files?.[0];
+    e.target.value = "";
+    if (!fichier) return;
+    agir(async () => {
+      const r = await analyserFichier(fichier);
+      if (!vivant.current) return;
+      onChange({ foyer: { ...saisie.foyer, principal: String(r.foyer.emprunteurPrincipalNet), charges: String(r.foyer.chargesCourantesFixes) } });
+      const resume = `Rempli depuis ${r.nom ?? "le relevé"} (${r.periode.jours} jours) : ${r.detail.nbRevenus} versement${r.detail.nbRevenus > 1 ? "s" : ""} de salaire, ${r.detail.nbChargesRecurrentes} dépense${r.detail.nbChargesRecurrentes > 1 ? "s" : ""} récurrente${r.detail.nbChargesRecurrentes > 1 ? "s" : ""}.`;
+      setMessage({
+        ton: r.avertissements.length ? "alerte" : "ok",
+        texte: [resume, ...r.avertissements, "Corrigez les montants si besoin. Pour ajouter ces opérations au budget, importez le relevé depuis l'onglet Flux."].join(" "),
+      });
+    });
+  };
+
   const majFoyer = (champ) => (v) => onChange({ foyer: { ...saisie.foyer, [champ]: v } });
   const b = saisie.banque;
   const lectureSeule = synchronise && Boolean(b);
@@ -230,6 +250,15 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
             onChange={majFoyer("charges")} largeur={230} placeholder="0" disabled={lectureSeule}
           />
         </div>
+
+        {!lectureSeule && (
+          <div style={{ marginTop: 10 }}>
+            <input ref={champFichier} type="file" accept={FORMATS_RELEVE} onChange={estimerDepuisReleve} hidden />
+            <button className="lien" onClick={() => champFichier.current?.click()} disabled={occupe}>
+              Estimer depuis un relevé bancaire (CSV, OFX, QIF)
+            </button>
+          </div>
+        )}
 
         {lectureSeule && (
           <>
