@@ -90,6 +90,17 @@ export const api = {
 
   modifierFoyer: (repartition) => requete("/foyer", "PUT", { repartition }),
 
+  /* ─── Synchronisation bancaire ───
+     Aucune de ces routes ne prend d'identifiant de compte : le serveur ne
+     connaît que celui de la session. */
+  banqueStatut: () => requete("/gocardless/statut"),
+  banqueInstitutions: (pays = "FR") => requete(`/gocardless/institutions?pays=${encodeURIComponent(pays)}`),
+  banqueInitier: (institutionId) => requete("/gocardless/initiate", "POST", { institutionId }),
+  banqueConfirmer: () => requete("/gocardless/callback"),
+  banqueActiver: (active) => requete("/gocardless", "PUT", { active }),
+  banqueDonnees: () => requete("/gocardless/financial-data"),
+  banqueDissocier: () => requete("/gocardless", "DELETE"),
+
   /* ─── Foyer partagé ─── */
   acces: () => requete("/foyer/acces"),
   inviter: (email, role, membreId) => requete("/foyer/invitations", "POST", { email, role, membreId }),

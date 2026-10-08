@@ -80,6 +80,25 @@ model Utilisateur {
   // rester une personne sans identifiants, un enfant par exemple.
   membre         Membre?
 
+  // ─── Agrégation bancaire (GoCardless), facultative ───────────────────────
+  // Portée par le compte et non par le foyer : chacun relie SA banque, et le
+  // consentement donné à la banque est personnel.
+  //
+  // Aucun secret ici : ces identifiants ne donnent accès à rien sans les clés
+  // du serveur. Aucune opération bancaire non plus — seuls les totaux
+  // de la dernière synchronisation sont gardés, pour ne pas réinterroger la
+  // banque à chaque affichage (GoCardless plafonne les appels par jour).
+  agregationActive        Boolean   @default(false)
+  // Demande de consentement en cours ou aboutie.
+  goCardlessRequisitionId String?
+  // Compte bancaire relié ; null tant que le consentement n'a pas abouti.
+  goCardlessAccountId     String?
+  // Synthèse de la dernière synchronisation, en JSON (montants en centimes).
+  // Du texte plutôt qu'une colonne Json : un null y reste un null ordinaire, ce
+  // que la restauration d'une sauvegarde rejoue sans cas particulier.
+  agregationSynthese      String?
+  agregationSynchroLe     DateTime?
+
   @@index([foyerId])
 }
 
