@@ -95,6 +95,8 @@ export const BudgetSchema = z.object({
 // Le contenu du fichier, déjà décodé en texte par le navigateur.
 export const ReleveSchema = z.object({
   nom: z.string().trim().max(200).optional(),
+  // À qui est le compte : "foyer" pour un compte commun, sinon l'id d'un membre.
+  pour: chaine("pour").default("foyer"),
   contenu: z.string("fichier requis").min(1, "Le fichier est vide.").max(3_000_000, "Fichier trop volumineux : exportez une période plus courte."),
 });
 

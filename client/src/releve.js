@@ -26,8 +26,14 @@ export async function decoderFichier(fichier) {
   }
 }
 
-/** Envoie un relevé au serveur et rend son estimation et son aperçu. */
-export async function analyserFichier(fichier) {
+/** Lit un fichier choisi : son nom et son contenu en texte, prêts à être analysés. */
+export async function lireFichier(fichier) {
   if (fichier.size > TAILLE_MAXIMUM) throw new Error("Fichier trop volumineux : exportez une période plus courte.");
-  return api.banqueReleve(fichier.name, await decoderFichier(fichier));
+  return { nom: fichier.name, contenu: await decoderFichier(fichier) };
 }
+
+/**
+ * Envoie un relevé au serveur et rend son estimation et son aperçu.
+ * @param pour à qui est le compte : "foyer" (compte commun) ou l'id d'un membre
+ */
+export const analyserReleve = ({ nom, contenu }, pour = "foyer") => api.banqueReleve(nom, contenu, pour);
