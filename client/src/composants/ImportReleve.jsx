@@ -8,7 +8,7 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Icone from "./Icone.jsx";
 import { lireFichier, analyserReleve, FORMATS_RELEVE } from "../releve.js";
-import { euroPrecis, libelleMois, CATEGORIES } from "../utiles.js";
+import { euroPrecis, libelleMois, CATEGORIES, CATEGORIES_REVENU } from "../utiles.js";
 import { destinationsInternes, versValeur, depuisValeur } from "../interne.js";
 
 // Le serveur accepte 2 000 opérations par envoi.
@@ -50,15 +50,18 @@ export default function ImportReleve({ etat, creditsEnCours, executer }) {
       const r = await analyserReleve(lu, titulaire);
       setFichier(lu);
       setApercu(r);
-      // Par défaut, tout sauf ce qui ferait doublon : les lignes déjà importées,
-      // et les salaires — déjà comptés dans les revenus des membres du foyer.
+      // Par défaut, tout sauf ce qui ferait doublon : les lignes déjà importées.
+      // Un salaire reçu sur le compte d'une personne remplace son salaire de
+      // référence : il est retenu. Sur un compte commun, rien ne dit de qui il
+      // est — il s'ajouterait aux salaires de référence au lieu de les
+      // remplacer : il reste décoché.
       // Une proposition du serveur n'est gardée que si la liste l'offre : un
       // crédit soldé, par exemple, ne se choisit plus.
       const offerte = (o) => groupesInternes[o.type].some((g) => g.options.some((x) => x.v === versValeur(o.affectation)));
       setLignes(r.operations.map((o) => ({
         ...o,
         affectation: o.affectation && offerte(o) ? o.affectation : null,
-        retenue: !o.dejaImportee && !o.salaire,
+        retenue: !o.dejaImportee && (!o.salaire || titulaire !== "foyer"),
       })));
     } catch (err) {
       setMessage({ ton: "alerte", texte: err.message });
@@ -106,7 +109,11 @@ export default function ImportReleve({ etat, creditsEnCours, executer }) {
     };
   }, [etat, creditsEnCours]);
   const classements = (l) => [
-    { groupe: l.type === "revenu" ? "Revenu" : "Dépense", options: CATEGORIES.map((c) => ({ v: `categorie:${c}`, l: c })) },
+    {
+      groupe: l.type === "revenu" ? "Revenu" : "Dépense",
+      // Une catégorie d'avant, hors de la liste, reste proposée plutôt que d'être perdue.
+      options: [...new Set([...(l.type === "revenu" ? CATEGORIES_REVENU : CATEGORIES), l.categorie])].map((c) => ({ v: `categorie:${c}`, l: c })),
+    },
     ...groupesInternes[l.type],
   ];
   const valeurClassement = (l) => (l.affectation ? versValeur(l.affectation) : `categorie:${l.categorie}`);
@@ -218,8 +225,9 @@ export default function ImportReleve({ etat, creditsEnCours, executer }) {
             </div>
             {salaires > 0 && (
               <div className="carte-note" style={{ marginTop: 6 }}>
-                {pluriel(salaires, "versement")} de salaire {salaires > 1 ? "sont décochés" : "est décoché"} : les salaires sont déjà comptés
-                dans les revenus du foyer (Réglages › Foyer). Cochez-les seulement s'ils n'y figurent pas.
+                {pour === "foyer"
+                  ? `${pluriel(salaires, "versement")} de salaire ${salaires > 1 ? "sont décochés" : "est décoché"} : sur un compte commun, rien ne dit de qui ${salaires > 1 ? "ils sont" : "il est"}, et ${salaires > 1 ? "ils s'ajouteraient" : "il s'ajouterait"} aux salaires de référence au lieu de les remplacer. Indiquez plutôt à qui est le compte, ou importez le relevé de chacun.`
+                  : `${pluriel(salaires, "versement")} de salaire ${salaires > 1 ? "remplaceront" : "remplacera"}, pour ${salaires > 1 ? "leur" : "son"} mois, le salaire de référence de ${nomTitulaire} saisi dans les réglages : seule la paie reçue compte.`}
               </div>
             )}
             {reconnus > 0 && (

@@ -223,7 +223,7 @@ export default function Accueil({ etat, calc, mois, executer, naviguer }) {
                     {m.nom}
                   </div>
                   <div className="ligne-meta">
-                    Revenus {euro(m.revenu + m.bonus)} · quote-part {Math.round(m.part * 100)} % ({euro(m.du)}) · perso {euro(m.perso)}
+                    Revenus {euro(m.revenu + m.bonus)}{m.salaireReel ? " (paie reçue)" : ""} · quote-part {Math.round(m.part * 100)} % ({euro(m.du)}) · perso {euro(m.perso)}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>

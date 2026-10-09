@@ -67,6 +67,12 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
   const recurrents = visibles.filter((t) => t.recurrent);
   const ponctuels = visibles.filter((t) => !t.recurrent);
   const autresRevenus = calc.revenus - calc.salaires;
+  // D'où vient le chiffre : les paies du mois, la référence des réglages, ou les deux.
+  const recues = calc.parMembre.filter((m) => m.salaireReel).length;
+  const noteSalaires =
+    recues === 0 ? "Salaires de référence (Réglages › Foyer)"
+    : recues === calc.parMembre.length ? "Paies reçues ce mois-ci"
+    : `Paie reçue pour ${recues} personne${recues > 1 ? "s" : ""}, référence pour les autres`;
   const nbDepenses = calc.actifs.filter((t) => t.type === "depense").length;
 
   const ligne = (t) => (
@@ -146,7 +152,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
       <div className="tuiles trois">
         <Tuile
           libelle="Salaires" icone="foyer" teinte="var(--reste)" valeur={euro(calc.salaires)}
-          note="Réglés dans Réglages › Foyer" onClick={() => naviguer("foyer")}
+          note={noteSalaires} onClick={() => naviguer("foyer")}
         />
         <Tuile libelle="Autres revenus" icone="entree" teinte="var(--reste)" valeur={euro(autresRevenus)} note="Primes, locations, remboursements…" />
         <Tuile libelle="Dépenses" icone="depense" teinte="var(--depenses)" valeur={euro(calc.depenses)} note={`${nbDepenses} ligne${nbDepenses > 1 ? "s" : ""} ce mois-ci`} />

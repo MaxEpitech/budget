@@ -156,6 +156,21 @@ Sont refusés, avec un message qui dit quoi faire : le PDF, l'ancien format
 Excel `.xls` et le classeur protégé par mot de passe (à réenregistrer en
 `.xlsx`), et le classeur OpenDocument `.ods`.
 
+### Salaire de référence et paie reçue
+
+Le salaire saisi pour chaque personne (Réglages › Foyer) n'est qu'une
+référence. Dès que le flux d'un mois porte un revenu de catégorie « Salaire »
+attribué à une personne — saisi, ou lu sur son relevé — c'est lui seul qui
+compte pour elle ce mois-là : dans le total des revenus, le reste à vivre,
+l'historique et la quote-part des charges communes. Un mois sans paie retombe
+sur la référence. Les autres revenus (prime, location…) s'ajoutent toujours.
+
+La règle vit dans `finance.js` (`revenusDuMois`), côté serveur et côté client.
+Un salaire attribué au foyer ne dit pas de qui il est : il ne remplace rien et
+compte comme un autre revenu. À l'import, un salaire reconnu est donc classé
+« Salaire » et retenu sur le relevé d'une personne, mais décoché sur un compte
+commun.
+
 ### Mouvements internes
 
 Un virement vers l'épargne, un versement sur un projet ou le prélèvement d'un

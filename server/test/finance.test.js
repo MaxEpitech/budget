@@ -611,3 +611,42 @@ test("versement requis : échéance passée ou courante → tout sur un mois", (
 test("versement requis : objectif déjà atteint → zéro", () => {
   assert.equal(versementRequis(1000, 1200, 6), 0);
 });
+
+/* ─── Salaire de référence et salaire réel ─── */
+
+const paie = (pour, montant, extra = {}) => ({ type: "revenu", categorie: "Salaire", pour, recurrent: false, mois: "2026-08", montant, ...extra });
+
+test("salaires : sans paie dans le flux, le salaire de référence compte", () => {
+  const t = totauxDuMois(FOYER, "2026-08");
+  assert.deepEqual([t.salaires, t.revenus], [4000, 4000]);
+});
+
+test("salaires : la paie du flux remplace la référence de sa personne, et d'elle seule", () => {
+  const foyer = { ...FOYER, transactions: [...FOYER.transactions, paie("a", 2700), paie("a", 150)] };
+  const t = totauxDuMois(foyer, "2026-08");
+  assert.equal(t.salaires, 2850 + 1000, "Maxime : 2 850 € reçus au lieu de 3 000 ; Estelle garde sa référence");
+  assert.equal(t.revenus, 3850, "la paie n'est pas comptée une seconde fois parmi les autres revenus");
+
+  const [maxime, estelle] = repartirParMembre(foyer, "2026-08");
+  assert.deepEqual([maxime.revenu, maxime.salaireReference, maxime.salaireReel], [2850, 3000, true]);
+  assert.deepEqual([estelle.revenu, estelle.salaireReel], [1000, false]);
+  assert.equal(maxime.bonus, 0, "la paie n'est pas un bonus");
+  proche(maxime.part, 2850 / 3850, 1e-12, "la quote-part suit le revenu réel");
+});
+
+test("salaires : une prime ne remplace rien, un salaire attribué au foyer non plus", () => {
+  const foyer = {
+    ...FOYER,
+    transactions: [...FOYER.transactions, paie("a", 300, { categorie: "Autre" }), paie("foyer", 500)],
+  };
+  const t = totauxDuMois(foyer, "2026-08");
+  assert.deepEqual([t.salaires, t.revenus], [4000, 4800]);
+  const [maxime] = repartirParMembre(foyer, "2026-08");
+  assert.deepEqual([maxime.revenu, maxime.bonus], [3000, 300]);
+});
+
+test("salaires : la paie d'un autre mois ne remplace pas celle de ce mois-ci", () => {
+  const foyer = { ...FOYER, transactions: [...FOYER.transactions, paie("a", 2700, { mois: "2026-07" })] };
+  assert.equal(totauxDuMois(foyer, "2026-08").salaires, 4000);
+  assert.equal(totauxDuMois(foyer, "2026-07").salaires, 3700);
+});

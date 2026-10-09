@@ -5,7 +5,8 @@
 // délégué au cadre (Coquille) et à l'écran courant, choisi par l'adresse.
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
-import { mensualite, capitalRestant, cotisationAssurance, repartirParMembre } from "./finance.js";
+import { mensualite, capitalRestant, cotisationAssurance, repartirParMembre, revenusDuMois } from "./finance.js";
+import { CATEGORIE_SALAIRE } from "./utiles.js";
 import { moisCle, ecartMois } from "./utiles.js";
 import { useNavigation } from "./navigation.js";
 import Coquille from "./composants/Coquille.jsx";
@@ -225,8 +226,14 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
   const calc = useMemo(() => {
     if (!etat) return null;
     const actifs = etat.transactions; // déjà filtrées par mois côté API
-    const salaires = etat.membres.reduce((s, m) => s + m.revenu, 0);
-    const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
+    // Le salaire saisi dans les réglages n'est qu'une référence : la paie du
+    // mois, quand elle figure dans le flux, la remplace (revenusDuMois).
+    const membresDuMois = revenusDuMois(etat.membres, actifs);
+    const salaires = membresDuMois.reduce((s, m) => s + m.revenu, 0);
+    const paies = new Set(membresDuMois.filter((m) => m.salaireReel).map((m) => m.id));
+    const autresRevenus = actifs
+      .filter((t) => t.type === "revenu" && !(t.categorie === CATEGORIE_SALAIRE && paies.has(t.pour)))
+      .reduce((s, t) => s + t.montant, 0);
     const revenus = salaires + autresRevenus;
 
     const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);

@@ -330,11 +330,48 @@ export const lignesDuMois = (transactions, mois) =>
  * Les montants sont dans l'unité qu'on lui donne — euros à la frontière de
  * l'API, comme partout côté client.
  */
+// Les revenus de catégorie « Salaire » remplacent le salaire de référence de
+// la personne à qui ils sont attribués.
+const CATEGORIE_SALAIRE = "Salaire";
+
+/**
+ * Le revenu de chaque personne pour un mois.
+ *
+ * Le salaire saisi dans les réglages n'est qu'une référence — une estimation.
+ * Dès que le flux du mois porte un salaire au nom de la personne (un revenu de
+ * catégorie « Salaire »), c'est lui qui compte, et lui seul : une paie reçue
+ * vaut mieux qu'une paie supposée, et les compter ensemble la compterait deux
+ * fois. Les autres revenus — prime, location — restent à part, en plus.
+ *
+ * Un salaire attribué au foyer ne dit pas de qui il est : il ne remplace aucun
+ * salaire de référence et compte comme un autre revenu.
+ *
+ * @param actifs les lignes du mois (lignesDuMois)
+ * @returns les membres, `revenu` étant celui du mois ; `salaireReference` garde
+ *   le salaire saisi, `salaireReel` dit si le flux l'a remplacé
+ */
+export function revenusDuMois(membres, actifs) {
+  return membres.map((m) => {
+    const paies = actifs.filter((t) => t.type === "revenu" && t.categorie === CATEGORIE_SALAIRE && t.pour === m.id);
+    const reel = paies.length > 0;
+    return {
+      ...m,
+      salaireReference: m.revenu,
+      salaireReel: reel,
+      revenu: reel ? paies.reduce((s, t) => s + t.montant, 0) : m.revenu,
+    };
+  });
+}
+
+// Un salaire déjà compté dans le revenu d'une personne.
+const estSalaireDe = (t, membres) =>
+  t.type === "revenu" && t.categorie === CATEGORIE_SALAIRE && membres.some((m) => m.id === t.pour);
+
 export function totauxDuMois({ membres = [], transactions = [], credits = [], projets = [], placements = [] }, mois) {
   const actifs = lignesDuMois(transactions, mois);
 
-  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
-  const autresRevenus = actifs.filter((t) => t.type === "revenu").reduce((s, t) => s + t.montant, 0);
+  const salaires = revenusDuMois(membres, actifs).reduce((s, m) => s + m.revenu, 0);
+  const autresRevenus = actifs.filter((t) => t.type === "revenu" && !estSalaireDe(t, membres)).reduce((s, t) => s + t.montant, 0);
   const depenses = actifs.filter((t) => t.type === "depense").reduce((s, t) => s + t.montant, 0);
 
   // Un crédit soldé ne pèse plus : sa dernière échéance est passée. L'assurance
@@ -400,7 +437,8 @@ export function repartirParMembre(
   mois
 ) {
   const actifs = lignesDuMois(transactions, mois);
-  const salaires = membres.reduce((s, m) => s + m.revenu, 0);
+  const membresDuMois = revenusDuMois(membres, actifs);
+  const salaires = membresDuMois.reduce((s, m) => s + m.revenu, 0);
   const appartientA = (x, cible) => (x.pour ?? "foyer") === cible;
 
   // Un crédit soldé ne pèse plus, et l'assurance fait partie du prélèvement.
@@ -420,11 +458,11 @@ export function repartirParMembre(
     projets.reduce((s, p) => s + p.versement, 0) +
     placementsDe("foyer");
 
-  return membres.map((m) => {
+  return membresDuMois.map((m) => {
     const part = quotePart(m.revenu, salaires, membres.length, repartition);
     const perso = depensesDe(m.id) + creditsDe(m.id) + placementsDe(m.id);
     const bonus = actifs
-      .filter((t) => t.type === "revenu" && t.pour === m.id)
+      .filter((t) => t.type === "revenu" && t.pour === m.id && t.categorie !== CATEGORIE_SALAIRE)
       .reduce((s, t) => s + t.montant, 0);
     const du = chargesFoyer * part;
     return { ...m, part, perso, bonus, du, reste: m.revenu + bonus - du - perso };

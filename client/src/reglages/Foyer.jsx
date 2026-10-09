@@ -19,7 +19,7 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
     <>
       <Carte
         titre="Personnes et revenus"
-        note={`${etat.membres.length} personne${etat.membres.length > 1 ? "s" : ""} · ${euro(calc.salaires)} de salaires nets par mois`}
+        note={`${etat.membres.length} personne${etat.membres.length > 1 ? "s" : ""} · salaires de référence, remplacés par la paie du mois dès qu'elle figure dans les opérations`}
         action={
           <button className="btn fant mini" onClick={() => executer(() => api.creerMembre({ nom: "Nouveau", revenu: 0 }))}>
             <Icone nom="plus" taille={16} /> Ajouter une personne
@@ -29,7 +29,10 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
         {etat.membres.length === 0 && (
           <div className="vide">Ajoutez les personnes du foyer et leur salaire net : c'est la base de tous les calculs.</div>
         )}
-        {etat.membres.map((m) => (
+        {etat.membres.map((m) => {
+          // Le revenu qui compte ce mois-ci : la paie reçue, ou la référence.
+          const duMois = calc.parMembre.find((x) => x.id === m.id);
+          return (
           <div className="ligne membre" key={m.id}>
             {/* La même teinte que dans « Qui paie quoi » et sur les étiquettes. */}
             <span className="membre-pastille" style={{ "--teinte": teinteMembre(etat.membres, m.id) }} aria-hidden="true">
@@ -37,20 +40,30 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
             </span>
             <Champ libelle="Prénom" valeur={m.nom} onChange={(v) => modifierMembre(m.id, { nom: v })} largeur={160} />
             <Champ
-              libelle="Salaire net /mois" valeur={String(m.revenu)} onChange={(v) => modifierMembre(m.id, { revenu: num(v) })}
+              libelle="Salaire de référence /mois" valeur={String(m.revenu)} onChange={(v) => modifierMembre(m.id, { revenu: num(v) })}
               largeur={140} attributs={{ inputMode: "decimal" }}
             />
+            <div style={{ minWidth: 0 }}>
+              <div className="stat-lib">Ce mois-ci</div>
+              {duMois?.salaireReel ? (
+                <span className="etiq perso" style={{ "--teinte": "var(--caisse)" }}>Paie reçue : {euro(duMois.revenu)}</span>
+              ) : (
+                <span className="etiq">Référence utilisée</span>
+              )}
+            </div>
             <div className="pousse" style={{ textAlign: "right" }}>
               <div className="stat-lib">Part des revenus</div>
               <div className="chiffre" style={{ fontWeight: 650, fontSize: 17 }}>
-                {calc.salaires ? Math.round((m.revenu / calc.salaires) * 100) : 0} %
+                {calc.salaires ? Math.round(((duMois?.revenu ?? m.revenu) / calc.salaires) * 100) : 0} %
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         <div className="corps carte-note" style={{ borderTop: "1px solid var(--filet-fin)" }}>
-          Les modifications sont enregistrées au fil de la frappe. Les autres revenus — primes, locations —
-          se saisissent comme des opérations.
+          Le salaire de référence est une estimation : dès qu'une opération de catégorie « Salaire » au
+          nom de la personne figure dans le flux d'un mois — saisie, ou lue sur son relevé — c'est elle seule
+          qui compte ce mois-là. Les autres revenus — primes, locations — s'ajoutent comme des opérations.
         </div>
       </Carte>
 

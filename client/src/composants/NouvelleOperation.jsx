@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Dialogue from "./Dialogue.jsx";
 import Segments from "./Segments.jsx";
-import { num, libelleMois, moisCle, CATEGORIES } from "../utiles.js";
+import { num, libelleMois, moisCle, CATEGORIES, CATEGORIES_REVENU, CATEGORIE_SALAIRE } from "../utiles.js";
 import { destinationsInternes, depuisValeur, enregistrerMouvement } from "../interne.js";
 
 export const RYTHMES = [
@@ -93,6 +93,15 @@ export default function NouvelleOperation({ ouvert, onFermer, etat, calc, mois, 
     ? "Il alimente l'écran concerné, sans compter comme une dépense"
     : f.recurrent ? "Saisie une fois, elle revient d'elle-même" : `Comptée en ${libelleMois(mois).toLowerCase()} uniquement`;
 
+  // Dépense et revenu n'ont pas les mêmes catégories : en changeant de nature,
+  // on repart de la catégorie la plus probable de la nouvelle.
+  const changerNature = (type) => {
+    const categories = type === "revenu" ? CATEGORIES_REVENU : CATEGORIES;
+    setF({ ...f, type, categorie: categories.includes(f.categorie) ? f.categorie : type === "revenu" ? CATEGORIE_SALAIRE : "Courses" });
+  };
+  const salaire = f.type === "revenu" && f.categorie === CATEGORIE_SALAIRE;
+  const nomPour = etat.membres.find((m) => m.id === f.pour)?.nom;
+
   const pourQui = (
     <Champ classe="plein" libelle={interne ? "Qui fait le mouvement" : "Pour qui"} valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur="100%"
       options={[{ v: "foyer", l: interne ? "Le foyer (compte commun)" : "Le foyer (charge commune)" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
@@ -112,7 +121,7 @@ export default function NouvelleOperation({ ouvert, onFermer, etat, calc, mois, 
       }
     >
       <Segments
-        plein libelle="Nature de l'opération" valeur={f.type} onChange={(v) => setF({ ...f, type: v })}
+        plein libelle="Nature de l'opération" valeur={f.type} onChange={changerNature}
         options={NATURES}
       />
 
@@ -154,7 +163,8 @@ export default function NouvelleOperation({ ouvert, onFermer, etat, calc, mois, 
             placeholder={f.type === "revenu" ? "Ex. Prime, location" : "Ex. Internet, loyer"} onEntree={ajouter} />
           <Champ libelle="Montant (€)" valeur={f.montant} onChange={(v) => setF({ ...f, montant: v })} largeur="100%"
             placeholder="0" onEntree={ajouter} attributs={MONTANT} />
-          <Champ libelle="Catégorie" valeur={f.categorie} onChange={(v) => setF({ ...f, categorie: v })} largeur="100%" options={CATEGORIES} />
+          <Champ libelle="Catégorie" valeur={f.categorie} onChange={(v) => setF({ ...f, categorie: v })} largeur="100%"
+            options={f.type === "revenu" ? CATEGORIES_REVENU : CATEGORIES} />
           {pourQui}
           <label className="bascule plein">
             <input type="checkbox" checked={f.recurrent} onChange={(e) => setF({ ...f, recurrent: e.target.checked })} />
@@ -169,6 +179,13 @@ export default function NouvelleOperation({ ouvert, onFermer, etat, calc, mois, 
               <Champ libelle="Jusqu'à (facultatif)" valeur={f.fin} onChange={(v) => setF({ ...f, fin: v })} largeur="100%" type="month" />
             </>
           )}
+        </div>
+      )}
+      {salaire && (
+        <div className={`avis ${nomPour ? "ok" : "alerte"}`}>
+          {nomPour
+            ? `Ce salaire remplacera, pour ${f.recurrent ? "chaque mois où il tombe" : libelleMois(mois).toLowerCase()}, le salaire de référence de ${nomPour} saisi dans les réglages.`
+            : "Choisissez la personne qui le perçoit : un salaire attribué au foyer ne remplace aucun salaire de référence, il s'y ajoute."}
         </div>
       )}
       {!interne && f.recurrent && f.periodicite !== "mensuel" && (

@@ -70,6 +70,11 @@ export const ilYA = (iso) => {
 
 export const CATEGORIES = ["Logement", "Courses", "Transport", "Énergie", "Abonnements", "Santé", "Loisirs", "Enfants", "Assurances", "Impôts", "Autre"];
 
+// Les catégories d'un revenu. « Salaire » a un sens : attribué à une personne,
+// il remplace pour le mois son salaire de référence (finance.js, revenusDuMois).
+export const CATEGORIE_SALAIRE = "Salaire";
+export const CATEGORIES_REVENU = [CATEGORIE_SALAIRE, "Prime", "Location", "Remboursement", "Autre"];
+
 // ─── Le versement du mois a-t-il eu lieu ? ──────────────────────────────
 // Le budget annonce un versement mensuel sur les projets et sur l'épargne.
 // Sans cette vérification il pourrait l'annoncer pendant des mois sans qu'un

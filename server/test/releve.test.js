@@ -265,7 +265,8 @@ test("les lignes préparées portent type, montant positif, catégorie et repèr
     { bookingDate: "2026-09-01", transactionAmount: { amount: "0.00" }, remittanceInformationUnstructured: "AVIS" },
   ]);
   assert.deepEqual(lignes.map((l) => [l.date, l.type, l.montant, l.categorie, l.salaire]), [
-    ["2026-09-28", "revenu", 245000, "Autre", true],
+    // Classé « Salaire » : attribué à une personne, il remplacera son salaire de référence.
+    ["2026-09-28", "revenu", 245000, "Salaire", true],
     ["2026-09-12", "revenu", 8640, "Autre", false],
     ["2026-09-02", "depense", 6240, "Courses", false],
   ]);
@@ -498,5 +499,28 @@ testIntegration("comptes séparés : la même opération chez deux personnes don
 
     // Un titulaire qui n'est pas du foyer est refusé dès la lecture.
     assert.equal((await client.appel("/banque/releve", "POST", { contenu: releve, pour: "membre-inconnu" })).code, 400);
+  });
+});
+
+testIntegration("le salaire lu sur le relevé d'une personne remplace son salaire de référence, pour son mois seulement", async () => {
+  await avecFoyer(async (contexte) => {
+    const client = await clientConnecte(serveur.base, contexte);
+    const alex = (await client.appel("/membres", "POST", { nom: "Alex", revenu: 3000 })).corps;
+
+    const apercu = (await client.appel("/banque/releve", "POST", { contenu: RELEVE, pour: alex.id })).corps;
+    const paies = apercu.operations.filter((o) => o.salaire);
+    assert.ok(paies.length === 3 && paies.every((o) => o.categorie === "Salaire"));
+    const operations = apercu.operations.map(({ cle, date, type, libelle, montant, categorie }) => ({ cle, date, type, libelle, montant, categorie }));
+    assert.equal((await client.appel("/transactions/import", "POST", { pour: alex.id, operations })).code, 201);
+
+    // Septembre : la paie reçue (2 450 €) compte, la référence (3 000 €) non.
+    const septembre = (await client.appel("/etat?mois=2026-09")).corps.parMembre[0];
+    assert.deepEqual([septembre.revenu, septembre.salaireReference, septembre.salaireReel, septembre.bonus], [2450, 3000, true, 0]);
+    const [historique] = (await client.appel("/historique?jusqu=2026-09&mois=1")).corps.serie;
+    assert.equal(historique.revenus, 2450, "ni la référence ni la paie ne sont comptées deux fois");
+
+    // Un mois sans paie dans le flux retombe sur la référence.
+    const novembre = (await client.appel("/etat?mois=2026-11")).corps.parMembre[0];
+    assert.deepEqual([novembre.revenu, novembre.salaireReel], [3000, false]);
   });
 });

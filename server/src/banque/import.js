@@ -44,7 +44,9 @@ export function preparerOperations(operations, titulaire = "foyer") {
       type: centimes > 0 ? "revenu" : "depense",
       libelle: texte.slice(0, LIBELLE_MAXIMUM),
       montant: Math.abs(centimes),
-      categorie: centimes > 0 ? CATEGORIE_PAR_DEFAUT : devinerCategorie(texte),
+      // Un salaire reconnu est classé comme tel : attribué à une personne, il
+      // remplace son salaire de référence pour le mois.
+      categorie: centimes > 0 ? (estRevenuReconnu(o) ? "Salaire" : CATEGORIE_PAR_DEFAUT) : devinerCategorie(texte),
       salaire: estRevenuReconnu(o),
     });
   }

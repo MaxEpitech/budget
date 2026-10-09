@@ -120,6 +120,26 @@ const CAS_NON_NUMERIQUES = {
       repartition: "moitie",
     }, "2026-08"],
     [{ membres: [], transactions: [], credits: [], projets: [], placements: [] }, "2026-08"],
+    // Un salaire réel remplace la référence de sa personne, et pèse sur la quote-part.
+    [{
+      membres: [{ id: "a", nom: "Maxime", revenu: 3050 }, { id: "b", nom: "Estelle", revenu: 1980 }],
+      transactions: [
+        { type: "depense", pour: "foyer", recurrent: true, periodicite: "mensuel", debut: null, fin: null, montant: 980 },
+        { type: "revenu", pour: "a", categorie: "Salaire", recurrent: false, mois: "2026-08", montant: 2800 },
+        { type: "revenu", pour: "a", categorie: "Autre", recurrent: false, mois: "2026-08", montant: 300 },
+        { type: "revenu", pour: "foyer", categorie: "Salaire", recurrent: false, mois: "2026-08", montant: 100 },
+      ],
+      credits: [], projets: [], placements: [], repartition: "prorata",
+    }, "2026-08"],
+  ],
+  revenusDuMois: [
+    [[{ id: "a", revenu: 3050 }, { id: "b", revenu: 1980 }], []],
+    [[{ id: "a", revenu: 3050 }, { id: "b", revenu: 1980 }], [
+      { type: "revenu", pour: "a", categorie: "Salaire", montant: 1400 },
+      { type: "revenu", pour: "a", categorie: "Salaire", montant: 1500 },
+      { type: "revenu", pour: "b", categorie: "Autre", montant: 200 },
+      { type: "depense", pour: "b", categorie: "Salaire", montant: 50 },
+    ]],
   ],
   totauxDuMois: [
     [{
@@ -134,6 +154,13 @@ const CAS_NON_NUMERIQUES = {
       ],
       projets: [{ versement: 250 }],
       placements: [{ versement: 150 }],
+    }, "2026-08"],
+    [{
+      membres: [{ id: 1, revenu: 3050 }, { id: 2, revenu: 1980 }],
+      transactions: [
+        { type: "revenu", pour: 1, categorie: "Salaire", recurrent: false, mois: "2026-08", montant: 2900 },
+        { type: "revenu", pour: "foyer", categorie: "Salaire", recurrent: false, mois: "2026-08", montant: 120 },
+      ],
     }, "2026-08"],
   ],
 };
