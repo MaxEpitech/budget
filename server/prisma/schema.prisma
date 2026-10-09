@@ -219,17 +219,14 @@ model Transaction {
   // sert au filtrage et n'a pas à disparaître. Une ligne récurrente n'a pas de
   // date — elle revient tous les mois, elle n'arrive pas un jour précis.
   date        DateTime?
-  creeLe      DateTime        @default(now())
-  modifieLe   DateTime        @updatedAt
-  date      DateTime?
   // Lignes venues d'un relevé bancaire importé. La clé est l'empreinte de
   // l'opération (date, montant, libellé, rang) : réimporter le même relevé, ou
   // un relevé qui le chevauche, ne crée pas de doublon. Le lot réunit les
   // lignes d'un même import, pour pouvoir l'annuler d'un geste.
-  importCle String?
-  importLot String?
-  creeLe    DateTime        @default(now())
-  modifieLe DateTime        @updatedAt
+  importCle   String?
+  importLot   String?
+  creeLe      DateTime        @default(now())
+  modifieLe   DateTime        @updatedAt
   // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
   membre      Membre?         @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId    String?
