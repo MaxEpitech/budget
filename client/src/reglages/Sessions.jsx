@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
+import Carte from "../composants/Carte.jsx";
+import Icone from "../composants/Icone.jsx";
 import { ilYA } from "../utiles.js";
 
 /**
@@ -38,34 +40,30 @@ export default function Sessions() {
     }
   };
 
-  if (!sessions) return null;
-
   return (
-    <div className="corps" style={{ borderTop: "1px solid var(--filet-fin)" }}>
-      <div className="stat-lib">Connexions ouvertes</div>
-      {erreur && <div className="avis alerte" role="alert">{erreur}</div>}
-      <div style={{ marginTop: 8 }}>
-        {sessions.map((s) => (
-          <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "6px 0", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 14 }}>
-                {s.appareil ?? "Appareil inconnu"}{" "}
-                {s.actuelle && <span className="etiq">cet appareil</span>}
-              </div>
-              <div className="ligne-meta">Active {ilYA(s.derniereActivite)} · ouverte {ilYA(s.creeLe)}</div>
+    <Carte
+      titre="Connexions ouvertes"
+      note="Une connexion que vous ne reconnaissez pas ? Fermez-la, puis changez de mot de passe."
+    >
+      {erreur && <div className="corps"><div className="avis alerte" role="alert" style={{ marginTop: 0 }}>{erreur}</div></div>}
+      {!sessions && !erreur && <div className="vide">Chargement…</div>}
+      {sessions?.map((s) => (
+        <div className="ligne" key={s.id}>
+          <span className="ligne-avatar" aria-hidden="true"><Icone nom="appareil" taille={16} /></span>
+          <div style={{ minWidth: 0 }}>
+            <div className="ligne-lib">
+              {s.appareil ?? "Appareil inconnu"}{" "}
+              {s.actuelle && <span className="etiq perso" style={{ "--teinte": "var(--accent)" }}>cet appareil</span>}
             </div>
-            {!s.actuelle && (
-              <button className="btn fant mini" onClick={() => fermer(s.id)} disabled={occupe}>
-                Fermer
-              </button>
-            )}
+            <div className="ligne-meta">Active {ilYA(s.derniereActivite)} · ouverte {ilYA(s.creeLe)}</div>
           </div>
-        ))}
-      </div>
-      <div className="carte-note" style={{ marginTop: 8 }}>
-        Une connexion que vous ne reconnaissez pas ? Fermez-la, puis changez de mot de passe — cela
-        referme aussi toutes les autres.
-      </div>
-    </div>
+          {!s.actuelle && (
+            <button className="btn fant mini pousse" onClick={() => fermer(s.id)} disabled={occupe}>
+              Fermer
+            </button>
+          )}
+        </div>
+      ))}
+    </Carte>
   );
 }

@@ -1,7 +1,7 @@
 // Revenus et charges du foyer : synchronisés depuis la banque, ou saisis à la main.
 //
 // Les deux modes écrivent au même endroit — l'état unique du simulateur, tenu
-// par l'onglet Emprunt. Ce composant ne garde pour lui que ce qui relève de
+// par l'écran Capacité d'emprunt. Ce composant ne garde pour lui que ce qui relève de
 // l'écran : où en est la liaison, la liste des banques, un appel en cours.
 //
 // La synchronisation est facultative à deux titres : l'utilisateur peut la
@@ -10,8 +10,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../api.js";
 import Champ from "./Champ.jsx";
 import Carte from "./Carte.jsx";
+import Icone from "./Icone.jsx";
 import { euro, ilYA } from "../utiles.js";
 import { lireFichier, analyserReleve, FORMATS_RELEVE } from "../releve.js";
+import { ecran } from "../navigation.js";
 
 /**
  * @param saisie    l'état du simulateur (lecture) : `source`, `banque`, `foyer`
@@ -89,7 +91,8 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       } finally {
         // L'adresse de retour a fait son office : inutile d'y laisser un code
         // à usage unique, qu'un rechargement rejouerait.
-        if (retourDeBanque()) window.history.replaceState({}, "", "/");
+        // On reste sur le simulateur, à sa vraie adresse.
+        if (retourDeBanque()) window.history.replaceState({}, "", ecran("emprunt").chemin);
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -135,8 +138,8 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
     agir(async () => {
       if (!banqueChoisie) return;
       const { link } = await api.banqueInitier(banqueChoisie);
-      // On quitte l'application pour la banque ; le retour se fait sur l'onglet
-      // Emprunt, et la saisie en cours est conservée par le navigateur.
+      // On quitte l'application pour la banque ; le retour se fait sur le
+      // simulateur, et la saisie en cours est conservée par le navigateur.
       window.location.assign(link);
     });
 
@@ -192,7 +195,7 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
       const resume = `Relevé lu (${r.periode.jours} jours) : ${r.detail.nbRevenus} versement${r.detail.nbRevenus > 1 ? "s" : ""} de salaire, ${r.detail.nbChargesRecurrentes} dépense${r.detail.nbChargesRecurrentes > 1 ? "s" : ""} récurrente${r.detail.nbChargesRecurrentes > 1 ? "s" : ""}.`;
       setMessage({
         ton: r.avertissements.length ? "alerte" : "ok",
-        texte: [resume, ...r.avertissements, "Corrigez les montants si besoin. Pour ajouter ces opérations au budget, importez le relevé depuis l'onglet Flux."].join(" "),
+        texte: [resume, ...r.avertissements, "Corrigez les montants si besoin. Pour ajouter ces opérations au budget, importez le relevé depuis l'écran Opérations."].join(" "),
       });
     });
   };
@@ -228,8 +231,8 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
             Activer la synchronisation bancaire automatique
             {statut && !statut.disponible && (
               <span style={{ display: "block", fontSize: 12.5, color: "var(--doux)" }}>
-                Pas encore configurée pour ce foyer : un propriétaire peut la régler dans l'onglet
-                Foyer. La saisie manuelle reste disponible.
+                Pas encore configurée pour ce foyer : un propriétaire peut la régler dans
+                Réglages › Banque. La saisie manuelle reste disponible.
               </span>
             )}
           </span>
@@ -299,7 +302,7 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
                     <span>
                       {TITULAIRES[cle]} — {r.nom} : {euro(r.revenus)} de revenus, {euro(r.charges)} de charges par mois
                     </span>
-                    <button className="suppr" style={{ opacity: 1 }} onClick={() => retirerReleve(cle)} aria-label={`Retirer le relevé : ${TITULAIRES[cle]}`}>×</button>
+                    <button className="suppr" style={{ opacity: 1 }} onClick={() => retirerReleve(cle)} aria-label={`Retirer le relevé : ${TITULAIRES[cle]}`}><Icone nom="fermer" taille={14} /></button>
                   </div>
                 ))}
                 <div style={{ marginTop: 4 }}>

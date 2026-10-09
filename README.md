@@ -73,7 +73,7 @@ le comportement :
 
 ## Capacité d'emprunt et synchronisation bancaire
 
-L'onglet **Emprunt** estime ce que le foyer peut emprunter et acheter. Le calcul
+L'écran **Capacité d'emprunt** estime ce que le foyer peut emprunter et acheter. Le calcul
 vit dans `client/src/moteur/moteurFinancier.ts` — des fonctions pures, testées
 sans navigateur — et le hook `useFinanceEngine` n'en est que la mémoïsation :
 chaque frappe met tous les chiffres à jour, sans appel réseau. Trois étapes
@@ -98,7 +98,7 @@ Deux prestataires sont pris en charge, un seul à la fois par foyer :
 - **GoCardless Bank Account Data** — n'accepte plus de nouvelles inscriptions ;
   gardé pour qui y a déjà un compte (`Secret ID` et `Secret key`).
 
-Un propriétaire les saisit dans l'onglet Foyer. Ils sont essayés auprès du
+Un propriétaire les saisit dans Réglages › Banque. Ils sont essayés auprès du
 prestataire avant d'être gardés, puis le secret est chiffré en base
 (AES-256-GCM) avec `CLE_CHIFFREMENT`, qui ne vit que sur l'hébergeur : une copie
 de la base ne suffit pas à le relire. Il n'est plus jamais affiché. À défaut
@@ -121,18 +121,18 @@ Sans prestataire ni identifiants, un relevé téléchargé depuis l'espace banca
 (CSV, OFX ou QIF) fait le même office, avec toutes les banques. Il sert à deux
 endroits :
 
-- **onglet Flux** — ses opérations sont affichées, puis celles que l'on retient
+- **écran Opérations** — ses opérations sont affichées, puis celles que l'on retient
   entrent dans le flux comme lignes ponctuelles, à leur date, avec une catégorie
   proposée d'après le libellé. Les salaires sont décochés par défaut : ils sont
   déjà comptés dans les revenus des membres ;
-- **onglet Emprunt** — il préremplit le revenu et les charges courantes, qui
+- **écran Capacité d'emprunt** — il préremplit le revenu et les charges courantes, qui
   restent modifiables.
 
 Avec des comptes séparés, on indique à qui est le compte du relevé. Dans le
 flux, ses lignes sont attribuées à ce membre — des dépenses personnelles, qui
 pèsent sur son reste et non sur les charges communes — et le titulaire entre
 dans l'empreinte des opérations : le même abonnement prélevé le même jour chez
-deux personnes donne bien deux lignes. Dans l'onglet Emprunt, chaque relevé
+deux personnes donne bien deux lignes. Dans le simulateur, chaque relevé
 remplit le revenu de son titulaire, et les charges s'additionnent.
 
 `POST /api/banque/releve` lit et analyse le fichier sans rien enregistrer ;
@@ -276,14 +276,18 @@ lancer depuis sa machine avec le `DATABASE_URL` de production dans `.env`.
 ```
 client/src/
   App.jsx            aiguillage : écrans d'authentification ou budget
-  Budget.jsx         l'application, en-tête et onglets
-  onglets/           Flux, Crédits, Emprunt, Projets, Épargne, Foyer
+  Budget.jsx         état du mois et écritures ; choisit l'écran d'après l'adresse
+  navigation.js      une adresse par écran (/operations, /reglages/acces…), sans bibliothèque
+  pages/             Vue d'ensemble, Opérations (Flux), Enveloppes, Historique,
+                     Crédits, Projets, Épargne, Capacité d'emprunt (Emprunt)
+  reglages/          Foyer, Accès, Banque, Mon compte, Données
   moteur/            capacité d'emprunt : calcul pur et hook useFinanceEngine (TypeScript)
   ecrans/            connexion, inscription, confirmation, mot de passe oublié
-  composants/        Champ, Carte, Jauge
+  composants/        Coquille (menu, barre du mois), Dialogue, Champ, Carte, Tuile…
   api.js             seul point de couplage avec le serveur
   finance.js         copie des formules pour l'affichage (le serveur fait foi)
-  styles.css         CSS d'origine, inchangé
+  theme.js           thème clair, sombre ou système, propre à l'appareil
+  styles.css         identité visuelle : jetons de couleur des deux thèmes, mise en page
 
 api/index.js         point d'entrée en production (fonction Vercel)
 

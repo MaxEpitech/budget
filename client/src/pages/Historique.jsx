@@ -1,7 +1,9 @@
-// Onglet Historique — l'application ne montrait qu'un mois, sans jamais comparer.
+// Historique — l'application ne montrait qu'un mois, sans jamais comparer.
 import { useState, useEffect } from "react";
 import { api } from "../api.js";
 import Carte from "../composants/Carte.jsx";
+import Segments from "../composants/Segments.jsx";
+import EnTetePage from "../composants/EnTetePage.jsx";
 import { euro, libelleMois, POSTES } from "../utiles.js";
 
 // Ce qui compose une colonne, dans l'ordre où on l'empile. Le reste à vivre
@@ -29,15 +31,31 @@ export default function Historique({ mois }) {
     return () => { vivant = false; };
   }, [mois, horizon]);
 
+  const entete = (
+    <EnTetePage
+      titre="Historique"
+      description={serie ? `Du ${libelleMois(serie[0].mois).toLowerCase()} à ${libelleMois(serie[serie.length - 1].mois).toLowerCase()}` : "Les mois passés, côte à côte"}
+      actions={
+        <Segments
+          libelle="Période affichée" valeur={horizon} onChange={setHorizon}
+          options={HORIZONS.map((h) => ({ v: h.mois, l: h.nom }))}
+        />
+      }
+    />
+  );
+
   if (erreur) {
     return (
-      <Carte titre="Historique">
-        <div className="corps"><div className="avis alerte" style={{ marginTop: 0 }}>{erreur}</div></div>
-      </Carte>
+      <>
+        {entete}
+        <Carte>
+          <div className="corps"><div className="avis alerte" style={{ marginTop: 0 }}>{erreur}</div></div>
+        </Carte>
+      </>
     );
   }
   if (!serie) {
-    return <Carte titre="Historique"><div className="vide">Chargement…</div></Carte>;
+    return <>{entete}<Carte><div className="vide">Chargement…</div></Carte></>;
   }
 
   // L'échelle est commune à toutes les colonnes, sans quoi la hauteur ne voudrait
@@ -53,27 +71,16 @@ export default function Historique({ mois }) {
 
   return (
     <>
-      <Carte
-        titre="Évolution"
-        note={`Du ${libelleMois(serie[0].mois).toLowerCase()} à ${libelleMois(courant.mois).toLowerCase()}`}
-        action={
-          <div style={{ display: "flex", gap: 4 }}>
-            {HORIZONS.map((h) => (
-              <button key={h.mois} className={`btn mini ${horizon === h.mois ? "" : "fant"}`} onClick={() => setHorizon(h.mois)}>
-                {h.nom}
-              </button>
-            ))}
-          </div>
-        }
-      >
+      {entete}
+      <Carte titre="Évolution" note="Une colonne par mois, à la même échelle">
         <div className="corps">
           <Colonnes serie={serie} plafond={plafond} />
           <div className="legende" style={{ marginTop: 14 }}>
             {POSTES_EMPILES.map((cle) => (
-              <span key={cle} className="puce" style={{ borderColor: "var(--trait)" }}>
+              <span key={cle} className="puce fixe">
                 <span className="pastille" style={{ background: `var(${POSTES[cle].var})` }} />
-                <span className="puce-lib" style={{ color: "var(--ardoise)" }}>{POSTES[cle].nom}</span>
-                <span className="puce-val chiffre" style={{ color: "var(--encre)" }}>{euro(moyenne(cle))}</span>
+                <span className="puce-lib">{POSTES[cle].nom}</span>
+                <span className="puce-val chiffre">{euro(moyenne(cle))}</span>
               </span>
             ))}
           </div>

@@ -5,8 +5,8 @@
 // avoir vues, c'est la meilleure façon de ne plus lui faire confiance.
 import { useState, useRef, useMemo } from "react";
 import { api } from "../api.js";
-import Carte from "./Carte.jsx";
 import Champ from "./Champ.jsx";
+import Icone from "./Icone.jsx";
 import { lireFichier, analyserReleve, FORMATS_RELEVE } from "../releve.js";
 import { euroPrecis, libelleMois, CATEGORIES } from "../utiles.js";
 
@@ -122,18 +122,9 @@ export default function ImportReleve({ membres, executer }) {
   const dejaLa = lignes.filter((l) => l.dejaImportee).length;
   const salaires = lignes.filter((l) => l.salaire && !l.dejaImportee).length;
 
+  // Le titre et la fermeture viennent de la fenêtre qui l'accueille.
   return (
-    <Carte
-      titre="Importer un relevé bancaire"
-      note="Fichier CSV, OFX ou QIF téléchargé depuis votre espace bancaire"
-      action={
-        !apercu && (
-          <button className="btn fant mini" onClick={() => champFichier.current?.click()} disabled={occupe}>
-            {occupe ? "Lecture…" : "Choisir un fichier"}
-          </button>
-        )
-      }
-    >
+    <div className="import">
       <input ref={champFichier} type="file" accept={FORMATS_RELEVE} onChange={choisir} hidden />
 
       {message && (
@@ -150,11 +141,16 @@ export default function ImportReleve({ membres, executer }) {
       {!apercu && (
         <div className="corps" style={message ? { paddingTop: 0 } : undefined}>
           {membres.length > 0 && (
-            <div className="forme" style={{ marginBottom: 10 }}>
-              <Champ libelle="Ce relevé est celui du" valeur={pour} onChange={changerTitulaire} largeur={240} options={titulaires} disabled={occupe} />
+            <div className="forme" style={{ marginBottom: 14 }}>
+              <Champ libelle="Ce relevé est celui du" valeur={pour} onChange={changerTitulaire} largeur={260} options={titulaires} disabled={occupe} />
             </div>
           )}
-          <div className="carte-note">
+          <button className="depot" onClick={() => champFichier.current?.click()} disabled={occupe}>
+            <span className="etat-vide-icone"><Icone nom="importer" taille={22} /></span>
+            <span className="ligne-lib">{occupe ? "Lecture du relevé…" : "Choisir un fichier"}</span>
+            <span className="ligne-meta">CSV, OFX ou QIF — rien n'est ajouté avant votre validation</span>
+          </button>
+          <div className="carte-note" style={{ marginTop: 14 }}>
             Les opérations sont d'abord affichées : vous choisissez celles qui entrent dans le flux, et leur
             catégorie. Réimporter un relevé déjà traité n'ajoute rien en double.
             {membres.length > 1 && " Avec des comptes séparés, importez le relevé de chacun en indiquant à qui il appartient : ses dépenses lui seront attribuées."}
@@ -174,7 +170,7 @@ export default function ImportReleve({ membres, executer }) {
             {salaires > 0 && (
               <div className="carte-note" style={{ marginTop: 6 }}>
                 {pluriel(salaires, "versement")} de salaire {salaires > 1 ? "sont décochés" : "est décoché"} : les salaires sont déjà comptés
-                dans les revenus du foyer (onglet Foyer). Cochez-les seulement s'ils n'y figurent pas.
+                dans les revenus du foyer (Réglages › Foyer). Cochez-les seulement s'ils n'y figurent pas.
               </div>
             )}
             <div className="carte-note" style={{ marginTop: 6 }}>
@@ -227,6 +223,6 @@ export default function ImportReleve({ membres, executer }) {
           </div>
         </>
       )}
-    </Carte>
+    </div>
   );
 }

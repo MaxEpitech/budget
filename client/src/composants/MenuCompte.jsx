@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+import Icone from "./Icone.jsx";
+import { lienVers } from "../navigation.js";
 
 /**
  * Le compte, en haut à droite, toujours à la même place.
  *
- * Se déconnecter était jusqu'ici enterré au bas de l'onglet Foyer : personne
- * ne va chercher une sortie dans un formulaire de réglages. Le menu réunit ce
- * qui concerne le compte plutôt que le budget — l'identité, les réglages du
- * foyer, les pages légales, et la sortie.
+ * Il mène à ce qui concerne la personne connectée — son compte, ses données —
+ * et aux réglages du foyer, aux pages légales, et à la sortie. Personne ne va
+ * chercher où se déconnecter au fond d'un formulaire de réglages.
  */
-export default function MenuCompte({ compte, onReglages, onDeconnexion, ouvrirPage }) {
+export default function MenuCompte({ compte, naviguer, onDeconnexion, ouvrirPage }) {
   const [ouvert, setOuvert] = useState(false);
   const boite = useRef(null);
 
@@ -28,8 +29,8 @@ export default function MenuCompte({ compte, onReglages, onDeconnexion, ouvrirPa
 
   const email = compte?.email ?? "";
   const initiale = email.slice(0, 1) || "?";
-
-  const choisir = (action) => () => { setOuvert(false); action(); };
+  const fermer = () => setOuvert(false);
+  const choisir = (action) => () => { fermer(); action(); };
 
   return (
     <div className="compte" ref={boite}>
@@ -42,27 +43,37 @@ export default function MenuCompte({ compte, onReglages, onDeconnexion, ouvrirPa
       >
         <span className="compte-pastille" aria-hidden="true">{initiale}</span>
         <span className="compte-nom">{email}</span>
-        <span className="compte-chevron" aria-hidden="true">▾</span>
+        <span className="compte-chevron" aria-hidden="true"><Icone nom="bas" taille={14} /></span>
       </button>
 
       {ouvert && (
         <div className="compte-menu" role="menu">
           <div className="compte-entete">
-            <div className="stat-lib">Connecté en tant que</div>
-            <div className="compte-mail">{email}</div>
+            <span className="compte-pastille grande" aria-hidden="true">{initiale}</span>
+            <div style={{ minWidth: 0 }}>
+              <div className="stat-lib">Connecté en tant que</div>
+              <div className="compte-mail">{email}</div>
+            </div>
           </div>
-          <button className="compte-item" role="menuitem" onClick={choisir(onReglages)}>
-            Réglages du foyer
-          </button>
+          <a className="compte-item" role="menuitem" {...lienVers("compte", naviguer, fermer)}>
+            <Icone nom="compte" taille={16} /> Mon compte
+          </a>
+          <a className="compte-item" role="menuitem" {...lienVers("foyer", naviguer, fermer)}>
+            <Icone nom="reglages" taille={16} /> Réglages du foyer
+          </a>
+          <a className="compte-item" role="menuitem" {...lienVers("donnees", naviguer, fermer)}>
+            <Icone nom="donnees" taille={16} /> Mes données
+          </a>
+          <div className="compte-sep" />
           <button className="compte-item" role="menuitem" onClick={choisir(() => ouvrirPage("confidentialite"))}>
-            Politique de confidentialité
+            <Icone nom="bouclier" taille={16} /> Confidentialité
           </button>
           <button className="compte-item" role="menuitem" onClick={choisir(() => ouvrirPage("mentions-legales"))}>
-            Mentions légales
+            <Icone nom="document" taille={16} /> Mentions légales
           </button>
           <div className="compte-sep" />
           <button className="compte-item sortie" role="menuitem" onClick={choisir(onDeconnexion)}>
-            Se déconnecter
+            <Icone nom="sortie" taille={16} /> Se déconnecter
           </button>
         </div>
       )}

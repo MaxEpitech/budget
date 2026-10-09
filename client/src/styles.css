@@ -11,11 +11,11 @@
 
    Cinq couleurs, une par poste du budget, assez soutenues pour se distinguer
    entre elles et assez sombres pour se lire en texte. Une sixième, l'indigo,
-   ne sert qu'aux commandes : rien de ce qui est cliquable ne peut être
-   confondu avec un montant.
+   ne sert qu'aux commandes et à la navigation : rien de ce qui est cliquable
+   ne peut être confondu avec un montant.
 
-   Les noms de classes sont ceux d'origine : toute l'interface se rhabille
-   sans qu'aucun composant ne bouge.
+   L'application se range dans un cadre fixe : un menu à gauche (un tiroir au
+   téléphone), une barre en haut qui porte le mois, et l'écran courant.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ─── Jetons ────────────────────────────────────────────────────────────
@@ -23,9 +23,13 @@
    Aucune couleur n'est écrite ailleurs que dans ces blocs : c'est ce qui
    garantit que les deux thèmes restent cohérents l'un avec l'autre. */
 :root {
+  color-scheme: light;
+
   --fond: #F3F4F7;
   --surface: #FFFFFF;
   --surface-douce: #F8F9FB;
+  /* Ce qui se pose au-dessus d'une surface : segment choisi, menu. */
+  --eleve: #FFFFFF;
 
   --texte: #0F172A;
   --texte-doux: #475467;
@@ -33,7 +37,7 @@
 
   --bord: #E4E7EC;
   --bord-fin: #EFF1F4;
-  --survol: #F4F5F8;
+  --survol: #F1F2F6;
   /* Le contour d'un champ dit où l'on peut écrire : il lui faut un contraste
      réel, là où le contour d'une carte n'est qu'une bordure décorative. */
   --bord-champ: #858E9E;
@@ -72,6 +76,14 @@
   --accent-survol: #4338CA;
   --accent-pale: #EEF0FE;
   --sur-accent: #FFFFFF;
+  --sur-danger: #FFFFFF;
+
+  /* Le panneau de présentation des écrans de connexion. */
+  --vitrine-debut: #312E81;
+  --vitrine-fin: #5B54EA;
+  --sur-vitrine: #FFFFFF;
+
+  --voile: rgba(15, 23, 42, .45);
 
   /* Noms hérités du prototype, conservés : les composants les utilisent. */
   --ardoise: var(--texte-doux);
@@ -96,23 +108,27 @@
   --attention-texte: #97540A;
 
   --ombre: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
-  --ombre-haute: 0 8px 28px -10px rgba(16, 24, 40, .22), 0 2px 6px rgba(16, 24, 40, .06);
+  --ombre-haute: 0 12px 32px -12px rgba(16, 24, 40, .25), 0 2px 6px rgba(16, 24, 40, .06);
 
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
-  --corps: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --corps: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 
   /* Rythme vertical unique : tout l'espacement en dérive. */
   --pas: 8px;
-  --marge-page: 24px;
-  --arrondi: 14px;
+  --marge-page: 32px;
+  --arrondi: 16px;
   --arrondi-petit: 10px;
+  --largeur-menu: 252px;
+  --hauteur-barre: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --fond: #0D1117;
     --surface: #161B22;
     --surface-douce: #1B212A;
+    --eleve: #262D38;
 
     --texte: #E6E9EF;
     --texte-doux: #A2ACBA;
@@ -149,6 +165,12 @@
     --accent-survol: #A5B0FC;
     --accent-pale: #20243A;
     --sur-accent: #10121F;
+    --sur-danger: #1A0B0E;
+
+    --vitrine-debut: #1E1B4B;
+    --vitrine-fin: #3730A3;
+    --sur-vitrine: #FFFFFF;
+    --voile: rgba(0, 0, 0, .6);
 
     --ok-fond: #10281F;
     --ok-texte: #4ADE9E;
@@ -158,14 +180,16 @@
     --attention-texte: #F0B357;
 
     --ombre: 0 1px 2px rgba(0, 0, 0, .4);
-    --ombre-haute: 0 10px 30px -10px rgba(0, 0, 0, .65), 0 2px 6px rgba(0, 0, 0, .4);
+    --ombre-haute: 0 12px 32px -10px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .4);
   }
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --fond: #0D1117;
   --surface: #161B22;
   --surface-douce: #1B212A;
+  --eleve: #262D38;
   --texte: #E6E9EF;
   --texte-doux: #A2ACBA;
   --texte-tres-doux: #8792A2;
@@ -196,6 +220,11 @@
   --accent-survol: #A5B0FC;
   --accent-pale: #20243A;
   --sur-accent: #10121F;
+  --sur-danger: #1A0B0E;
+  --vitrine-debut: #1E1B4B;
+  --vitrine-fin: #3730A3;
+  --sur-vitrine: #FFFFFF;
+  --voile: rgba(0, 0, 0, .6);
   --ok-fond: #10281F;
   --ok-texte: #4ADE9E;
   --alerte-fond: #2C1519;
@@ -203,7 +232,7 @@
   --attention-fond: #2A1E10;
   --attention-texte: #F0B357;
   --ombre: 0 1px 2px rgba(0, 0, 0, .4);
-  --ombre-haute: 0 10px 30px -10px rgba(0, 0, 0, .65), 0 2px 6px rgba(0, 0, 0, .4);
+  --ombre-haute: 0 12px 32px -10px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .4);
 }
 
 /* ─── Socle ─────────────────────────────────────────────────────────── */
@@ -217,15 +246,17 @@ body { background: var(--fond); color: var(--texte); }
   min-height: 100%;
   font-size: 15px;
   line-height: 1.5;
-  padding-bottom: calc(var(--pas) * 8);
   -webkit-font-smoothing: antialiased;
 }
 .bdg *, .bdg *::before, .bdg *::after { box-sizing: border-box; }
 .bdg button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+.bdg button:disabled { cursor: not-allowed; }
 .bdg input, .bdg select { font: inherit; color: inherit; }
+.bdg a { color: inherit; }
 .bdg :focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
 }
+.bdg .icone { flex: none; display: block; }
 
 /* Les chiffres s'alignent en colonne : chasse tabulaire, approche resserrée.
    Ils restent dans la police du texte — un monospace les aurait renvoyés du
@@ -236,171 +267,244 @@ body { background: var(--fond); color: var(--texte); }
   letter-spacing: -0.015em;
 }
 
-/* ─── Barre d'application ───────────────────────────────────────────────
-   Toujours là, en haut : la marque, et le compte à portée de clic. C'est
-   d'ici qu'on se déconnecte — le chercher au fond d'un onglet n'allait pas. */
-.bdg .barre {
-  position: sticky; top: 0; z-index: 30;
-  background: var(--surface);
-  border-bottom: 1px solid var(--bord);
+/* Pour le clavier : sauter le menu et aller droit à l'écran. */
+.bdg .lien-evitement {
+  position: absolute; left: 12px; top: -60px; z-index: 100;
+  background: var(--accent); color: var(--sur-accent);
+  padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600;
 }
-.bdg .barre-inner {
-  max-width: 1100px; margin: 0 auto;
-  padding: 0 var(--marge-page);
-  height: 60px; display: flex; align-items: center; gap: calc(var(--pas) * 2);
-}
+.bdg .lien-evitement:focus { top: 12px; }
+
+/* ─── Marque ──────────────────────────────────────────────────────────── */
 .bdg .marque-app {
   display: flex; align-items: center; gap: 10px;
-  font-weight: 600; font-size: 15px; letter-spacing: -0.015em;
+  font-weight: 650; font-size: 15.5px; letter-spacing: -0.02em;
+  text-decoration: none; color: var(--texte);
 }
 .bdg .marque-logo {
-  width: 30px; height: 30px; border-radius: 9px; flex: none;
-  background: var(--accent); color: var(--sur-accent);
+  width: 32px; height: 32px; border-radius: 10px; flex: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-survol));
+  color: var(--sur-accent);
   display: grid; place-items: center; font-size: 15px; font-weight: 700;
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
-/* ─── Menu du compte ──────────────────────────────────────────────────── */
-.bdg .compte { position: relative; margin-left: auto; }
-.bdg .compte-bouton {
-  display: flex; align-items: center; gap: var(--pas);
-  padding: 5px 10px 5px 5px; border-radius: 999px;
-  border: 1px solid var(--bord-champ); background: var(--surface);
-  transition: background .15s, border-color .15s;
-}
-.bdg .compte-bouton:hover { background: var(--survol); }
-.bdg .compte-bouton[aria-expanded="true"] { background: var(--survol); border-color: var(--texte-tres-doux); }
-.bdg .compte-pastille {
-  width: 28px; height: 28px; border-radius: 999px; flex: none;
-  background: var(--accent-pale); color: var(--accent);
-  display: grid; place-items: center; font-size: 13px; font-weight: 600;
-  text-transform: uppercase;
-}
-.bdg .compte-nom {
-  font-size: 13.5px; color: var(--texte-doux); max-width: 190px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bdg .compte-chevron { font-size: 10px; color: var(--texte-tres-doux); }
+/* ─── Cadre de l'application ────────────────────────────────────────────
+   Grand écran : le menu en colonne fixe, l'écran à côté. En dessous, le menu
+   devient un tiroir et une barre de raccourcis s'installe en bas. */
+.bdg .app { min-height: 100vh; }
 
-.bdg .compte-menu {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40;
-  min-width: 250px; padding: 6px;
-  background: var(--surface); border: 1px solid var(--bord);
-  border-radius: var(--arrondi); box-shadow: var(--ombre-haute);
+.bdg .lateral {
+  background: var(--surface);
+  border-right: 1px solid var(--bord);
+  display: flex; flex-direction: column; gap: var(--pas);
+  padding: 18px 14px 16px;
 }
-.bdg .compte-entete {
-  padding: 9px 10px 11px; border-bottom: 1px solid var(--bord-fin); margin-bottom: 6px;
-}
-.bdg .compte-entete .compte-mail {
-  font-size: 13.5px; font-weight: 500; word-break: break-all; line-height: 1.35;
-}
-.bdg .compte-item {
-  display: block; width: 100%; text-align: left;
-  padding: 9px 10px; border-radius: var(--arrondi-petit);
-  font-size: 14px; color: var(--texte);
-  transition: background .12s, color .12s;
-}
-.bdg .compte-item:hover { background: var(--survol); }
-.bdg .compte-item.sortie { color: var(--credits); }
-.bdg .compte-sep { height: 1px; background: var(--bord-fin); margin: 6px 4px; }
-
-/* ─── En-tête du mois ───────────────────────────────────────────────────
-   Une carte en tête de page : le mois qu'on feuillette à gauche, ce qui
-   reste à vivre à droite, et la répartition juste en dessous. */
-.bdg .entete {
-  max-width: 1100px; margin: calc(var(--pas) * 3) auto 0;
-  padding: 0 var(--marge-page);
-}
-.bdg .entete-haut {
+.bdg .lateral-tete {
   display: flex; align-items: center; justify-content: space-between;
-  gap: calc(var(--pas) * 2); flex-wrap: wrap;
-  background: var(--surface); border: 1px solid var(--bord);
-  border-radius: var(--arrondi) var(--arrondi) 0 0;
-  padding: calc(var(--pas) * 2.5) calc(var(--pas) * 3) calc(var(--pas) * 2);
-  border-bottom: none;
+  padding: 2px 8px 18px;
 }
+.bdg .lateral-nav {
+  flex: 1 1 auto; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.bdg .nav-groupe { display: flex; flex-direction: column; gap: 2px; }
+.bdg .nav-titre {
+  font-size: 12px; font-weight: 600; color: var(--texte-tres-doux);
+  padding: 0 12px 6px;
+}
+.bdg .nav-lien {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border-radius: 11px;
+  color: var(--texte-doux); font-size: 14.5px; font-weight: 500;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.bdg .nav-lien:hover { background: var(--survol); color: var(--texte); }
+.bdg .nav-lien[aria-current="page"] {
+  background: var(--accent-pale); color: var(--accent); font-weight: 600;
+}
+.bdg .lateral-pied { border-top: 1px solid var(--bord-fin); padding-top: 10px; }
+
+.bdg .voile { position: fixed; inset: 0; z-index: 55; background: var(--voile); }
+
+.bdg .principal { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* La barre du haut : le mois qu'on feuillette, le reste à vivre, le compte.
+   Translucide : on devine l'écran qui défile dessous, sans qu'il gêne. */
+.bdg .barre {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--hauteur-barre);
+  display: flex; align-items: center; gap: calc(var(--pas) * 1.5);
+  /* Alignée sur la colonne de contenu, quelle que soit la largeur. */
+  padding: 0 max(var(--marge-page), calc((100% - 1120px) / 2 + var(--marge-page)));
+  background: color-mix(in srgb, var(--fond) 82%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
+  backdrop-filter: saturate(1.4) blur(12px);
+  border-bottom: 1px solid var(--bord-fin);
+}
+.bdg .barre-titre { font-weight: 600; font-size: 15px; color: var(--texte); }
+.bdg .barre-droite { margin-left: auto; display: flex; align-items: center; gap: calc(var(--pas) * 1.5); }
+.bdg .barre-progression {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden;
+}
+.bdg .barre-progression::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 35%;
+  background: var(--accent); border-radius: 2px;
+  animation: progression 1s ease-in-out infinite;
+}
+@keyframes progression { from { left: -35%; } to { left: 100%; } }
+
+.bdg .contenu {
+  width: 100%; max-width: 1120px; margin: 0 auto;
+  padding: 28px var(--marge-page) 64px;
+  outline: none;
+  transition: opacity .15s;
+}
+.bdg .contenu[data-occupe="1"] { opacity: .72; }
+
+.bdg .icone-btn {
+  width: 38px; height: 38px; border-radius: 10px; flex: none;
+  display: grid; place-items: center; color: var(--texte-doux);
+  transition: background .15s, color .15s;
+}
+.bdg .icone-btn:hover { background: var(--survol); color: var(--texte); }
+
+/* ─── Sélecteur de mois ─────────────────────────────────────────────── */
+.bdg .mois { display: flex; align-items: center; gap: var(--pas); min-width: 0; }
 .bdg .mois-nav {
   display: flex; align-items: center; gap: 2px;
-  background: var(--surface-douce); border: 1px solid var(--bord-champ);
-  border-radius: 999px; padding: 3px;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: 999px; padding: 3px; box-shadow: var(--ombre);
 }
 .bdg .mois-titre {
-  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em;
   min-width: 132px; text-align: center; color: var(--texte);
 }
 .bdg .fleche {
-  width: 28px; height: 28px; border-radius: 999px; color: var(--texte-doux);
-  display: grid; place-items: center; font-size: 17px; line-height: 1;
+  width: 30px; height: 30px; border-radius: 999px; color: var(--texte-doux);
+  display: grid; place-items: center;
   transition: background .15s, color .15s;
 }
-.bdg .fleche:hover { background: var(--surface); color: var(--texte); box-shadow: var(--ombre); }
+.bdg .fleche:hover { background: var(--survol); color: var(--texte); }
+.bdg .mois-retour {
+  font-size: 13px; font-weight: 550; color: var(--accent);
+  padding: 6px 11px; border-radius: 999px; white-space: nowrap;
+  transition: background .15s;
+}
+.bdg .mois-retour:hover { background: var(--accent-pale); }
 
-.bdg .solde { text-align: right; margin-left: auto; }
-.bdg .solde-lib {
-  font-size: 12.5px; color: var(--texte-tres-doux); margin-bottom: 1px;
+/* Le reste à vivre, rappelé dans la barre sur les écrans du mois. */
+.bdg .pilule-reste {
+  display: flex; align-items: baseline; gap: var(--pas);
+  padding: 6px 14px; border-radius: 999px; text-decoration: none;
+  font-size: 13px; color: var(--texte-doux); white-space: nowrap;
+  background: color-mix(in srgb, var(--reste) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--reste) 22%, transparent);
+  transition: border-color .15s;
 }
-.bdg .solde-val {
-  font-size: clamp(28px, 5vw, 34px); font-weight: 680; line-height: 1.1;
-  letter-spacing: -0.03em; color: var(--reste);
+.bdg .pilule-reste strong { color: var(--reste); font-size: 15px; font-weight: 680; }
+.bdg .pilule-reste.neg {
+  background: color-mix(in srgb, var(--credits) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--credits) 22%, transparent);
 }
-.bdg .solde-val.neg { color: var(--credits); }
+.bdg .pilule-reste.neg strong { color: var(--credits); }
+.bdg .pilule-reste:hover { border-color: color-mix(in srgb, var(--reste) 50%, transparent); }
 
-/* La bande : élément signature. Des segments arrondis, détachés les uns des
-   autres — un tout qu'on divise, et chaque part se saisit du regard. */
-.bdg .bande {
-  display: flex; gap: 3px; height: 12px;
-  background: var(--surface); border: 1px solid var(--bord); border-bottom: none;
-  padding: 0 calc(var(--pas) * 3);
-}
-.bdg .seg {
-  position: relative; min-width: 6px; border-radius: 999px;
-  transition: width .55s cubic-bezier(.22,1,.36,1), transform .15s, filter .15s;
-}
-.bdg .seg:hover, .bdg .seg[data-actif="1"] { filter: brightness(1.1); transform: scaleY(1.35); }
-/* Les pourcentages ne tiennent pas dans une bande fine : la légende les porte. */
-.bdg .seg-pct { display: none; }
-
-.bdg .legende {
-  display: flex; flex-wrap: wrap; gap: var(--pas);
-  background: var(--surface); border: 1px solid var(--bord);
-  border-radius: 0 0 var(--arrondi) var(--arrondi);
-  padding: calc(var(--pas) * 2) calc(var(--pas) * 2.5) calc(var(--pas) * 2.5);
-  box-shadow: var(--ombre);
-}
-.bdg .puce {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 11px 6px 9px; border-radius: 999px;
-  border: 1px solid transparent; text-align: left;
+/* ─── Menu du compte ──────────────────────────────────────────────────── */
+.bdg .compte { position: relative; }
+.bdg .compte-bouton {
+  display: flex; align-items: center; gap: var(--pas);
+  padding: 4px 10px 4px 4px; border-radius: 999px;
+  border: 1px solid var(--bord); background: var(--surface);
   transition: background .15s, border-color .15s;
 }
-.bdg .puce:hover { background: var(--survol); }
-.bdg .puce[data-actif="1"] { background: var(--survol); border-color: var(--bord); }
-.bdg .pastille { width: 9px; height: 9px; border-radius: 999px; flex: none; }
-.bdg .puce-lib { font-size: 13px; color: var(--texte-doux); }
-.bdg .puce-val { font-size: 13.5px; font-weight: 600; color: var(--texte); }
+.bdg .compte-bouton:hover { background: var(--survol); }
+.bdg .compte-bouton[aria-expanded="true"] { background: var(--survol); border-color: var(--bord-champ); }
+.bdg .compte-pastille {
+  width: 30px; height: 30px; border-radius: 999px; flex: none;
+  background: var(--accent-pale); color: var(--accent);
+  display: grid; place-items: center; font-size: 13px; font-weight: 650;
+  text-transform: uppercase;
+}
+.bdg .compte-pastille.grande { width: 38px; height: 38px; font-size: 16px; }
+.bdg .compte-pastille.tres-grande { width: 56px; height: 56px; font-size: 22px; }
+.bdg .compte-nom {
+  font-size: 13.5px; color: var(--texte-doux); max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdg .compte-chevron { color: var(--texte-tres-doux); display: grid; }
 
-/* ─── Onglets ───────────────────────────────────────────────────────────
-   En pastilles : l'onglet actif est un objet plein, pas un simple souligné. */
-.bdg .onglets {
-  display: flex; gap: 4px;
-  max-width: 1100px; margin: calc(var(--pas) * 3) auto calc(var(--pas) * 1);
-  padding: 0 var(--marge-page);
-  overflow-x: auto; scrollbar-width: none;
+.bdg .compte-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40;
+  min-width: 260px; padding: 6px;
+  background: var(--eleve); border: 1px solid var(--bord);
+  border-radius: var(--arrondi); box-shadow: var(--ombre-haute);
+  animation: apparition .14s ease-out;
 }
-.bdg .onglets::-webkit-scrollbar { display: none; }
-.bdg .onglet {
-  padding: 8px 14px; border-radius: 999px;
-  font-size: 14px; font-weight: 500; color: var(--texte-doux);
-  white-space: nowrap; transition: background .15s, color .15s;
+.bdg .compte-entete {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 12px; border-bottom: 1px solid var(--bord-fin); margin-bottom: 6px;
 }
-.bdg .onglet:hover { background: var(--survol); color: var(--texte); }
-.bdg .onglet[data-actif="1"] {
-  background: var(--texte); color: var(--surface); font-weight: 600;
+.bdg .compte-entete .compte-mail {
+  font-size: 13.5px; font-weight: 550; word-break: break-all; line-height: 1.35;
+}
+.bdg .compte-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 10px; border-radius: var(--arrondi-petit);
+  font-size: 14px; color: var(--texte); text-decoration: none;
+  transition: background .12s, color .12s;
+}
+.bdg .compte-item .icone { color: var(--texte-tres-doux); }
+.bdg .compte-item:hover { background: var(--survol); }
+.bdg .compte-item.sortie, .bdg .compte-item.sortie .icone { color: var(--credits); }
+.bdg .compte-sep { height: 1px; background: var(--bord-fin); margin: 6px 4px; }
+
+/* ─── Barre de raccourcis (téléphone) ───────────────────────────────── */
+.bdg .nav-bas {
+  display: none;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  grid-template-columns: repeat(5, 1fr);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--bord);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+.bdg .nav-bas-lien {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 2px; border-radius: 12px;
+  font-size: 11.5px; font-weight: 550; color: var(--texte-tres-doux);
+  text-decoration: none;
+}
+.bdg .nav-bas-lien[aria-current="page"] { color: var(--accent); }
+.bdg .nav-bas-lien[aria-current="page"] .icone {
+  background: var(--accent-pale); border-radius: 999px; box-sizing: content-box; padding: 2px 14px;
+}
+
+/* ─── En-tête d'écran ───────────────────────────────────────────────── */
+.bdg .page-tete {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: calc(var(--pas) * 2); flex-wrap: wrap;
+  margin-bottom: calc(var(--pas) * 3);
+}
+.bdg .page-tete-texte { min-width: 0; flex: 1 1 320px; }
+.bdg .page-titre {
+  margin: 0; font-size: 28px; font-weight: 720; letter-spacing: -0.035em; line-height: 1.15;
+}
+.bdg .page-description {
+  margin: 6px 0 0; color: var(--texte-doux); font-size: 14.5px; max-width: 680px;
+}
+.bdg .page-actions { display: flex; gap: var(--pas); flex-wrap: wrap; }
+
+.bdg .barre-outils {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: calc(var(--pas) * 1.5); flex-wrap: wrap;
+  margin-bottom: calc(var(--pas) * 2);
 }
 
 /* ─── Cartes ────────────────────────────────────────────────────────────
    Une surface blanche, un arrondi franc, une ombre à peine posée. */
-.bdg .zone { padding: calc(var(--pas) * 2) var(--marge-page) 0; max-width: 1100px; margin: 0 auto; }
-
 .bdg .carte {
   background: var(--surface); border: 1px solid var(--bord);
   border-radius: var(--arrondi); box-shadow: var(--ombre);
@@ -413,35 +517,176 @@ body { background: var(--fond); color: var(--texte); }
   padding: calc(var(--pas) * 2) calc(var(--pas) * 2.5);
   border-bottom: 1px solid var(--bord-fin);
 }
-.bdg .carte-titre { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; color: var(--texte); }
+.bdg .carte-titre { font-size: 15.5px; font-weight: 650; letter-spacing: -0.015em; color: var(--texte); }
 .bdg .carte-note { font-size: 13px; color: var(--texte-doux); line-height: 1.45; margin-top: 1px; }
 .bdg .corps { padding: calc(var(--pas) * 2) calc(var(--pas) * 2.5); }
+
+/* Zone de danger : ce qui ne se rattrape pas se distingue avant le clic. */
+.bdg .carte.zone-danger { border-color: color-mix(in srgb, var(--credits) 35%, var(--bord)); }
+.bdg .carte.zone-danger .carte-titre { color: var(--credits); }
+
+/* ─── Vue d'ensemble ────────────────────────────────────────────────── */
+.bdg .carte.resume {
+  padding: calc(var(--pas) * 3) calc(var(--pas) * 3.25) calc(var(--pas) * 2.5);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 55%),
+    var(--surface);
+}
+.bdg .resume-haut {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: calc(var(--pas) * 2); flex-wrap: wrap; margin-bottom: calc(var(--pas) * 2.5);
+}
+.bdg .resume-lib { font-size: 14px; color: var(--texte-doux); font-weight: 550; }
+.bdg .resume-val {
+  font-size: clamp(38px, 6vw, 52px); font-weight: 740; line-height: 1.05;
+  letter-spacing: -0.045em; color: var(--reste); margin-top: 4px;
+}
+.bdg .resume-val.neg { color: var(--credits); }
+.bdg .resume-note { color: var(--texte-doux); font-size: 14px; margin-top: 8px; }
+.bdg .resume-note strong { color: var(--texte); font-weight: 650; }
+
+/* La bande : élément signature. Des segments arrondis, détachés les uns des
+   autres — un tout qu'on divise, et chaque part se saisit du regard. */
+.bdg .bande { display: flex; gap: 4px; height: 14px; }
+.bdg .seg {
+  position: relative; min-width: 6px; border-radius: 999px;
+  transition: width .55s cubic-bezier(.22,1,.36,1), transform .15s, filter .15s;
+}
+.bdg .seg:hover, .bdg .seg[data-actif="1"] { filter: brightness(1.1); transform: scaleY(1.3); }
+
+.bdg .legende {
+  display: flex; flex-wrap: wrap; gap: 4px 6px;
+  margin: calc(var(--pas) * 1.5) 0 0 -8px;
+}
+.bdg .puce {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 11px 6px 9px; border-radius: 999px;
+  border: 1px solid transparent; text-align: left;
+  transition: background .15s, border-color .15s;
+}
+.bdg button.puce:hover, .bdg .puce[data-actif="1"] { background: var(--survol); }
+.bdg .pastille { width: 9px; height: 9px; border-radius: 999px; flex: none; }
+.bdg .puce-lib { font-size: 13px; color: var(--texte-doux); }
+.bdg .puce-val { font-size: 13.5px; font-weight: 600; color: var(--texte); }
+
+/* Tuiles : un chiffre clé par poste, dans sa couleur. */
+.bdg .tuiles {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(var(--pas) * 2); margin-bottom: calc(var(--pas) * 2.5);
+}
+.bdg .tuiles.trois { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bdg .tuile {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: left;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--arrondi); box-shadow: var(--ombre);
+  padding: calc(var(--pas) * 2) calc(var(--pas) * 2.25);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.bdg .tuile.cliquable:hover {
+  border-color: color-mix(in srgb, var(--teinte, var(--accent)) 40%, var(--bord));
+  box-shadow: var(--ombre-haute); transform: translateY(-1px);
+}
+.bdg .tuile-haut { display: flex; align-items: center; gap: 10px; }
+.bdg .tuile-icone {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  display: grid; place-items: center;
+  color: var(--teinte, var(--accent));
+  background: color-mix(in srgb, var(--teinte, var(--accent)) 12%, var(--surface));
+}
+.bdg .tuile-lib { font-size: 13.5px; font-weight: 550; color: var(--texte-doux); }
+.bdg .tuile-fleche { margin-left: auto; color: var(--texte-tres-doux); opacity: 0; transition: opacity .15s; }
+.bdg .tuile.cliquable:hover .tuile-fleche { opacity: 1; }
+.bdg .tuile-val {
+  font-size: 24px; font-weight: 700; letter-spacing: -0.035em; color: var(--texte);
+  margin-top: 10px; line-height: 1.15;
+}
+.bdg .tuile-note { font-size: 12.5px; color: var(--texte-tres-doux); }
+
+/* Ce qui demande attention : une ligne par constat, qui mène à son écran. */
+.bdg .constats { list-style: none; margin: 0; padding: 6px 0; }
+.bdg .constat {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px calc(var(--pas) * 2.5);
+  transition: background .12s;
+}
+.bdg .constat:hover { background: var(--surface-douce); }
+.bdg .constat > .icone { color: var(--texte-tres-doux); }
+.bdg .constat-icone {
+  width: 30px; height: 30px; border-radius: 999px; flex: none;
+  display: grid; place-items: center;
+}
+.bdg .constat[data-ton="alerte"] .constat-icone { background: var(--alerte-fond); color: var(--alerte-texte); }
+.bdg .constat[data-ton="attention"] .constat-icone { background: var(--attention-fond); color: var(--attention-texte); }
+.bdg .constat[data-ton="info"] .constat-icone { background: var(--accent-pale); color: var(--accent); }
+.bdg .constat-texte { flex: 1 1 auto; font-size: 14px; line-height: 1.4; }
+.bdg .constat-ok { display: flex; align-items: center; gap: 14px; padding: calc(var(--pas) * 2.5); }
+
+/* ─── États vides et chargement ─────────────────────────────────────── */
+.bdg .etat-vide {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: calc(var(--pas) * 5) calc(var(--pas) * 3);
+}
+.bdg .etat-vide-icone {
+  width: 48px; height: 48px; border-radius: 14px; flex: none;
+  display: grid; place-items: center;
+  background: var(--accent-pale); color: var(--accent);
+  margin-bottom: 12px;
+}
+.bdg .etat-vide-icone.ok { background: var(--ok-fond); color: var(--ok-texte); margin-bottom: 0; }
+.bdg .etat-vide-titre { font-weight: 650; font-size: 16px; letter-spacing: -0.015em; }
+.bdg .etat-vide-texte { color: var(--texte-doux); font-size: 14px; max-width: 470px; margin: 6px 0 0; }
+
+.bdg .chargement {
+  display: flex; align-items: center; gap: 10px; color: var(--texte-tres-doux); font-size: 14px;
+}
+.bdg .chargement::before {
+  content: ""; width: 18px; height: 18px; border-radius: 999px;
+  border: 2px solid var(--bord); border-top-color: var(--accent);
+  animation: rotation .8s linear infinite;
+}
+@keyframes rotation { to { transform: rotate(360deg); } }
+
+.bdg .vide {
+  padding: calc(var(--pas) * 4) calc(var(--pas) * 2.5); text-align: center;
+  color: var(--texte-tres-doux); font-size: 14px;
+}
 
 /* ─── Lignes ────────────────────────────────────────────────────────────
    Une écriture par ligne, le montant à droite, un filet ténu entre elles. */
 .bdg .ligne {
-  display: flex; align-items: center; gap: calc(var(--pas) * 2);
-  padding: calc(var(--pas) * 1.75) calc(var(--pas) * 2.5);
+  display: flex; align-items: center; gap: calc(var(--pas) * 1.75);
+  padding: calc(var(--pas) * 1.5) calc(var(--pas) * 2.5);
   border-bottom: 1px solid var(--bord-fin);
   transition: background .12s;
 }
 .bdg .ligne:last-child { border-bottom: none; }
 .bdg .ligne:hover { background: var(--surface-douce); }
 .bdg .ligne:hover .suppr { opacity: 1; }
-.bdg .ligne-lib { font-weight: 550; letter-spacing: -0.005em; }
+.bdg .ligne-lib { font-weight: 560; letter-spacing: -0.005em; }
 .bdg .ligne-meta { font-size: 13px; color: var(--texte-doux); margin-top: 2px; }
+.bdg .ligne-etiquettes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.bdg .ligne-avatar {
+  width: 36px; height: 36px; border-radius: 11px; flex: none;
+  display: grid; place-items: center;
+  background: var(--survol); color: var(--texte-doux);
+}
+.bdg .ligne-avatar[data-type="revenu"] { background: var(--ok-fond); color: var(--ok-texte); }
 .bdg .pousse { margin-left: auto; }
-.bdg .montant { font-weight: 600; font-size: 15.5px; }
+.bdg .montant { font-weight: 650; font-size: 15.5px; white-space: nowrap; }
 .bdg .montant.pos { color: var(--reste); }
 .bdg .suppr {
-  opacity: 0; color: var(--texte-tres-doux); font-size: 17px; line-height: 1;
-  width: 28px; height: 28px; flex: none; border-radius: 999px;
+  opacity: 0; color: var(--texte-tres-doux);
+  width: 32px; height: 32px; flex: none; border-radius: 999px;
   display: grid; place-items: center;
   transition: opacity .15s, color .15s, background .15s;
 }
 .bdg .suppr:hover { color: var(--credits); background: var(--alerte-fond); }
-/* Sans survol — au doigt — la croix doit rester atteignable. */
-@media (hover: none) { .bdg .suppr { opacity: 0.55; } }
+.bdg .suppr:focus-visible { opacity: 1; }
+/* Hors des lignes — sur une carte de projet, d'enveloppe — la corbeille reste
+   visible : il n'y a pas de ligne à survoler pour la faire apparaître. */
+.bdg .carte.projet .suppr, .bdg .carte.enveloppe .suppr, .bdg .corps .suppr { opacity: .65; }
+/* Sans survol — au doigt — la corbeille doit rester atteignable. */
+@media (hover: none) { .bdg .suppr { opacity: 0.6; } }
 
 .bdg .etiq {
   display: inline-block; font-size: 11.5px; padding: 2px 9px; border-radius: 999px;
@@ -463,19 +708,41 @@ body { background: var(--fond); color: var(--texte); }
   font-weight: 550;
 }
 
+/* Une personne du foyer : son initiale, dans sa teinte. */
+.bdg .ligne.membre { flex-wrap: wrap; }
+.bdg .membre-pastille {
+  width: 40px; height: 40px; border-radius: 999px; flex: none;
+  display: grid; place-items: center;
+  font-weight: 650; font-size: 15px; text-transform: uppercase;
+  color: var(--teinte);
+  background: color-mix(in srgb, var(--teinte) 14%, var(--surface));
+}
+.bdg .profil { display: flex; align-items: center; gap: calc(var(--pas) * 2); flex-wrap: wrap; }
+
 /* ─── Formulaires ───────────────────────────────────────────────────── */
 .bdg .forme { display: flex; flex-wrap: wrap; gap: calc(var(--pas) * 1.5); align-items: flex-end; }
 /* Formulaire empilé — écrans de connexion. Les champs y reprennent leur
    hauteur naturelle : la base flexible du mobile ne vaut que couchée. */
 .bdg .forme.pile { flex-direction: column; align-items: stretch; }
 .bdg .forme.pile > .champ { flex: 0 0 auto; }
-.bdg .champ { display: flex; flex-direction: column; gap: 5px; }
-.bdg .champ-lib { font-size: 12.5px; font-weight: 500; color: var(--texte-doux); }
+/* Formulaire en grille — fenêtres d'ajout : deux colonnes, des champs qui
+   occupent toute leur case, et « plein » pour ceux qui prennent la ligne. */
+.bdg .grille-form {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--pas) * 1.75) calc(var(--pas) * 1.5);
+  margin-top: calc(var(--pas) * 2);
+}
+.bdg .grille-form:first-child { margin-top: 0; }
+.bdg .grille-form > .plein { grid-column: 1 / -1; }
+
+.bdg .champ { display: flex; flex-direction: column; gap: 6px; }
+.bdg .champ-lib { font-size: 12.5px; font-weight: 550; color: var(--texte-doux); }
 .bdg input.saisie, .bdg select.saisie {
   border: 1px solid var(--bord-champ); border-radius: var(--arrondi-petit); padding: 9px 12px;
   background: var(--surface); color: var(--texte); min-width: 0; height: 42px;
   transition: border-color .15s, box-shadow .15s;
 }
+.bdg input.saisie:hover:not(:disabled), .bdg select.saisie:hover:not(:disabled) { border-color: var(--texte-tres-doux); }
 .bdg input.saisie:focus, .bdg select.saisie:focus {
   border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-pale); outline: none;
 }
@@ -483,24 +750,69 @@ body { background: var(--fond); color: var(--texte); }
 .bdg input.saisie::placeholder { color: var(--texte-tres-doux); }
 
 .bdg .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   background: var(--accent); color: var(--sur-accent);
   padding: 0 18px; border-radius: var(--arrondi-petit);
   font-size: 14px; font-weight: 600; height: 42px; letter-spacing: -0.005em;
+  white-space: nowrap; text-decoration: none;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 30%, transparent);
   transition: background .15s, opacity .15s, box-shadow .15s;
 }
-.bdg .btn:hover { background: var(--accent-survol); }
-.bdg .btn:disabled { opacity: .45; cursor: not-allowed; }
+.bdg .btn:hover:not(:disabled) { background: var(--accent-survol); }
+.bdg .btn:disabled { opacity: .45; }
 .bdg .btn.fant {
   background: var(--surface); color: var(--texte);
   box-shadow: inset 0 0 0 1px var(--bord-champ);
 }
-.bdg .btn.fant:hover { background: var(--survol); box-shadow: inset 0 0 0 1px var(--texte-doux); }
-.bdg .btn.mini { height: 34px; padding: 0 13px; font-size: 13px; }
-.bdg .bascule {
-  display: flex; align-items: center; gap: 8px; font-size: 14px;
-  color: var(--texte-doux); height: 42px; padding: 0 2px;
+.bdg .btn.fant:hover:not(:disabled) { background: var(--survol); box-shadow: inset 0 0 0 1px var(--texte-doux); }
+.bdg .btn.danger {
+  background: var(--surface); color: var(--credits);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--credits) 50%, transparent);
 }
-.bdg .bascule input { accent-color: var(--accent); width: 16px; height: 16px; }
+.bdg .btn.danger:hover:not(:disabled) { background: var(--alerte-fond); }
+.bdg .btn.danger.plein-fond { background: var(--credits); color: var(--sur-danger); box-shadow: none; }
+.bdg .btn.danger.plein-fond:hover:not(:disabled) { background: color-mix(in srgb, var(--credits) 85%, var(--texte)); }
+.bdg .btn.mini { height: 34px; padding: 0 13px; font-size: 13px; gap: 6px; }
+
+/* Une case qui active quelque chose prend la forme d'un interrupteur : on
+   comprend qu'elle agit, et dans quel sens, sans lire le libellé deux fois. */
+.bdg .bascule {
+  display: flex; align-items: center; gap: 10px; font-size: 14px;
+  color: var(--texte); height: 42px; padding: 0 2px; cursor: pointer;
+}
+.bdg .bascule input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; margin: 0;
+  width: 38px; height: 22px; border-radius: 999px; flex: none;
+  background: var(--bord-champ); position: relative; cursor: pointer;
+  transition: background .18s;
+}
+.bdg .bascule input[type="checkbox"]::before {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 999px;
+  background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  transition: transform .18s cubic-bezier(.22,1,.36,1);
+}
+.bdg .bascule input[type="checkbox"]:checked { background: var(--accent); }
+.bdg .bascule input[type="checkbox"]:checked::before { transform: translateX(16px); }
+.bdg .bascule input[type="checkbox"]:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Choix exclusif entre quelques options : toutes visibles, une en relief. */
+.bdg .segments {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--survol); border: 1px solid var(--bord-fin);
+  border-radius: 12px; max-width: 100%; overflow-x: auto;
+}
+.bdg .segments.plein { display: flex; width: 100%; }
+.bdg .segments.plein .segment { flex: 1 1 0; }
+.bdg .segment {
+  padding: 6px 14px; border-radius: 9px; white-space: nowrap;
+  font-size: 13.5px; font-weight: 550; color: var(--texte-doux);
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.bdg .segment:hover:not([aria-pressed="true"]) { color: var(--texte); }
+.bdg .segment[aria-pressed="true"] {
+  background: var(--eleve); color: var(--texte); font-weight: 650; box-shadow: var(--ombre);
+}
 
 /* Un lien s'écrit dans la couleur des commandes et se signale par son
    soulignement : il ne peut être pris pour un montant. */
@@ -511,25 +823,91 @@ body { background: var(--fond); color: var(--texte); }
   transition: text-decoration-color .15s;
 }
 .bdg .lien:hover { text-decoration-color: currentColor; }
+.bdg .liens-legaux { display: flex; gap: calc(var(--pas) * 1.5); flex-wrap: wrap; padding: 0 4px; }
+
+/* Zone de dépôt d'un relevé. */
+.bdg .depot {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%;
+  padding: calc(var(--pas) * 3) calc(var(--pas) * 2);
+  border: 1.5px dashed var(--bord-champ); border-radius: var(--arrondi);
+  background: var(--surface-douce); text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.bdg .depot:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-pale); }
+
+/* ─── Fenêtres modales ──────────────────────────────────────────────────
+   Le voile est en couleur littérale : ::backdrop n'hérite pas des jetons
+   dans tous les navigateurs encore en usage. */
+.bdg .dialogue {
+  border: none; padding: 0; background: transparent; color: var(--texte);
+  width: 100%; max-width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px); overflow: visible;
+}
+.bdg .dialogue.large { max-width: min(880px, calc(100vw - 32px)); }
+.bdg .dialogue::backdrop {
+  background: rgba(15, 23, 42, .5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.bdg .dialogue[open] { animation: apparition .18s ease-out; }
+.bdg .dialogue-boite {
+  display: flex; flex-direction: column;
+  max-height: calc(100dvh - 48px); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: 20px; box-shadow: var(--ombre-haute);
+}
+.bdg .dialogue-tete {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 20px 20px 16px 24px; border-bottom: 1px solid var(--bord-fin);
+}
+.bdg .dialogue-titre { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.025em; }
+.bdg .dialogue-note { margin: 4px 0 0; font-size: 13.5px; color: var(--texte-doux); }
+.bdg .dialogue-corps { padding: 20px 24px 24px; overflow-y: auto; flex: 1 1 auto; }
+/* L'import gère ses propres marges : ses lignes vont d'un bord à l'autre. */
+.bdg .dialogue-corps:has(> .import) { padding: 0; }
+.bdg .dialogue-pied {
+  display: flex; justify-content: flex-end; gap: var(--pas); flex-wrap: wrap;
+  padding: 14px 24px; border-top: 1px solid var(--bord-fin); background: var(--surface-douce);
+}
+@keyframes apparition { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* ─── Annonces passagères ───────────────────────────────────────────── */
+.bdg .toasts {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 80;
+  display: flex; flex-direction: column; gap: var(--pas);
+  width: max-content; max-width: calc(100vw - 32px);
+}
+.bdg .toast {
+  display: flex; align-items: center; gap: calc(var(--pas) * 2);
+  background: var(--texte); color: var(--surface);
+  padding: 10px 10px 10px 18px; border-radius: 14px;
+  box-shadow: var(--ombre-haute); font-size: 14px;
+  animation: apparition .2s ease-out;
+}
+.bdg .toast-action {
+  font-weight: 650; padding: 7px 12px; border-radius: 9px;
+  color: color-mix(in srgb, var(--accent) 50%, var(--surface));
+}
+.bdg .toast-action:hover { background: color-mix(in srgb, var(--surface) 12%, transparent); }
 
 /* ─── Anneau de répartition ─────────────────────────────────────────────
    Le camembert et sa légende se répondent : survoler l'un éteint le reste de
    l'autre. Sans cet écho, il faudrait compter les parts dans le sens horaire
    pour retrouver laquelle est laquelle. */
 .bdg .anneau {
-  display: flex; align-items: center; gap: calc(var(--pas) * 3); flex-wrap: wrap;
+  display: flex; align-items: center; gap: calc(var(--pas) * 4); flex-wrap: wrap;
 }
 .bdg .anneau-svg { flex: none; }
 .bdg .part { cursor: pointer; transition: opacity .18s; }
 .bdg .anneau:has(.part[data-actif="1"]) .part[data-actif="0"] { opacity: .28; }
 .bdg .anneau:has(.anneau-ligne[data-actif="1"]) .anneau-ligne[data-actif="0"] { opacity: .5; }
-.bdg .anneau-total { font-size: 21px; font-weight: 660; fill: var(--texte); }
+.bdg .anneau-total { font-size: 21px; font-weight: 680; fill: var(--texte); }
 .bdg .anneau-sous { font-size: 12px; fill: var(--texte-tres-doux); }
 
-.bdg .anneau-legende { display: flex; flex-direction: column; gap: 1px; flex: 1 1 260px; min-width: 0; max-width: 440px; }
+.bdg .anneau-legende { display: flex; flex-direction: column; gap: 1px; flex: 1 1 260px; min-width: 0; max-width: 480px; }
 .bdg .anneau-ligne {
   display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
-  padding: 6px 8px; border-radius: var(--arrondi-petit);
+  padding: 7px 10px; border-radius: var(--arrondi-petit);
   transition: background .12s, opacity .18s;
 }
 .bdg .anneau-ligne:hover, .bdg .anneau-ligne[data-actif="1"] { background: var(--survol); }
@@ -548,38 +926,101 @@ body { background: var(--fond); color: var(--texte); }
 .bdg .jauge-fill { height: 100%; border-radius: 999px; transition: width .55s cubic-bezier(.22,1,.36,1); }
 
 /* ─── Blocs et statistiques ─────────────────────────────────────────── */
-.bdg .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: calc(var(--pas) * 2); }
-/* Une enveloppe projet est un objet à part entière : elle reprend la surface
-   des cartes, en plus discret. */
-.bdg .projet {
-  background: var(--surface-douce); border: 1px solid var(--bord);
-  border-radius: var(--arrondi); padding: calc(var(--pas) * 2);
+.bdg .grille {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: calc(var(--pas) * 2); margin-bottom: calc(var(--pas) * 2.5);
 }
+.bdg .grille > .carte { margin-bottom: 0; }
+/* Une enveloppe projet est un objet à part entière : une carte, complète. */
+.bdg .carte.projet { padding: calc(var(--pas) * 2.25); }
+.bdg .enveloppe-pied {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 12px; margin-top: 10px; flex-wrap: wrap;
+}
+
+/* Un support d'épargne : son nom et sa valeur, puis ses réglages alignés. */
+.bdg .support { border-bottom: 1px solid var(--bord-fin); }
+.bdg .support:last-child { border-bottom: none; }
+.bdg .support-tete { display: flex; align-items: flex-start; gap: 12px; }
+.bdg .support-valeur { margin-left: auto; font-size: 18px; font-weight: 680; letter-spacing: -0.02em; white-space: nowrap; }
+.bdg .grille-champs {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: calc(var(--pas) * 1.5); margin-top: calc(var(--pas) * 2);
+}
+
 .bdg .duo { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--pas) * 3); }
+.bdg .duo.serre { gap: calc(var(--pas) * 2); }
+/* Deux cartes côte à côte : l'espacement vient de la grille, pas des cartes. */
+.bdg .duo:has(> .carte) { gap: calc(var(--pas) * 2.5); margin-bottom: calc(var(--pas) * 2.5); }
+.bdg .duo > .carte { margin-bottom: 0; }
 
 .bdg .stat-lib { font-size: 12.5px; color: var(--texte-tres-doux); }
 .bdg .stat-val {
-  font-size: 26px; font-weight: 660; margin-top: 2px; letter-spacing: -0.03em;
+  font-size: 26px; font-weight: 680; margin-top: 2px; letter-spacing: -0.03em;
 }
 
 /* Les avis sont des aplats teintés : c'est là que la couleur doit arrêter
    le regard. */
 .bdg .avis {
-  font-size: 13px; padding: 9px 12px; border-radius: var(--arrondi-petit);
+  font-size: 13px; padding: 10px 13px; border-radius: var(--arrondi-petit);
   margin-top: calc(var(--pas) * 1.5); line-height: 1.45;
 }
 .bdg .avis.ok { background: var(--ok-fond); color: var(--ok-texte); }
 .bdg .avis.alerte { background: var(--attention-fond); color: var(--attention-texte); }
-
-.bdg .vide {
-  padding: calc(var(--pas) * 4) calc(var(--pas) * 2.5); text-align: center;
-  color: var(--texte-tres-doux); font-size: 14px;
+.bdg .avis.bandeau {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 calc(var(--pas) * 2);
 }
+.bdg .avis.bandeau > span { flex: 1 1 200px; }
+
+/* ─── Simulateur ────────────────────────────────────────────────────────
+   La saisie à gauche, les résultats à droite : on fait varier une hypothèse
+   et on voit le chiffre bouger sans faire défiler. */
+.bdg .simulateur {
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px;
+  gap: calc(var(--pas) * 2.5); align-items: start;
+}
+.bdg .sim-saisie { grid-column: 1; grid-row: 1; min-width: 0; }
+.bdg .sim-resultats { grid-column: 2; grid-row: 1; min-width: 0; }
+.bdg .pile-cartes { display: flex; flex-direction: column; }
+/* Collée seulement si l'écran est assez haut pour la montrer en entier. */
+@media (min-height: 880px) {
+  .bdg .sim-resultats { position: sticky; top: calc(var(--hauteur-barre) + 20px); }
+}
+
+/* ─── Réglages ──────────────────────────────────────────────────────── */
+.bdg .reglages {
+  display: grid; grid-template-columns: 250px minmax(0, 1fr);
+  gap: calc(var(--pas) * 3.5); align-items: start;
+}
+.bdg .reglages-nav {
+  position: sticky; top: calc(var(--hauteur-barre) + 24px);
+  display: flex; flex-direction: column; gap: calc(var(--pas) * 2.5);
+}
+.bdg .reglages-groupe { display: flex; flex-direction: column; gap: 2px; }
+.bdg .reglages-lien {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  color: var(--texte-doux); text-decoration: none;
+  border: 1px solid transparent;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.bdg .reglages-lien .icone { margin-top: 2px; }
+.bdg .reglages-lien:hover { background: var(--survol); color: var(--texte); }
+.bdg .reglages-lien[aria-current="page"] {
+  background: var(--surface); color: var(--texte);
+  border-color: var(--bord); box-shadow: var(--ombre);
+}
+.bdg .reglages-lien[aria-current="page"] .icone { color: var(--accent); }
+.bdg .reglages-lien-texte { display: flex; flex-direction: column; min-width: 0; }
+.bdg .reglages-lien-nom { font-size: 14.5px; font-weight: 600; }
+.bdg .reglages-lien-desc { font-size: 12.5px; color: var(--texte-tres-doux); }
+.bdg .reglages-contenu { min-width: 0; }
 
 /* ─── Tableaux ──────────────────────────────────────────────────────── */
 .bdg table.amort { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .bdg table.amort th {
-  text-align: right; font-size: 12.5px; font-weight: 500;
+  text-align: right; font-size: 12.5px; font-weight: 550;
   color: var(--texte-tres-doux);
   padding: 0 10px calc(var(--pas)) 0; border-bottom: 1px solid var(--bord);
 }
@@ -589,31 +1030,138 @@ body { background: var(--fond); color: var(--texte); }
   text-align: right; padding: calc(var(--pas)) 10px; border-bottom: 1px solid var(--bord-fin);
 }
 .bdg table.amort tbody tr:last-child td { border-bottom: none; }
+.bdg table.amort tbody tr:hover td { background: var(--surface-douce); }
+
+/* ─── Écrans de connexion ───────────────────────────────────────────── */
+.bdg.auth-page { min-height: 100vh; }
+.bdg .auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100vh; }
+.bdg .auth-vitrine {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
+  padding: 48px clamp(32px, 5vw, 72px);
+  color: var(--sur-vitrine);
+  background:
+    radial-gradient(80% 60% at 100% 0%, color-mix(in srgb, var(--sur-vitrine) 14%, transparent), transparent 70%),
+    linear-gradient(155deg, var(--vitrine-debut), var(--vitrine-fin));
+}
+.bdg .auth-vitrine .marque-app { color: var(--sur-vitrine); }
+.bdg .auth-vitrine .marque-logo {
+  background: color-mix(in srgb, var(--sur-vitrine) 18%, transparent);
+  color: var(--sur-vitrine); box-shadow: none;
+}
+.bdg .auth-accroche {
+  font-size: clamp(28px, 3vw, 40px); font-weight: 720; letter-spacing: -0.035em;
+  line-height: 1.12; margin: 0 0 32px; max-width: 480px;
+}
+.bdg .auth-atouts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 18px; max-width: 440px; }
+.bdg .auth-atouts li { display: flex; align-items: center; gap: 14px; font-size: 15px; line-height: 1.45; }
+.bdg .auth-atout-icone {
+  width: 38px; height: 38px; border-radius: 11px; flex: none;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--sur-vitrine) 14%, transparent);
+}
+.bdg .auth-bande { display: flex; gap: 5px; height: 10px; max-width: 420px; }
+.bdg .auth-bande span { border-radius: 999px; background: var(--sur-vitrine); }
+.bdg .auth-formulaire {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+.bdg .auth-colonne { width: 100%; max-width: 420px; }
+.bdg .auth-marque { display: flex; justify-content: center; margin-bottom: 22px; }
+.bdg .auth-marque.mobile { display: none; }
+.bdg .auth-lecture { max-width: 760px; margin: 0 auto; padding: 48px 20px 40px; }
 
 /* ─── Adaptations ───────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .bdg .app { display: grid; grid-template-columns: var(--largeur-menu) minmax(0, 1fr); }
+  .bdg .lateral { position: sticky; top: 0; height: 100vh; }
+  .bdg .lateral-fermer, .bdg .voile, .bdg .nav-bas, .bdg .barre-menu { display: none; }
+}
+
+/* Tablette et téléphone : le menu devient un tiroir. */
+@media (max-width: 1023px) {
+  :root { --marge-page: 24px; }
+  .bdg .lateral {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 60;
+    width: min(300px, 86vw);
+    transform: translateX(-102%); visibility: hidden;
+    transition: transform .24s cubic-bezier(.22,1,.36,1), visibility 0s .24s;
+    box-shadow: var(--ombre-haute);
+  }
+  .bdg .lateral[data-ouvert="1"] {
+    transform: none; visibility: visible;
+    transition: transform .24s cubic-bezier(.22,1,.36,1);
+  }
+  .bdg .nav-bas { display: grid; }
+  .bdg .contenu { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+  .bdg .toasts { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  .bdg .tuiles, .bdg .tuiles.trois { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bdg .simulateur { grid-template-columns: minmax(0, 1fr); }
+  .bdg .sim-saisie, .bdg .sim-resultats { grid-column: auto; grid-row: auto; position: static; }
+}
+
+@media (max-width: 860px) {
+  .bdg .reglages { grid-template-columns: minmax(0, 1fr); gap: calc(var(--pas) * 2); }
+  /* Les sections deviennent une rangée de pastilles qu'on fait défiler. */
+  .bdg .reglages-nav {
+    position: static; flex-direction: row; gap: 6px;
+    overflow-x: auto; scrollbar-width: none;
+    margin: 0 calc(-1 * var(--marge-page)); padding: 2px var(--marge-page) 4px;
+  }
+  .bdg .reglages-nav::-webkit-scrollbar { display: none; }
+  .bdg .reglages-groupe { flex-direction: row; gap: 6px; }
+  .bdg .reglages-groupe .nav-titre { display: none; }
+  .bdg .reglages-lien {
+    align-items: center; white-space: nowrap;
+    padding: 8px 14px; border-radius: 999px; border-color: var(--bord);
+    background: var(--surface);
+  }
+  .bdg .reglages-lien .icone { margin-top: 0; }
+  .bdg .reglages-lien-nom { font-size: 14px; }
+  .bdg .reglages-lien-desc { display: none; }
+  .bdg .reglages-lien[aria-current="page"] {
+    background: var(--accent-pale); color: var(--accent); border-color: transparent; box-shadow: none;
+  }
+  .bdg .auth { grid-template-columns: minmax(0, 1fr); }
+  .bdg .auth-vitrine { display: none; }
+  .bdg .auth-marque.mobile { display: flex; }
+  .bdg .auth-formulaire { justify-content: flex-start; padding-top: 56px; }
+}
+
 @media (max-width: 700px) {
-  :root { --marge-page: 14px; }
-  .bdg .barre-inner { height: 56px; }
-  .bdg .compte-nom { display: none; }
-  .bdg .entete-haut { padding: calc(var(--pas) * 2) calc(var(--pas) * 2); }
-  .bdg .bande { padding: 0 calc(var(--pas) * 2); }
-  .bdg .legende { padding: calc(var(--pas) * 1.5) calc(var(--pas) * 1.5) calc(var(--pas) * 2); }
-  .bdg .solde { text-align: right; }
-  .bdg .duo { grid-template-columns: 1fr; gap: calc(var(--pas) * 3); }
+  :root { --marge-page: 16px; --hauteur-barre: 58px; }
+  .bdg .barre { gap: var(--pas); }
+  .bdg .barre-menu, .bdg .pilule-reste, .bdg .compte-nom, .bdg .compte-chevron { display: none; }
+  .bdg .compte-bouton { padding: 3px; }
+  .bdg .mois-titre { min-width: 112px; font-size: 14px; }
+  .bdg .contenu { padding-top: 20px; }
+  .bdg .page-titre { font-size: 23px; }
+  .bdg .page-tete { margin-bottom: calc(var(--pas) * 2); }
+  .bdg .page-actions { width: 100%; }
+  .bdg .page-actions > .btn { flex: 1 1 0; padding: 0 12px; }
+  .bdg .tuiles { gap: 10px; }
+  .bdg .tuiles.trois > :first-child { grid-column: 1 / -1; }
+  .bdg .tuile { padding: 14px; }
+  .bdg .tuile-val { font-size: 20px; margin-top: 8px; }
+  .bdg .carte.resume { padding: 20px 18px 16px; }
+  .bdg .duo { grid-template-columns: minmax(0, 1fr); gap: calc(var(--pas) * 3); }
   .bdg .anneau { justify-content: center; gap: calc(var(--pas) * 2); }
   .bdg .anneau-legende { max-width: none; }
   .bdg .champ { flex: 1 1 140px; }
   .bdg .carte-tete, .bdg .corps, .bdg .ligne { padding-left: calc(var(--pas) * 2); padding-right: calc(var(--pas) * 2); }
-  /* Les onglets débordent volontairement : un dégradé au bord dit qu'il y a
-     une suite, là où une coupe nette laisse croire à une fin. */
-  .bdg .onglets {
-    -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent);
-    mask-image: linear-gradient(90deg, #000 90%, transparent);
-  }
+  .bdg .constat { padding-left: calc(var(--pas) * 2); padding-right: calc(var(--pas) * 2); }
   .bdg .stat-val { font-size: 23px; }
+  .bdg .grille-form { grid-template-columns: minmax(0, 1fr); }
+  /* Au téléphone, la fenêtre monte du bas de l'écran, sous le pouce. */
+  .bdg .dialogue, .bdg .dialogue.large { max-width: 100vw; margin: auto 0 0; }
+  .bdg .dialogue-boite { border-radius: 20px 20px 0 0; border-bottom: none; padding-bottom: env(safe-area-inset-bottom); }
+  .bdg .dialogue-pied > .btn { flex: 1 1 0; }
+  .bdg .toast { width: calc(100vw - 32px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bdg .seg, .bdg .jauge-fill, .bdg .fleche, .bdg .onglet, .bdg .btn { transition: none; }
-  .bdg .seg:hover, .bdg .seg[data-actif="1"] { transform: none; }
+  .bdg *, .bdg *::before, .bdg *::after {
+    animation-duration: 0s !important; transition-duration: 0s !important;
+  }
+  .bdg .seg:hover, .bdg .seg[data-actif="1"], .bdg .tuile.cliquable:hover { transform: none; }
+  .bdg .barre-progression::after { animation: none; left: 0; width: 100%; opacity: .5; }
 }

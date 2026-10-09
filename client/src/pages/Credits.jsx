@@ -1,21 +1,27 @@
-// Onglet Crédits — logique du prototype ; seules les écritures passent par l'API.
+// Crédits — logique du prototype ; seules les écritures passent par l'API.
 import { useState } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
 import Jauge from "../composants/Jauge.jsx";
+import Icone from "../composants/Icone.jsx";
+import EtatVide from "../composants/EtatVide.jsx";
+import Dialogue from "../composants/Dialogue.jsx";
+import EnTetePage from "../composants/EnTetePage.jsx";
 import { euro, euroPrecis, num, libelleMois, decalerMois, teinteMembre } from "../utiles.js";
 import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
   const [ouvert, setOuvert] = useState(null);
+  const [ajout, setAjout] = useState(false);
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
   // Un seul panneau ouvert à la fois : « amortissement » ou « anticipation ».
   const [panneau, setPanneau] = useState(null);
 
+  const valide = f.libelle.trim() && num(f.capital) > 0 && num(f.duree) > 0;
   const ajouter = () => {
-    if (!f.libelle.trim() || num(f.capital) <= 0 || num(f.duree) <= 0) return;
+    if (!valide) return;
     executer(() =>
       api.creerCredit({
         libelle: f.libelle.trim(),
@@ -29,6 +35,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
       })
     );
     setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
+    setAjout(false);
   };
 
   const totalRestant = calc.creditsActifs.reduce((s, c) => s + c.restant, 0);
@@ -44,8 +51,31 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const assuranceVersee = calc.creditsActifs.reduce((s, c) => s + assurancePayee(c.capital, c.taux, c.duree, c.assuranceTaux ?? 0, c.assuranceBase, c.k), 0);
   const capitalEmprunte = etat.credits.reduce((s, c) => s + c.capital, 0);
 
+  const boutonAjout = (
+    <button className="btn" onClick={() => setAjout(true)}>
+      <Icone nom="plus" /> Nouveau crédit
+    </button>
+  );
+
   return (
     <>
+      <EnTetePage
+        titre="Crédits"
+        description="Ce que les emprunts pèsent chaque mois, ce qu'il reste à rembourser, et ce qu'ils coûtent vraiment"
+        actions={boutonAjout}
+      />
+
+      {etat.credits.length === 0 ? (
+        <Carte>
+          <EtatVide
+            icone="credits"
+            titre="Aucun crédit enregistré"
+            texte="Prêt immobilier, auto, travaux : saisissez le capital, le taux et la durée, et l'application calcule mensualités, capital restant dû et intérêts."
+            action={boutonAjout}
+          />
+        </Carte>
+      ) : (
+      <>
       <div className="duo">
         <Carte titre="Mensualités">
           <div className="corps">
@@ -102,7 +132,6 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
       )}
 
       <Carte titre="Crédits en cours">
-        {calc.creditsActifs.length === 0 && <div className="vide">Aucun crédit enregistré.</div>}
         {calc.creditsActifs.map((c) => {
           const restants = Math.max(0, c.duree - c.k);
           const fin = decalerMois(c.debut, c.duree);
@@ -152,7 +181,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                 >
                   {ouvert === c.id && panneau === "amortissement" ? "Masquer" : "Détail"}
                 </button>
-                <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}>×</button>
+                <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}><Icone nom="corbeille" taille={16} /></button>
               </div>
               {ouvert === c.id && panneau === "amortissement" && <Amortissement credit={c} mois={mois} />}
               {ouvert === c.id && panneau === "anticipation" && <Anticipation credit={c} />}
@@ -161,23 +190,34 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         })}
       </Carte>
 
-      <Carte titre="Ajouter un crédit">
-        <div className="corps">
-          <div className="forme">
-            <Champ libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur={170} placeholder="Ex. Prêt auto" onEntree={ajouter} />
-            <Champ libelle="Capital emprunté" valeur={f.capital} onChange={(v) => setF({ ...f, capital: v })} largeur={130} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Taux annuel %" valeur={f.taux} onChange={(v) => setF({ ...f, taux: v })} largeur={110} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Durée (mois)" valeur={f.duree} onChange={(v) => setF({ ...f, duree: v })} largeur={110} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="1re échéance" valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur={130} type="month" />
-            <Champ libelle="Assurance %/an" valeur={f.assuranceTaux} onChange={(v) => setF({ ...f, assuranceTaux: v })} largeur={120} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={130}
-              options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
-            <Champ libelle="Assurance sur" valeur={f.assuranceBase} onChange={(v) => setF({ ...f, assuranceBase: v })} largeur={185}
-              options={[{ v: "initial", l: "Le capital initial" }, { v: "restant", l: "Le capital restant dû" }]} />
-            <button className="btn" onClick={ajouter}>Ajouter</button>
-          </div>
+      </>
+      )}
+
+      <Dialogue
+        ouvert={ajout}
+        onFermer={() => setAjout(false)}
+        titre="Nouveau crédit"
+        note="Mensualité, intérêts et capital restant dû se calculent d'après ces chiffres"
+        pied={
+          <>
+            <button className="btn fant" onClick={() => setAjout(false)}>Annuler</button>
+            <button className="btn" onClick={ajouter} disabled={!valide}>Ajouter le crédit</button>
+          </>
+        }
+      >
+        <div className="grille-form">
+          <Champ classe="plein" libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur="100%" placeholder="Ex. Prêt auto" onEntree={ajouter} />
+          <Champ libelle="Capital emprunté (€)" valeur={f.capital} onChange={(v) => setF({ ...f, capital: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Taux annuel (%)" valeur={f.taux} onChange={(v) => setF({ ...f, taux: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Durée (mois)" valeur={f.duree} onChange={(v) => setF({ ...f, duree: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "numeric" }} />
+          <Champ libelle="1re échéance" valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur="100%" type="month" />
+          <Champ classe="plein" libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur="100%"
+            options={[{ v: "foyer", l: "Le foyer (crédit commun)" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
+          <Champ libelle="Assurance (%/an)" valeur={f.assuranceTaux} onChange={(v) => setF({ ...f, assuranceTaux: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Assurance calculée sur" valeur={f.assuranceBase} onChange={(v) => setF({ ...f, assuranceBase: v })} largeur="100%"
+            options={[{ v: "initial", l: "Le capital initial" }, { v: "restant", l: "Le capital restant dû" }]} />
         </div>
-      </Carte>
+      </Dialogue>
     </>
   );
 }

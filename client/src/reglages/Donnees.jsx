@@ -1,15 +1,13 @@
-// Onglet Foyer — logique du prototype ; seules les écritures passent par l'API.
-// Les deux boutons « Données » recréent l'état voulu via les routes CRUD :
-// il n'existe pas d'endpoint de réinitialisation dédié.
+// Réglages › Données — emporter ses données, repartir de zéro, ou tout effacer.
+// Les deux remises à zéro recréent l'état voulu via les routes CRUD : il
+// n'existe pas d'endpoint de réinitialisation dédié.
 import { useState } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
-import ReglagesBanque from "../composants/ReglagesBanque.jsx";
+import Icone from "../composants/Icone.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
-import Acces from "../composants/Acces.jsx";
-import Sessions from "../composants/Sessions.jsx";
-import { euro, num, moisCle, decalerMois, teinteMembre } from "../utiles.js";
+import { moisCle, decalerMois } from "../utiles.js";
 
 // Supprime transactions, crédits, projets et placements (les membres restent).
 async function toutSupprimer() {
@@ -90,8 +88,8 @@ function BoutonTelecharger() {
 
   return (
     <>
-      <button className="btn fant mini" onClick={telecharger} disabled={occupe}>
-        {occupe ? "Préparation…" : "Télécharger mes données"}
+      <button className="btn fant" onClick={telecharger} disabled={occupe}>
+        <Icone nom="telecharger" /> {occupe ? "Préparation…" : "Télécharger mes données"}
       </button>
       {erreur && <span className="carte-note" style={{ color: "var(--brique)" }}>{erreur}</span>}
     </>
@@ -124,18 +122,16 @@ function SupprimerCompte({ onSupprime }) {
 
   if (!ouvert) {
     return (
-      <button className="btn fant mini" onClick={() => setOuvert(true)}>
-        Supprimer mon compte
+      <button className="btn danger" onClick={() => setOuvert(true)}>
+        <Icone nom="corbeille" /> Supprimer mon compte
       </button>
     );
   }
 
   return (
-    <div style={{ width: "100%", marginTop: 6, padding: 14, border: "1px solid var(--brique)", borderRadius: 6 }}>
-      <div className="ligne-lib" style={{ color: "var(--brique)" }}>Supprimer définitivement ce compte</div>
-      <div className="carte-note" style={{ marginTop: 4 }}>
-        Le foyer entier disparaît : membres, transactions, crédits, projets, épargne. Rien n'est
-        conservé et rien ne pourra être récupéré. Pensez à télécharger vos données avant.
+    <div style={{ width: "100%" }}>
+      <div className="avis alerte" style={{ marginTop: 0 }}>
+        Confirmez avec votre mot de passe. Le foyer entier disparaîtra immédiatement.
       </div>
       {erreur && <div className="avis alerte" role="alert">{erreur}</div>}
       <div className="forme" style={{ marginTop: 12 }}>
@@ -143,10 +139,10 @@ function SupprimerCompte({ onSupprime }) {
           libelle="Votre mot de passe" type="password" valeur={motDePasse} onChange={setMotDePasse}
           largeur={220} onEntree={supprimer} attributs={{ autoComplete: "current-password" }}
         />
-        <button className="btn mini" style={{ background: "var(--brique)" }} onClick={supprimer} disabled={occupe || !motDePasse}>
+        <button className="btn danger plein-fond" onClick={supprimer} disabled={occupe || !motDePasse}>
           {occupe ? "Suppression…" : "Supprimer définitivement"}
         </button>
-        <button className="btn fant mini" onClick={() => { setOuvert(false); setMotDePasse(""); setErreur(null); }}>
+        <button className="btn fant" onClick={() => { setOuvert(false); setMotDePasse(""); setErreur(null); }}>
           Annuler
         </button>
       </div>
@@ -154,10 +150,8 @@ function SupprimerCompte({ onSupprime }) {
   );
 }
 
-export default function Foyer({ etat, calc, executer, modifier, changerRepartition, compte, onDeconnexion, onCompteSupprime, ouvrirPage }) {
+export default function Donnees({ executer, onCompteSupprime, ouvrirPage }) {
   const [occupe, setOccupe] = useState(false);
-
-  const modifierMembre = (id, patch) => modifier("membres", id, patch);
 
   const lancer = (action) => {
     setOccupe(true);
@@ -172,101 +166,60 @@ export default function Foyer({ etat, calc, executer, modifier, changerRepartiti
 
   return (
     <>
-      <Carte titre={etat.membres.length === 1 ? "Le revenu" : `Les ${etat.membres.length} revenus`} note="Salaires nets mensuels du foyer">
-        {etat.membres.map((m) => (
-          <div className="ligne" key={m.id}>
-            {/* La même teinte que dans « Qui paie quoi » et sur les étiquettes. */}
-            <span className="pastille" style={{ background: teinteMembre(etat.membres, m.id) }} />
-            <Champ libelle="Prénom" valeur={m.nom} onChange={(v) => modifierMembre(m.id, { nom: v })} largeur={150} />
-            <Champ libelle="Revenu net /mois" valeur={String(m.revenu)} onChange={(v) => modifierMembre(m.id, { revenu: num(v) })} largeur={130} />
-            <div className="pousse" style={{ textAlign: "right" }}>
-              <div className="stat-lib">Part des revenus</div>
-              <div className="chiffre" style={{ fontWeight: 600 }}>
-                {calc.salaires ? Math.round((m.revenu / calc.salaires) * 100) : 0}%
-              </div>
-            </div>
-          </div>
-        ))}
+      <Carte titre="Emporter vos données" note="Vos données vous appartiennent">
         <div className="corps">
-          <button className="btn fant mini" onClick={() => executer(() => api.creerMembre({ nom: "Nouveau", revenu: 0 }))}>
-            Ajouter une personne
-          </button>
+          <div className="carte-note" style={{ marginBottom: 12 }}>
+            Un fichier JSON lisible, avec l'intégralité du foyer : membres, opérations, crédits, projets,
+            épargne, enveloppes. Tout est enregistré sur le serveur, rien n'est gardé dans le navigateur.
+          </div>
+          <BoutonTelecharger />
         </div>
       </Carte>
 
-      <Carte titre="Partage des charges communes">
+      <Carte titre="Repartir d'un budget neuf" note="Les membres du foyer et les comptes sont conservés">
         <div className="corps">
-          <div className="forme">
-            <Champ libelle="Méthode" valeur={etat.repartition} onChange={changerRepartition} largeur={230}
-              options={[{ v: "prorata", l: "Au prorata des revenus" }, { v: "moitie", l: "Moitié-moitié" }]} />
+          <div className="carte-note" style={{ marginBottom: 12 }}>
+            Le jeu d'exemple est fictif : il sert à découvrir l'application. Ces deux actions remplacent tout
+            le budget, et ne peuvent pas être annulées — contrairement à la suppression d'une ligne.
           </div>
-          <div className="carte-note" style={{ marginTop: 10 }}>
-            {etat.repartition === "prorata"
-              ? "Chacun contribue proportionnellement à ce qu'il gagne. Le reste à vivre est plus équilibré quand les salaires diffèrent."
-              : "Chacun paie la même somme, quel que soit son salaire."}
-          </div>
-        </div>
-      </Carte>
-
-      <Acces membres={etat.membres} />
-
-      <ReglagesBanque />
-
-      <Carte titre="Compte">
-        <div className="corps">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div className="stat-lib">Connecté en tant que</div>
-              <div className="ligne-lib">{compte?.email}</div>
-            </div>
-            <button className="btn fant mini" onClick={onDeconnexion}>Se déconnecter</button>
-          </div>
-        </div>
-        <Sessions />
-        <div className="corps" style={{ borderTop: "1px solid var(--filet-fin)" }}>
-          <div className="carte-note">
-            Vos données vous appartiennent : vous pouvez les emporter, et faire disparaître ce compte
-            quand vous voulez.
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-            <BoutonTelecharger />
-            <SupprimerCompte onSupprime={onCompteSupprime} />
-          </div>
-          <div className="carte-note" style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="lien" style={{ fontSize: 12 }} onClick={() => ouvrirPage("confidentialite")}>
-              Politique de confidentialité
-            </button>
-            <button className="lien" style={{ fontSize: 12 }} onClick={() => ouvrirPage("mentions-legales")}>
-              Mentions légales
-            </button>
-          </div>
-        </div>
-      </Carte>
-
-      <Carte titre="Données">
-        <div className="corps">
-          <div className="carte-note">
-            Tout est enregistré dans la base du foyer, rien n'est gardé dans le navigateur. Le jeu de départ est fictif : remplacez-le par vos chiffres.
-          </div>
-          {/* Ces deux boutons effacent tout le foyer. Ils demandent donc
-              confirmation sur place, et rien ne les rend annulables ensuite —
-              contrairement à la suppression d'une ligne. */}
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Ces deux boutons effacent tout le foyer : ils demandent donc
+              confirmation sur place. */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <BoutonConfirme
-              libelle="Recharger les données d'exemple"
+              libelle="Charger les données d'exemple"
               confirmation="Remplacer tout le budget"
               disabled={occupe}
               onConfirme={() => lancer(recreerDemo)}
             />
             <BoutonConfirme
-              libelle="Repartir de zéro"
-              confirmation="Tout effacer"
+              libelle="Tout effacer"
+              confirmation="Effacer tout le budget"
               disabled={occupe}
               onConfirme={() => lancer(toutSupprimer)}
             />
           </div>
         </div>
       </Carte>
+
+      <section className="carte zone-danger">
+        <div className="carte-tete">
+          <div>
+            <div className="carte-titre">Supprimer le compte</div>
+            <div className="carte-note">
+              Le foyer entier disparaît : membres, opérations, crédits, projets, épargne. Rien n'est
+              conservé et rien ne pourra être récupéré. Pensez à télécharger vos données avant.
+            </div>
+          </div>
+        </div>
+        <div className="corps">
+          <SupprimerCompte onSupprime={onCompteSupprime} />
+        </div>
+      </section>
+
+      <div className="liens-legaux">
+        <button className="lien" onClick={() => ouvrirPage("confidentialite")}>Politique de confidentialité</button>
+        <button className="lien" onClick={() => ouvrirPage("mentions-legales")}>Mentions légales</button>
+      </div>
     </>
   );
 }

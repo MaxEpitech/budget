@@ -1,8 +1,13 @@
-// Onglet Épargne — logique du prototype ; seules les écritures passent par l'API.
+// Épargne — logique du prototype ; seules les écritures passent par l'API.
 import { useState, useMemo } from "react";
 import { api } from "../api.js";
 import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
+import Icone from "../composants/Icone.jsx";
+import Segments from "../composants/Segments.jsx";
+import EtatVide from "../composants/EtatVide.jsx";
+import Dialogue from "../composants/Dialogue.jsx";
+import EnTetePage from "../composants/EnTetePage.jsx";
 import { euro, euroPrecis, num, libelleMois, libelleDate, moisCle, decalerMois, verseCeMois, teinteMembre } from "../utiles.js";
 import { projeterPlafonne, verseAvecPlafond, moisAvantPlafond } from "../finance.js";
 
@@ -12,6 +17,7 @@ const plafondSaisi = (v) => (num(v) > 0 ? num(v) : null);
 export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
   const [horizon, setHorizon] = useState(10);
   const [ouvert, setOuvert] = useState(null);
+  const [ajout, setAjout] = useState(false);
   const [f, setF] = useState({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "", pour: "foyer" });
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
 
@@ -28,6 +34,7 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
       })
     );
     setF({ libelle: "", valeur: "", versement: "", rendement: "", plafond: "", pour: "foyer" });
+    setAjout(false);
   };
 
   const valeurTotale = etat.placements.reduce((s, p) => s + p.valeur, 0);
@@ -47,17 +54,43 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
 
   const final = courbe[courbe.length - 1];
 
+  const boutonAjout = (
+    <button className="btn" onClick={() => setAjout(true)}>
+      <Icone nom="plus" /> Nouveau support
+    </button>
+  );
+
   return (
     <>
+      <EnTetePage
+        titre="Épargne"
+        description={
+          etat.placements.length
+            ? `${euro(valeurTotale)} placés · ${euro(versementTotal)} versés chaque mois`
+            : "Livrets, assurance vie, PEA : ce que vous avez, et ce que ça deviendra"
+        }
+        actions={boutonAjout}
+      />
+
+      {etat.placements.length === 0 ? (
+        <Carte>
+          <EtatVide
+            icone="epargne"
+            titre="Aucun support d'épargne"
+            texte="Ajoutez un livret ou un placement avec sa valeur, votre versement mensuel et son rendement : l'application projette ce qu'il vaudra, plafond compris."
+            action={boutonAjout}
+          />
+        </Carte>
+      ) : (
+      <>
       <Carte
         titre="Projection"
         note={`Épargne du foyer sur ${horizon} ans`}
         action={
-          <div style={{ display: "flex", gap: 4 }}>
-            {[5, 10, 20].map((h) => (
-              <button key={h} className={`btn mini ${horizon === h ? "" : "fant"}`} onClick={() => setHorizon(h)}>{h} ans</button>
-            ))}
-          </div>
+          <Segments
+            libelle="Horizon de la projection" valeur={horizon} onChange={setHorizon}
+            options={[5, 10, 20].map((h) => ({ v: h, l: `${h} ans` }))}
+          />
         }
       >
         <div className="corps">
@@ -78,8 +111,7 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
         </div>
       </Carte>
 
-      <Carte titre="Supports" note={`${euro(valeurTotale)} placés · ${euro(versementTotal)} versés chaque mois`}>
-        {etat.placements.length === 0 && <div className="vide">Aucun support d'épargne enregistré.</div>}
+      <Carte titre="Supports" note="Valeur, versement, rendement et plafond se modifient directement">
         {etat.placements.map((p) => {
           const atteint = p.plafond != null && p.valeur >= p.plafond;
           // Découvrir le plafond une fois dedans est trop tard : les versements
@@ -93,76 +125,89 @@ export default function Epargne({ etat, mois, executer, modifier, supprimer }) {
           // d'action : on ne verse qu'aujourd'hui.
           const aRelancer = manquant && mois === moisCle();
           return (
-            <div key={p.id}>
-            <div className="ligne">
-              <div style={{ minWidth: 140 }}>
-                <div className="ligne-lib">
-                  {p.libelle}{" "}
-                  <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, p.pour) }}>{nomDe(p.pour)}</span>
-                  {atteint && <span className="etiq" style={{ background: "var(--ok-fond)", color: "var(--caisse)" }}>Plafond atteint</span>}
-                </div>
-                <div className="ligne-meta">
-                  {p.rendement}% par an · {euro(projeterPlafonne(p.valeur, p.versement, p.rendement, horizon * 12, p.plafond))} dans {horizon} ans
-                  {p.plafond != null && ` · plafond ${euro(p.plafond)}`}
+            <div key={p.id} className="support">
+              <div className="corps">
+                <div className="support-tete">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="ligne-lib">
+                      {p.libelle}{" "}
+                      <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, p.pour) }}>{nomDe(p.pour)}</span>{" "}
+                      {atteint && <span className="etiq perso" style={{ "--teinte": "var(--caisse)" }}>Plafond atteint</span>}
+                    </div>
+                    <div className="ligne-meta">
+                      {p.rendement} % par an · {euro(projeterPlafonne(p.valeur, p.versement, p.rendement, horizon * 12, p.plafond))} dans {horizon} ans
+                      {p.plafond != null && ` · plafond ${euro(p.plafond)}`}
+                    </div>
+                  </div>
+                  <div className="support-valeur chiffre">{euro(p.valeur)}</div>
+                  <button className="suppr" onClick={() => supprimer("placements", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}><Icone nom="corbeille" taille={16} /></button>
                 </div>
                 {echeance != null && (
-                  <div className={`avis ${echeance <= 12 ? "alerte" : "ok"}`} style={{ marginTop: 6 }}>
+                  <div className={`avis ${echeance <= 12 ? "alerte" : "ok"}`}>
                     Plafond atteint en {libelleMois(decalerMois(moisCle(), echeance)).toLowerCase()}
                     {echeance <= 12 ? " — moins d'un an." : `, dans ${Math.round(echeance / 12)} ans.`}
                   </div>
                 )}
                 {manquant && (
-                  <div className="avis alerte" style={{ marginTop: 6 }}>
+                  <div className="avis alerte">
                     Aucun versement en {libelleMois(mois).toLowerCase()}, alors que le budget en compte{" "}
                     {euro(p.versement)}.
                   </div>
                 )}
+                <div className="grille-champs">
+                  <Champ libelle="Valeur (€)" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur="100%" attributs={{ inputMode: "decimal" }} />
+                  <Champ libelle="Versement /mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur="100%" attributs={{ inputMode: "decimal" }} />
+                  <Champ libelle="Rendement %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur="100%" attributs={{ inputMode: "decimal" }} />
+                  <Champ libelle="Plafond (€)" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur="100%" placeholder="aucun" attributs={{ inputMode: "decimal" }} />
+                  <Champ libelle="Pour qui" valeur={p.pour} onChange={(v) => modifier("placements", p.id, { pour: v })} largeur="100%"
+                    options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 14 }}>
+                  {p.versement > 0 && !atteint && (
+                    <button className={`btn mini ${aRelancer ? "" : "fant"}`}
+                      onClick={() => executer(() => api.mouvementer(p.id, "versement", p.versement))}>
+                      Verser {euro(p.versement)}
+                    </button>
+                  )}
+                  <button className="btn fant mini" onClick={() => setOuvert(ouvert === p.id ? null : p.id)}>
+                    {ouvert === p.id ? "Masquer" : `Mouvements (${p.mouvements?.length ?? 0})`}
+                  </button>
+                </div>
               </div>
-              <div className="pousse forme" style={{ justifyContent: "flex-end" }}>
-                <Champ libelle="Valeur" valeur={String(p.valeur)} onChange={(v) => modifier("placements", p.id, { valeur: num(v) })} largeur={100} />
-                <Champ libelle="/mois" valeur={String(p.versement)} onChange={(v) => modifier("placements", p.id, { versement: num(v) })} largeur={85} />
-                <Champ libelle="Rdt %" valeur={String(p.rendement)} onChange={(v) => modifier("placements", p.id, { rendement: num(v) })} largeur={75} />
-                <Champ libelle="Plafond" valeur={p.plafond == null ? "" : String(p.plafond)} onChange={(v) => modifier("placements", p.id, { plafond: plafondSaisi(v) })} largeur={100} placeholder="aucun" />
-                <Champ libelle="Pour qui" valeur={p.pour} onChange={(v) => modifier("placements", p.id, { pour: v })} largeur={120}
-                  options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
-              </div>
-              <button className="suppr" onClick={() => supprimer("placements", p.id, p.libelle)} aria-label={`Supprimer ${p.libelle}`}>×</button>
-            </div>
 
-            <div className="corps" style={{ paddingTop: 0, display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {p.versement > 0 && !atteint && (
-                <button className={`btn mini ${aRelancer ? "" : "fant"}`}
-                  onClick={() => executer(() => api.mouvementer(p.id, "versement", p.versement))}>
-                  Verser {euro(p.versement)}
-                </button>
+              {ouvert === p.id && (
+                <Mouvements placement={p} membres={etat.membres} executer={executer} />
               )}
-              <button className="btn fant mini" onClick={() => setOuvert(ouvert === p.id ? null : p.id)}>
-                {ouvert === p.id ? "Masquer" : `Mouvements (${p.mouvements?.length ?? 0})`}
-              </button>
-            </div>
-
-            {ouvert === p.id && (
-              <Mouvements placement={p} membres={etat.membres} executer={executer} />
-            )}
             </div>
           );
         })}
       </Carte>
 
-      <Carte titre="Ajouter un support">
-        <div className="corps">
-          <div className="forme">
-            <Champ libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur={170} placeholder="Ex. Assurance vie" onEntree={ajouter} />
-            <Champ libelle="Valeur actuelle" valeur={f.valeur} onChange={(v) => setF({ ...f, valeur: v })} largeur={130} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Versement /mois" valeur={f.versement} onChange={(v) => setF({ ...f, versement: v })} largeur={130} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Rendement %" valeur={f.rendement} onChange={(v) => setF({ ...f, rendement: v })} largeur={110} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Plafond" valeur={f.plafond} onChange={(v) => setF({ ...f, plafond: v })} largeur={110} placeholder="aucun" onEntree={ajouter} />
-            <Champ libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={130}
-              options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
-            <button className="btn" onClick={ajouter}>Ajouter</button>
-          </div>
+      </>
+      )}
+
+      <Dialogue
+        ouvert={ajout}
+        onFermer={() => setAjout(false)}
+        titre="Nouveau support d'épargne"
+        note="Livret, assurance vie, PEA… Le plafond est facultatif"
+        pied={
+          <>
+            <button className="btn fant" onClick={() => setAjout(false)}>Annuler</button>
+            <button className="btn" onClick={ajouter} disabled={!f.libelle.trim()}>Ajouter le support</button>
+          </>
+        }
+      >
+        <div className="grille-form">
+          <Champ classe="plein" libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur="100%" placeholder="Ex. Assurance vie" onEntree={ajouter} />
+          <Champ libelle="Valeur actuelle (€)" valeur={f.valeur} onChange={(v) => setF({ ...f, valeur: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Versement /mois (€)" valeur={f.versement} onChange={(v) => setF({ ...f, versement: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Rendement (%/an)" valeur={f.rendement} onChange={(v) => setF({ ...f, rendement: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Plafond (€)" valeur={f.plafond} onChange={(v) => setF({ ...f, plafond: v })} largeur="100%" placeholder="aucun" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ classe="plein" libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur="100%"
+            options={[{ v: "foyer", l: "Le foyer (épargne commune)" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
         </div>
-      </Carte>
+      </Dialogue>
     </>
   );
 }
@@ -242,7 +287,7 @@ function Mouvements({ placement, membres, executer }) {
             solde {euro(m.valeurApres)}
           </span>
           <button className="suppr" onClick={() => executer(() => api.supprimerMouvement(placement.id, m.id))}
-            aria-label="Supprimer ce mouvement">×</button>
+            aria-label="Supprimer ce mouvement"><Icone nom="corbeille" taille={16} /></button>
         </div>
       ))}
 

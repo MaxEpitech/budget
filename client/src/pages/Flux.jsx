@@ -1,21 +1,21 @@
-// Onglet Flux — logique du prototype ; seules les écritures passent par l'API.
+// Opérations — les revenus et dépenses du mois, réguliers ou ponctuels.
+//
+// L'écran ne montre que les lignes : l'ajout et l'import s'ouvrent à la
+// demande, les enveloppes et la répartition entre membres ont leur propre
+// place (Enveloppes, Vue d'ensemble).
 import { useState } from "react";
-import { api } from "../api.js";
-import Champ from "../composants/Champ.jsx";
 import Carte from "../composants/Carte.jsx";
-import Jauge from "../composants/Jauge.jsx";
-import Budgets from "../composants/Budgets.jsx";
+import Tuile from "../composants/Tuile.jsx";
+import Icone from "../composants/Icone.jsx";
+import Segments from "../composants/Segments.jsx";
+import EtatVide from "../composants/EtatVide.jsx";
+import EnTetePage from "../composants/EnTetePage.jsx";
+import Dialogue from "../composants/Dialogue.jsx";
 import ImportReleve from "../composants/ImportReleve.jsx";
-import { euro, num, libelleMois, CATEGORIES, teinteMembre, couleurBudget } from "../utiles.js";
+import NouvelleOperation, { RYTHMES } from "../composants/NouvelleOperation.jsx";
+import { euro, libelleMois, teinteMembre, couleurBudget } from "../utiles.js";
 
-const RYTHMES = [
-  { cle: "mensuel", nom: "Tous les mois" },
-  { cle: "trimestriel", nom: "Tous les 3 mois" },
-  { cle: "semestriel", nom: "Tous les 6 mois" },
-  { cle: "annuel", nom: "Tous les ans" },
-];
-
-/** « Tous les 3 mois · depuis mars 2026 · jusqu'à juin 2027 » */
+/** « tous les 3 mois · depuis mars 2026 · jusqu'à juin 2027 » */
 function decrireRythme(t) {
   const rythme = RYTHMES.find((r) => r.cle === t.periodicite)?.nom ?? "Tous les mois";
   const morceaux = [rythme.toLowerCase()];
@@ -24,42 +24,27 @@ function decrireRythme(t) {
   return morceaux.join(" · ");
 }
 
-export default function Flux({ etat, calc, mois, executer, supprimer }) {
-  const [f, setF] = useState({
-    libelle: "", montant: "", categorie: "Courses", pour: "foyer", type: "depense",
-    recurrent: true, periodicite: "mensuel", debut: "", fin: "",
-  });
+const FILTRES = [
+  { v: "tout", l: "Tout" },
+  { v: "depense", l: "Dépenses" },
+  { v: "revenu", l: "Revenus" },
+];
 
-  const ajouter = () => {
-    if (!f.libelle.trim() || num(f.montant) <= 0) return;
-    executer(() =>
-      api.creerTransaction({
-        type: f.type,
-        libelle: f.libelle.trim(),
-        montant: num(f.montant),
-        categorie: f.categorie,
-        pour: f.pour,
-        recurrent: f.recurrent,
-        mois: f.recurrent ? null : mois,
-        periodicite: f.periodicite,
-        // Un rythme non mensuel a besoin d'un ancrage ; à défaut, le mois affiché.
-        debut: f.recurrent ? (f.debut || (f.periodicite !== "mensuel" ? mois : null)) : null,
-        fin: f.recurrent ? (f.fin || null) : null,
-      })
-    );
-    setF({ ...f, libelle: "", montant: "" });
-  };
+export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }) {
+  const [ajout, setAjout] = useState(false);
+  const [importer, setImporter] = useState(false);
+  const [filtre, setFiltre] = useState("tout");
 
   const retirer = (t) => supprimer("transactions", t.id, t.libelle);
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
 
   // Une dépense qui pioche dans une enveloppe le montre : la catégorie prend
   // la couleur de l'enveloppe, et son taux de remplissage. Sans cela il fallait
-  // descendre jusqu'aux budgets pour savoir si une ligne posait problème.
+  // aller voir les enveloppes pour savoir si une ligne posait problème.
   const enveloppes = new Map((etat.budgets ?? []).map((b) => [b.categorie, b]));
   const etiquetteCategorie = (t) => {
     const b = t.type === "depense" ? enveloppes.get(t.categorie) : null;
-    if (!b) return t.categorie;
+    if (!b) return <span className="etiq">{t.categorie}</span>;
     const part = b.montant > 0 ? b.consomme / b.montant : 0;
     return (
       <span
@@ -67,114 +52,110 @@ export default function Flux({ etat, calc, mois, executer, supprimer }) {
         style={{ "--teinte": couleurBudget(part) }}
         title={`Enveloppe ${t.categorie} : ${euro(b.consomme)} sur ${euro(b.montant)}`}
       >
-        {t.categorie} {Math.round(part * 100)}%
+        {t.categorie} {Math.round(part * 100)} %
       </span>
     );
   };
 
-  const recurrents = calc.actifs.filter((t) => t.recurrent);
-  const ponctuels = calc.actifs.filter((t) => !t.recurrent);
+  const visibles = calc.actifs.filter((t) => filtre === "tout" || t.type === filtre);
+  const recurrents = visibles.filter((t) => t.recurrent);
+  const ponctuels = visibles.filter((t) => !t.recurrent);
+  const autresRevenus = calc.revenus - calc.salaires;
+  const nbDepenses = calc.actifs.filter((t) => t.type === "depense").length;
+
+  const ligne = (t) => (
+    <div className="ligne" key={t.id}>
+      <span className="ligne-avatar" data-type={t.type} aria-hidden="true">
+        <Icone nom={t.type === "revenu" ? "entree" : "depense"} taille={16} />
+      </span>
+      <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+        <div className="ligne-lib">{t.libelle}</div>
+        <div className="ligne-meta ligne-etiquettes">
+          <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
+          {etiquetteCategorie(t)}
+          {t.recurrent && <span>{decrireRythme(t)}</span>}
+        </div>
+      </div>
+      <div className={`pousse chiffre montant${t.type === "revenu" ? " pos" : ""}`}>
+        {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
+      </div>
+      <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>
+        <Icone nom="corbeille" taille={16} />
+      </button>
+    </div>
+  );
+
+  const boutonAjout = (
+    <button className="btn" onClick={() => setAjout(true)}>
+      <Icone nom="plus" /> Nouvelle opération
+    </button>
+  );
 
   return (
     <>
-      <Carte titre="Ajouter une ligne">
-        <div className="corps">
-          <div className="forme">
-            <Champ libelle="Type" valeur={f.type} onChange={(v) => setF({ ...f, type: v })} largeur={110}
-              options={[{ v: "depense", l: "Dépense" }, { v: "revenu", l: "Revenu" }]} />
-            <Champ libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur={180} placeholder="Ex. Internet" onEntree={ajouter} />
-            <Champ libelle="Montant" valeur={f.montant} onChange={(v) => setF({ ...f, montant: v })} largeur={100} placeholder="0" onEntree={ajouter} />
-            <Champ libelle="Catégorie" valeur={f.categorie} onChange={(v) => setF({ ...f, categorie: v })} largeur={140} options={CATEGORIES} />
-            <Champ libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur={120}
-              options={[{ v: "foyer", l: "Foyer" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
-            <label className="bascule">
-              <input type="checkbox" checked={f.recurrent} onChange={(e) => setF({ ...f, recurrent: e.target.checked })} />
-              Revient régulièrement
-            </label>
-            {f.recurrent && (
-              <>
-                <Champ libelle="Rythme" valeur={f.periodicite} onChange={(v) => setF({ ...f, periodicite: v })} largeur={130}
-                  options={RYTHMES.map((r) => ({ v: r.cle, l: r.nom }))} />
-                <Champ libelle={f.periodicite === "mensuel" ? "Depuis (facultatif)" : "1er prélèvement"}
-                  valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur={130} type="month" />
-                <Champ libelle="Jusqu'à (facultatif)" valeur={f.fin} onChange={(v) => setF({ ...f, fin: v })} largeur={130} type="month" />
-              </>
-            )}
-            <button className="btn" onClick={ajouter}>Ajouter</button>
+      <EnTetePage
+        titre="Opérations"
+        description={`Revenus et dépenses de ${libelleMois(mois).toLowerCase()}`}
+        actions={
+          <>
+            <button className="btn fant" onClick={() => setImporter(true)}>
+              <Icone nom="importer" /> Importer un relevé
+            </button>
+            {boutonAjout}
+          </>
+        }
+      />
+
+      <div className="tuiles trois">
+        <Tuile
+          libelle="Salaires" icone="foyer" teinte="var(--reste)" valeur={euro(calc.salaires)}
+          note="Réglés dans Réglages › Foyer" onClick={() => naviguer("foyer")}
+        />
+        <Tuile libelle="Autres revenus" icone="entree" teinte="var(--reste)" valeur={euro(autresRevenus)} note="Primes, locations, remboursements…" />
+        <Tuile libelle="Dépenses" icone="depense" teinte="var(--depenses)" valeur={euro(calc.depenses)} note={`${nbDepenses} ligne${nbDepenses > 1 ? "s" : ""} ce mois-ci`} />
+      </div>
+
+      {calc.actifs.length === 0 ? (
+        <Carte>
+          <EtatVide
+            icone="operations"
+            titre="Aucune opération ce mois-ci"
+            texte="Saisissez vos charges fixes une fois pour toutes — loyer, énergie, abonnements — ou importez le relevé de votre banque."
+            action={boutonAjout}
+          />
+        </Carte>
+      ) : (
+        <>
+          <div className="barre-outils">
+            <Segments libelle="Filtrer les opérations" valeur={filtre} onChange={setFiltre} options={FILTRES} />
           </div>
-          {f.recurrent && (
-            <div className="carte-note" style={{ marginTop: 8 }}>
-              Le montant est celui d'une échéance : une assurance annuelle de 240 € pèse 240 € sur
-              le mois où elle est prélevée, pas 20 € tous les mois.
-            </div>
-          )}
-        </div>
-      </Carte>
 
-      <ImportReleve membres={etat.membres} executer={executer} />
+          <Carte
+            titre="Régulières"
+            note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci · saisies une fois, elles reviennent seules`}
+          >
+            {recurrents.length === 0 && <div className="vide">Aucune ligne régulière{filtre !== "tout" ? " de ce type" : ""}.</div>}
+            {recurrents.map(ligne)}
+          </Carte>
 
-      <Carte titre="Lignes régulières" note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci`}>
-        {recurrents.length === 0 && <div className="vide">Aucune ligne récurrente. Les charges fixes se saisissent une fois pour toutes.</div>}
-        {recurrents.map((t) => (
-          <div className="ligne" key={t.id}>
-            <div>
-              <div className="ligne-lib">{t.libelle}</div>
-              <div className="ligne-meta">
-                <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
-                {" · "}{etiquetteCategorie(t)} · {decrireRythme(t)}
-              </div>
-            </div>
-            <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
-              {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
-            </div>
-            <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>×</button>
-          </div>
-        ))}
-      </Carte>
+          <Carte titre="Ponctuelles" note={`Propres à ${libelleMois(mois).toLowerCase()}`}>
+            {ponctuels.length === 0 && <div className="vide">Rien d'exceptionnel ce mois-ci.</div>}
+            {ponctuels.map(ligne)}
+          </Carte>
+        </>
+      )}
 
-      <Carte titre={`Ce mois-ci · ${libelleMois(mois)}`} note="Lignes ponctuelles">
-        {ponctuels.length === 0 && <div className="vide">Rien d'exceptionnel ce mois-ci.</div>}
-        {ponctuels.map((t) => (
-          <div className="ligne" key={t.id}>
-            <div>
-              <div className="ligne-lib">{t.libelle}</div>
-              <div className="ligne-meta">
-                <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
-                {" · "}{etiquetteCategorie(t)}
-              </div>
-            </div>
-            <div className="pousse chiffre montant" style={{ color: t.type === "revenu" ? "var(--caisse)" : undefined }}>
-              {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
-            </div>
-            <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>×</button>
-          </div>
-        ))}
-      </Carte>
+      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} mois={mois} executer={executer} />
 
-      <Budgets budgets={etat.budgets ?? []} executer={executer} />
-
-      <Carte titre="Qui paie quoi" note={etat.repartition === "prorata" ? "Charges communes au prorata des revenus" : "Charges communes partagées à parts égales"}>
-        {calc.parMembre.map((m) => (
-          <div className="corps" key={m.id} style={{ borderBottom: "1px solid var(--filet-fin)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div className="ligne-lib" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="pastille" style={{ background: teinteMembre(etat.membres, m.id) }} />
-                  {m.nom}
-                </div>
-                <div className="ligne-meta">
-                  Revenus {euro(m.revenu + m.bonus)} · quote-part {Math.round(m.part * 100)}% ({euro(m.du)}) · perso {euro(m.perso)}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="stat-lib">Il lui reste</div>
-                <div className="stat-val chiffre" style={{ color: m.reste < 0 ? "var(--brique)" : "var(--caisse)" }}>{euro(m.reste)}</div>
-              </div>
-            </div>
-            <Jauge pct={(m.du + m.perso) / Math.max(1, m.revenu + m.bonus) * 100} couleur={teinteMembre(etat.membres, m.id)} />
-          </div>
-        ))}
-      </Carte>
+      <Dialogue
+        large
+        ouvert={importer}
+        onFermer={() => setImporter(false)}
+        titre="Importer un relevé bancaire"
+        note="Fichier CSV, OFX ou QIF téléchargé depuis votre espace bancaire"
+      >
+        <ImportReleve membres={etat.membres} executer={executer} />
+      </Dialogue>
     </>
   );
 }

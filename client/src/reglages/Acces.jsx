@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
-import Champ from "./Champ.jsx";
-import Carte from "./Carte.jsx";
-import BoutonConfirme from "./BoutonConfirme.jsx";
+import Champ from "../composants/Champ.jsx";
+import Carte from "../composants/Carte.jsx";
+import BoutonConfirme from "../composants/BoutonConfirme.jsx";
+import Icone from "../composants/Icone.jsx";
 
 /**
  * Qui a accès au foyer : les comptes, et les invitations en attente.
@@ -107,7 +108,7 @@ export default function Acces({ membres }) {
           </div>
           {jeSuisProprietaire && (
             <button className="suppr pousse" style={{ opacity: 1 }} disabled={occupe}
-              onClick={() => agir(() => api.revoquerInvitation(i.id))} aria-label={`Révoquer l'invitation de ${i.email}`}>×</button>
+              onClick={() => agir(() => api.revoquerInvitation(i.id))} aria-label={`Révoquer l'invitation de ${i.email}`}><Icone nom="fermer" taille={16} /></button>
           )}
         </div>
       ))}

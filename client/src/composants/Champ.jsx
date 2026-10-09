@@ -2,9 +2,11 @@
 // Le pavé numérique est réservé aux champs de montant ; les champs email et mot
 // de passe doivent garder le clavier ordinaire. `attributs` laisse passer ce
 // dont les formulaires de connexion ont besoin (autocomplete, autofocus…).
+// `classe` s'ajoute au libellé englobant : « plein » lui fait occuper toute la
+// ligne d'une grille de formulaire.
 const CLAVIER_ORDINAIRE = new Set(["text", "email", "password", "month"]);
 
-export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs, disabled }) {
+export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs, disabled, classe }) {
   const commun = {
     className: "saisie",
     style: { width: largeur },
@@ -14,7 +16,7 @@ export default function Champ({ libelle, valeur, onChange, largeur = 120, type =
     disabled,
   };
   return (
-    <label className="champ">
+    <label className={classe ? `champ ${classe}` : "champ"}>
       <span className="champ-lib">{libelle}</span>
       {options ? (
         <select {...commun}>

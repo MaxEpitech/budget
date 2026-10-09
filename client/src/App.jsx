@@ -1,9 +1,9 @@
 // Aiguillage de l'application : écrans d'authentification tant qu'aucun compte
 // n'est connecté, budget ensuite.
 //
-// Pas de routeur : deux chemins seulement viennent de l'extérieur, ceux des
-// liens envoyés par email. Ils sont lus une fois au chargement, puis l'URL est
+// Les liens envoyés par email sont lus une fois au chargement, puis l'URL est
 // nettoyée — un jeton n'a rien à faire dans la barre d'adresse une fois consommé.
+// Une fois connecté, chaque écran du budget a son adresse (navigation.js).
 import { useState, useEffect, useCallback } from "react";
 import { api } from "./api.js";
 import Budget from "./Budget.jsx";
@@ -16,6 +16,7 @@ import MotDePasseOublie from "./ecrans/MotDePasseOublie.jsx";
 import NouveauMotDePasse from "./ecrans/NouveauMotDePasse.jsx";
 import Invitation from "./ecrans/Invitation.jsx";
 import { Confidentialite, MentionsLegales } from "./ecrans/PagesLegales.jsx";
+import { estCheminApp } from "./navigation.js";
 import "./styles.css";
 
 // Pages atteignables directement par leur adresse : les liens reçus par email,
@@ -55,7 +56,9 @@ export default function App() {
   }, []);
 
   const connecter = useCallback((profil) => {
-    nettoyerUrl();
+    // Arrivé par l'adresse d'un écran du budget, on y va une fois connecté ;
+    // tout le reste — un lien email, une page légale — ramène à l'accueil.
+    if (!estCheminApp(window.location.pathname) || window.location.search) nettoyerUrl();
     // Indispensable : les écrans venant d'un lien email sont rendus avant même
     // qu'on regarde le compte. Sans quitter cet écran, la session s'ouvrirait
     // sans que l'affichage bouge.
@@ -74,6 +77,9 @@ export default function App() {
     } catch {
       // Session déjà close côté serveur : le résultat voulu est atteint.
     }
+    // La personne suivante qui se connecte sur ce poste n'a pas à retomber
+    // sur l'écran où celle-ci s'était arrêtée.
+    nettoyerUrl();
     setCompte(null);
     setEcran({ nom: "connexion" });
   };

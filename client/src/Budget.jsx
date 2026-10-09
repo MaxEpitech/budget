@@ -1,28 +1,25 @@
 // Application budget du foyer — structure et calculs du prototype,
 // données servies par l'API (/api/etat) au lieu du stockage navigateur.
+//
+// Ce composant tient l'état du mois et les écritures ; l'affichage est
+// délégué au cadre (Coquille) et à l'écran courant, choisi par l'adresse.
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
 import { mensualite, capitalRestant, cotisationAssurance, repartirParMembre } from "./finance.js";
-import { euro, moisCle, decalerMois, ecartMois, libelleMois, POSTES } from "./utiles.js";
-import Flux from "./onglets/Flux.jsx";
-import Historique from "./onglets/Historique.jsx";
-import Credits from "./onglets/Credits.jsx";
-import Emprunt from "./onglets/Emprunt.jsx";
+import { moisCle, ecartMois } from "./utiles.js";
+import { useNavigation } from "./navigation.js";
+import Coquille from "./composants/Coquille.jsx";
+import Icone from "./composants/Icone.jsx";
+import Accueil from "./pages/Accueil.jsx";
+import Flux from "./pages/Flux.jsx";
+import Enveloppes from "./pages/Enveloppes.jsx";
+import Historique from "./pages/Historique.jsx";
+import Credits from "./pages/Credits.jsx";
+import Emprunt from "./pages/Emprunt.jsx";
 import { retourDeBanque } from "./composants/SourceRevenus.jsx";
-import Projets from "./onglets/Projets.jsx";
-import Epargne from "./onglets/Epargne.jsx";
-import Foyer from "./onglets/Foyer.jsx";
-import MenuCompte from "./composants/MenuCompte.jsx";
-
-const ONGLETS = [
-  { id: "flux", nom: "Flux" },
-  { id: "historique", nom: "Historique" },
-  { id: "credits", nom: "Crédits" },
-  { id: "emprunt", nom: "Emprunt" },
-  { id: "projets", nom: "Projets" },
-  { id: "epargne", nom: "Épargne" },
-  { id: "foyer", nom: "Foyer" },
-];
+import Projets from "./pages/Projets.jsx";
+import Epargne from "./pages/Epargne.jsx";
+import Reglages from "./reglages/Reglages.jsx";
 
 // Route API de modification pour chaque ressource éditable au clavier.
 const MODIFICATEURS = {
@@ -31,12 +28,12 @@ const MODIFICATEURS = {
   membres: api.modifierMembre,
 };
 
-// Route API de suppression, et nom affiché dans le bandeau d'annulation.
+// Route API de suppression, et ce qu'en dit le bandeau d'annulation.
 const SUPPRESSIONS = {
-  transactions: { appeler: api.supprimerTransaction, nom: "La ligne" },
-  credits: { appeler: api.supprimerCredit, nom: "Le crédit" },
-  projets: { appeler: api.supprimerProjet, nom: "Le projet" },
-  placements: { appeler: api.supprimerPlacement, nom: "Le support" },
+  transactions: { appeler: api.supprimerTransaction, nom: "La ligne", accord: "supprimée" },
+  credits: { appeler: api.supprimerCredit, nom: "Le crédit", accord: "supprimé" },
+  projets: { appeler: api.supprimerProjet, nom: "Le projet", accord: "supprimé" },
+  placements: { appeler: api.supprimerPlacement, nom: "Le support", accord: "supprimé" },
 };
 
 // Temps laissé pour se raviser avant que la suppression ne parte vraiment.
@@ -45,10 +42,9 @@ const DELAI_ANNULATION = 6000;
 export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrirPage }) {
   const [etat, setEtat] = useState(null);
   const [mois, setMois] = useState(moisCle());
-  // Au retour de la banque, on rouvre l'onglet d'où l'on était parti : c'est
-  // lui qui confirme la liaison.
-  const [onglet, setOnglet] = useState(() => (retourDeBanque() ? "emprunt" : "flux"));
-  const [posteActif, setPosteActif] = useState(null);
+  // Au retour de la banque, on rouvre le simulateur d'où l'on était parti :
+  // c'est lui qui confirme la liaison.
+  const [route, naviguer] = useNavigation(retourDeBanque() ? "emprunt" : undefined);
   const [erreur, setErreur] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(false);
   const [annulable, setAnnulable] = useState(null); // suppression rétractable en cours
@@ -276,128 +272,74 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
     return { actifs, revenus, salaires, depenses, credits, creditsActifs, projets, placements, reste, parts, parMembre };
   }, [etat, mois]);
 
+  // Les écrans du budget ont tous besoin de l'état du mois ; tant qu'il n'est
+  // pas là, le cadre s'affiche déjà, avec de quoi patienter ou réessayer.
+  let ecranCourant;
   if (!etat || !calc) {
-    return (
-      <div className="bdg">
-        <div className="vide" style={{ paddingTop: 60 }}>
-          {erreur ? (
-            <>
-              <p>Impossible de charger le budget : {erreur}</p>
-              <button className="btn" onClick={() => charger(mois)}>Réessayer</button>
-            </>
-          ) : (
-            "Chargement du budget…"
-          )}
-        </div>
+    ecranCourant = (
+      <div className="etat-vide" style={{ paddingTop: 80 }}>
+        {erreur ? (
+          <>
+            <span className="etat-vide-icone"><Icone nom="alerte" taille={22} /></span>
+            <div className="etat-vide-titre">Impossible de charger le budget</div>
+            <p className="etat-vide-texte">{erreur}</p>
+            <button className="btn" style={{ marginTop: 14 }} onClick={() => charger(mois)}>Réessayer</button>
+          </>
+        ) : (
+          <div className="chargement" role="status">Chargement du budget…</div>
+        )}
       </div>
     );
+  } else if (route.reglages) {
+    ecranCourant = (
+      <Reglages
+        section={route.id} naviguer={naviguer} etat={etat} calc={calc} executer={executer} modifier={modifier}
+        changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage}
+        onCompteSupprime={onSessionExpiree} ouvrirPage={ouvrirPage}
+      />
+    );
+  } else {
+    const communs = { etat, calc, mois, executer, supprimer, modifier, naviguer };
+    ecranCourant = {
+      accueil: () => <Accueil {...communs} />,
+      operations: () => <Flux {...communs} />,
+      enveloppes: () => <Enveloppes budgets={etat.budgets ?? []} executer={executer} />,
+      historique: () => <Historique mois={mois} />,
+      credits: () => <Credits {...communs} />,
+      projets: () => <Projets {...communs} />,
+      epargne: () => <Epargne {...communs} />,
+      emprunt: () => <Emprunt etat={etat} calc={calc} compte={compte} signaler={signaler} />,
+    }[route.id]();
   }
 
-  const allerVers = (poste) => {
-    setPosteActif(poste);
-    const cible = { depenses: "flux", credits: "credits", projets: "projets", placements: "epargne", reste: "flux" }[poste];
-    setOnglet(cible);
-  };
-
   return (
-    <div className="bdg" style={{ opacity: rafraichissement ? 0.6 : 1, transition: "opacity .15s" }}>
-      {/* ── Barre d'application : la marque, et le compte à portée de clic ── */}
-      <div className="barre">
-        <div className="barre-inner">
-          <div className="marque-app">
-            <span className="marque-logo" aria-hidden="true">€</span>
-            Budget du foyer
-          </div>
-          <MenuCompte
-            compte={compte}
-            onReglages={() => setOnglet("foyer")}
-            onDeconnexion={deconnexionApresVidage}
-            ouvrirPage={ouvrirPage}
-          />
-        </div>
-      </div>
-
-      {/* ── En-tête du mois + bande ── */}
-      <header className="entete">
-        <div className="entete-haut">
-          <div className="mois-nav">
-            <button className="fleche" onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">‹</button>
-            <span className="mois-titre chiffre">{libelleMois(mois)}</span>
-            <button className="fleche" onClick={() => setMois(decalerMois(mois, 1))} aria-label="Mois suivant">›</button>
-          </div>
-          <div className="solde">
-            <div className="solde-lib">Reste à vivre</div>
-            <div className={`solde-val chiffre ${calc.reste < 0 ? "neg" : ""}`}>{euro(calc.reste)}</div>
-          </div>
-        </div>
-
-        <div className="bande" role="img" aria-label="Répartition des revenus du mois">
-          {Object.entries(POSTES).map(([cle, poste]) => {
-            const p = calc.parts[cle];
-            if (p.pct <= 0) return null;
-            return (
-              <button
-                key={cle}
-                className="seg"
-                data-actif={posteActif === cle ? "1" : "0"}
-                style={{ width: `${p.pct}%`, background: `var(${poste.var})` }}
-                onClick={() => allerVers(cle)}
-                aria-label={`${poste.nom} : ${euro(p.montant)}`}
-              >
-                {p.pct > 9 && <span className="seg-pct">{Math.round(p.pct)}%</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="legende">
-          {Object.entries(POSTES).map(([cle, poste]) => (
-            <button
-              key={cle}
-              className="puce"
-              data-actif={posteActif === cle ? "1" : "0"}
-              onClick={() => allerVers(cle)}
-            >
-              <span className="pastille" style={{ background: `var(${poste.var})` }} />
-              <span className="puce-lib">{poste.nom}</span>
-              <span className="puce-val chiffre">{euro(calc.parts[cle].montant)}</span>
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <nav className="onglets">
-        {ONGLETS.map((o) => (
-          <button key={o.id} className="onglet" data-actif={onglet === o.id ? "1" : "0"} onClick={() => setOnglet(o.id)}>
-            {o.nom}
-          </button>
-        ))}
-      </nav>
-
-      <div className="zone">
-        {erreur && (
-          <div className="avis alerte" role="alert" style={{ marginTop: 0, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div className="bdg">
+      <Coquille
+        route={route} naviguer={naviguer} compte={compte} mois={mois} setMois={setMois}
+        reste={calc?.reste} occupe={rafraichissement && Boolean(etat)}
+        onDeconnexion={deconnexionApresVidage} ouvrirPage={ouvrirPage}
+      >
+        {erreur && etat && (
+          <div className="avis alerte bandeau" role="alert">
+            <Icone nom="alerte" />
             <span>{erreur}</span>
             <button className="btn fant mini" onClick={() => charger(mois)}>Réessayer</button>
           </div>
         )}
+        {ecranCourant}
+      </Coquille>
+
+      {/* La zone d'annonce existe en permanence : un lecteur d'écran ne lit
+          que les changements d'une région qu'il connaissait déjà. */}
+      <div className="toasts" role="status" aria-live="polite">
         {annulable && (
-          <div
-            className="avis"
-            role="status"
-            style={{ marginTop: 0, marginBottom: 14, background: "var(--filet-fin)", color: "var(--ardoise)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
-          >
-            <span>{SUPPRESSIONS[annulable.type].nom} « {annulable.libelle} » a été supprimé.</span>
-            <button className="btn fant mini" onClick={annulerSuppression}>Annuler</button>
+          <div className="toast">
+            <span>
+              {SUPPRESSIONS[annulable.type].nom} « {annulable.libelle} » a été {SUPPRESSIONS[annulable.type].accord}.
+            </span>
+            <button className="toast-action" onClick={annulerSuppression}>Annuler</button>
           </div>
         )}
-        {onglet === "flux" && <Flux etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
-        {onglet === "historique" && <Historique mois={mois} />}
-        {onglet === "credits" && <Credits etat={etat} calc={calc} mois={mois} executer={executer} supprimer={supprimer} />}
-        {onglet === "emprunt" && <Emprunt etat={etat} calc={calc} compte={compte} signaler={signaler} />}
-        {onglet === "projets" && <Projets etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
-        {onglet === "epargne" && <Epargne etat={etat} mois={mois} executer={executer} modifier={modifier} supprimer={supprimer} />}
-        {onglet === "foyer" && <Foyer etat={etat} calc={calc} executer={executer} modifier={modifier} changerRepartition={changerRepartition} compte={compte} onDeconnexion={deconnexionApresVidage} onCompteSupprime={onSessionExpiree} ouvrirPage={ouvrirPage} />}
       </div>
     </div>
   );

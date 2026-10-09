@@ -9,14 +9,15 @@
 // connaît plus que l'existence. Pour le changer, on le ressaisit.
 import { useState, useEffect } from "react";
 import { api } from "../api.js";
-import Champ from "./Champ.jsx";
-import Carte from "./Carte.jsx";
-import BoutonConfirme from "./BoutonConfirme.jsx";
+import Champ from "../composants/Champ.jsx";
+import Carte from "../composants/Carte.jsx";
+import BoutonConfirme from "../composants/BoutonConfirme.jsx";
+import Icone from "../composants/Icone.jsx";
 
 const NOMS = { enablebanking: "Enable Banking", gocardless: "GoCardless" };
 const VIDE = { fournisseur: "enablebanking", appId: "", clePrivee: "", fichier: "", secretId: "", secretKey: "" };
 
-export default function ReglagesBanque() {
+function ReglagesBanque() {
   const [config, setConfig] = useState(null); // null : pas encore connu
   const [f, setF] = useState(VIDE);
   const [edition, setEdition] = useState(false);
@@ -73,7 +74,7 @@ export default function ReglagesBanque() {
           ? { fournisseur: "enablebanking", appId: f.appId.trim(), clePrivee: f.clePrivee.trim() }
           : { fournisseur: "gocardless", secretId: f.secretId.trim(), secretKey: f.secretKey.trim() },
       ),
-      `Identifiants vérifiés auprès de ${NOMS[f.fournisseur]} et enregistrés. La synchronisation se règle dans l'onglet Emprunt.`,
+      `Identifiants vérifiés auprès de ${NOMS[f.fournisseur]} et enregistrés. La synchronisation s'active depuis l'écran Capacité d'emprunt.`,
     );
   };
 
@@ -196,5 +197,35 @@ export default function ReglagesBanque() {
         )}
       </div>
     </Carte>
+  );
+}
+
+/**
+ * Réglages › Banque : le prestataire de synchronisation, et l'autre chemin —
+ * le relevé téléchargé, qui marche avec toutes les banques sans rien régler.
+ * Le rappeler ici évite de croire qu'il faut un prestataire pour commencer.
+ */
+export default function Banque({ naviguer }) {
+  return (
+    <>
+      <ReglagesBanque />
+      <Carte titre="Sans prestataire : le relevé" note="Fonctionne avec toutes les banques, sans aucun réglage">
+        <div className="corps">
+          <div className="carte-note" style={{ marginBottom: 12 }}>
+            Un relevé CSV, OFX ou QIF téléchargé depuis votre espace bancaire fait le même office : ses
+            opérations entrent dans le budget après votre validation, ou servent à estimer revenus et
+            charges dans le simulateur.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn fant" onClick={() => naviguer("operations")}>
+              <Icone nom="importer" /> Importer dans les opérations
+            </button>
+            <button className="btn fant" onClick={() => naviguer("emprunt")}>
+              <Icone nom="capacite" /> Estimer ma capacité d'emprunt
+            </button>
+          </div>
+        </div>
+      </Carte>
+    </>
   );
 }

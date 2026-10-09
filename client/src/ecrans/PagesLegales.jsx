@@ -61,7 +61,7 @@ export function MentionsLegales({ allerVers }) {
       <Section titre="Propriété">
         <p style={paragraphe}>
           Les données saisies dans l'application appartiennent à leur auteur. Elles peuvent être
-          récupérées à tout moment depuis l'onglet Foyer, et supprimées définitivement avec le
+          récupérées à tout moment depuis Réglages › Données, et supprimées définitivement avec le
           compte.
         </p>
       </Section>
@@ -105,8 +105,9 @@ export function Confidentialite({ allerVers }) {
           d'ajouter au flux sont enregistrées, comme des lignes saisies à la main.
         </p>
         <p style={paragraphe}>
-          <strong>Dans votre navigateur</strong> — ce que vous saisissez dans l'onglet Emprunt
-          reste sur votre appareil et n'est pas envoyé au service.
+          <strong>Dans votre navigateur</strong> — ce que vous saisissez dans le simulateur de
+          capacité d'emprunt reste sur votre appareil et n'est pas envoyé au service, tout comme
+          votre choix d'apparence (clair ou sombre).
         </p>
         <p style={paragraphe}>
           <strong>Techniquement</strong> — les sessions ouvertes, et des journaux d'accès contenant
@@ -164,11 +165,11 @@ export function Confidentialite({ allerVers }) {
 
       <Section titre="Vos droits">
         <p style={paragraphe}>
-          <strong>Emporter vos données</strong> — l'onglet Foyer permet de télécharger l'intégralité
+          <strong>Emporter vos données</strong> — Réglages › Données permet de télécharger l'intégralité
           du foyer dans un fichier lisible.
         </p>
         <p style={paragraphe}>
-          <strong>Tout effacer</strong> — le même onglet permet de supprimer le compte. La
+          <strong>Tout effacer</strong> — la même page permet de supprimer le compte. La
           suppression emporte le foyer entier et ne peut pas être annulée.
         </p>
         <p style={paragraphe}>
