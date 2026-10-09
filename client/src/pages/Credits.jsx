@@ -9,12 +9,55 @@ import EtatVide from "../composants/EtatVide.jsx";
 import Dialogue from "../composants/Dialogue.jsx";
 import EnTetePage from "../composants/EnTetePage.jsx";
 import { euro, euroPrecis, num, libelleMois, libelleDate, deMois, decalerMois, ecartMois, moisCle, teinteMembre } from "../utiles.js";
-import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
+import { mensualite, capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
+
+/**
+ * La durée qu'il faut pour rembourser `capital` à `mensualite` par mois : on
+ * connaît souvent la mensualité de son contrat mieux que sa durée exacte.
+ * null si la mensualité ne couvre même pas les intérêts.
+ */
+function dureePourMensualite(capital, tauxAnnuel, mensualiteVoulue) {
+  if (!(capital > 0) || !(mensualiteVoulue > 0)) return null;
+  const r = tauxAnnuel / 100 / 12;
+  if (mensualiteVoulue <= capital * r) return null;
+  const n = r === 0 ? capital / mensualiteVoulue : -Math.log(1 - (r * capital) / mensualiteVoulue) / Math.log(1 + r);
+  // Un contrat arrondit sa mensualité au centime : 257,20 € pour 257,2017 € de
+  // calcul fait 60,0003 échéances, et c'est bien un crédit sur 60 mois.
+  return Math.abs(n - Math.round(n)) < 0.05 ? Math.round(n) : Math.ceil(n);
+}
+
+const VIERGE = (mois) => ({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
-  const [f, setF] = useState({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
+  const [f, setF] = useState(VIERGE(mois));
   const [ouvert, setOuvert] = useState(null);
   const [ajout, setAjout] = useState(false);
+  // Le crédit en cours de modification ; null pour un nouveau crédit.
+  const [edition, setEdition] = useState(null);
+  // La mensualité tapée, tant qu'on la tape : elle fixe alors la durée.
+  const [mensualiteSaisie, setMensualiteSaisie] = useState("");
+
+  const nouveau = () => { setEdition(null); setF(VIERGE(mois)); setMensualiteSaisie(""); setAjout(true); };
+  const modifierCredit = (c) => {
+    setEdition(c.id);
+    setF({
+      libelle: c.libelle, capital: String(c.capital), taux: String(c.taux), duree: String(c.duree), debut: c.debut,
+      assuranceTaux: c.assuranceTaux ? String(c.assuranceTaux) : "", assuranceBase: c.assuranceBase ?? "initial", pour: c.pour ?? "foyer",
+    });
+    setMensualiteSaisie("");
+    setAjout(true);
+  };
+  const fermer = () => { setAjout(false); setEdition(null); };
+
+  // Capital, taux ou durée changent : la mensualité affichée redevient celle du calcul.
+  const majContrat = (champ) => (v) => { setMensualiteSaisie(""); setF({ ...f, [champ]: v }); };
+  const mensualiteCalculee = mensualite(num(f.capital), num(f.taux), Math.round(num(f.duree)));
+  const saisirMensualite = (v) => {
+    setMensualiteSaisie(v);
+    const n = dureePourMensualite(num(f.capital), num(f.taux), num(v));
+    if (n) setF({ ...f, duree: String(n) });
+  };
+  const mensualiteImpossible = mensualiteSaisie !== "" && num(mensualiteSaisie) > 0 && !dureePourMensualite(num(f.capital), num(f.taux), num(mensualiteSaisie));
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
   // Un seul panneau ouvert à la fois : « amortissement », « anticipation » ou « paiements ».
   const [panneau, setPanneau] = useState(null);
@@ -22,8 +65,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const valide = f.libelle.trim() && num(f.capital) > 0 && num(f.duree) > 0;
   const ajouter = () => {
     if (!valide) return;
-    executer(() =>
-      api.creerCredit({
+    const credit = {
         libelle: f.libelle.trim(),
         capital: num(f.capital),
         taux: num(f.taux),
@@ -32,10 +74,10 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         assuranceTaux: num(f.assuranceTaux),
         assuranceBase: f.assuranceBase,
         pour: f.pour,
-      })
-    );
-    setF({ libelle: "", capital: "", taux: "", duree: "", debut: mois, assuranceTaux: "", assuranceBase: "initial", pour: "foyer" });
-    setAjout(false);
+    };
+    executer(() => (edition ? api.modifierCredit(edition, credit) : api.creerCredit(credit)));
+    setF(VIERGE(mois));
+    fermer();
   };
 
   const totalRestant = calc.creditsActifs.reduce((s, c) => s + c.restant, 0);
@@ -52,7 +94,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const capitalEmprunte = etat.credits.reduce((s, c) => s + c.capital, 0);
 
   const boutonAjout = (
-    <button className="btn" onClick={() => setAjout(true)}>
+    <button className="btn" onClick={nouveau}>
       <Icone nom="plus" /> Nouveau crédit
     </button>
   );
@@ -207,6 +249,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                     {ouvert === c.id && panneau === "paiements" ? "Masquer" : `Paiements (${paiements.length})`}
                   </button>
                 )}
+                <button className="suppr" onClick={() => modifierCredit(c)} aria-label={`Modifier ${c.libelle}`}><Icone nom="modifier" taille={16} /></button>
                 <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}><Icone nom="corbeille" taille={16} /></button>
               </div>
               {ouvert === c.id && panneau === "amortissement" && <Amortissement credit={c} mois={mois} />}
@@ -222,21 +265,27 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
 
       <Dialogue
         ouvert={ajout}
-        onFermer={() => setAjout(false)}
-        titre="Nouveau crédit"
-        note="Mensualité, intérêts et capital restant dû se calculent d'après ces chiffres"
+        onFermer={fermer}
+        titre={edition ? "Modifier le crédit" : "Nouveau crédit"}
+        note={edition
+          ? "Les échéances passées, les intérêts et le capital restant dû se recalculent d'après ces chiffres"
+          : "Mensualité, intérêts et capital restant dû se calculent d'après ces chiffres"}
         pied={
           <>
-            <button className="btn fant" onClick={() => setAjout(false)}>Annuler</button>
-            <button className="btn" onClick={ajouter} disabled={!valide}>Ajouter le crédit</button>
+            <button className="btn fant" onClick={fermer}>Annuler</button>
+            <button className="btn" onClick={ajouter} disabled={!valide || mensualiteImpossible}>{edition ? "Enregistrer" : "Ajouter le crédit"}</button>
           </>
         }
       >
         <div className="grille-form">
           <Champ classe="plein" libelle="Libellé" valeur={f.libelle} onChange={(v) => setF({ ...f, libelle: v })} largeur="100%" placeholder="Ex. Prêt auto" onEntree={ajouter} />
-          <Champ libelle="Capital emprunté (€)" valeur={f.capital} onChange={(v) => setF({ ...f, capital: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
-          <Champ libelle="Taux annuel (%)" valeur={f.taux} onChange={(v) => setF({ ...f, taux: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
-          <Champ libelle="Durée (mois)" valeur={f.duree} onChange={(v) => setF({ ...f, duree: v })} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "numeric" }} />
+          <Champ libelle="Capital emprunté (€)" valeur={f.capital} onChange={majContrat("capital")} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Taux annuel (%)" valeur={f.taux} onChange={majContrat("taux")} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
+          <Champ libelle="Durée (mois)" valeur={f.duree} onChange={majContrat("duree")} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "numeric" }} />
+          {/* Les deux se répondent : changer la durée recalcule la mensualité,
+              taper la mensualité du contrat recalcule la durée. */}
+          <Champ libelle="Mensualité hors assurance (€)" valeur={mensualiteSaisie !== "" ? mensualiteSaisie : mensualiteCalculee ? mensualiteCalculee.toFixed(2) : ""}
+            onChange={saisirMensualite} largeur="100%" placeholder="0" onEntree={ajouter} attributs={{ inputMode: "decimal" }} />
           <Champ libelle="1re échéance" valeur={f.debut} onChange={(v) => setF({ ...f, debut: v })} largeur="100%" type="month" />
           <Champ classe="plein" libelle="Pour qui" valeur={f.pour} onChange={(v) => setF({ ...f, pour: v })} largeur="100%"
             options={[{ v: "foyer", l: "Le foyer (crédit commun)" }, ...etat.membres.map((m) => ({ v: m.id, l: m.nom }))]} />
@@ -244,6 +293,14 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
           <Champ libelle="Assurance calculée sur" valeur={f.assuranceBase} onChange={(v) => setF({ ...f, assuranceBase: v })} largeur="100%"
             options={[{ v: "initial", l: "Le capital initial" }, { v: "restant", l: "Le capital restant dû" }]} />
         </div>
+        {mensualiteImpossible ? (
+          <div className="avis alerte">Cette mensualité ne couvre pas les intérêts : le crédit ne serait jamais remboursé.</div>
+        ) : mensualiteSaisie !== "" && mensualiteCalculee > 0 ? (
+          <div className="avis ok">
+            Durée recalculée : {Math.round(num(f.duree))} mois, soit une mensualité exacte de {euroPrecis(mensualiteCalculee)}
+            {Math.abs(mensualiteCalculee - num(mensualiteSaisie)) >= 0.01 && " (la dernière échéance d'un contrat est souvent plus faible)"}.
+          </div>
+        ) : null}
       </Dialogue>
     </>
   );
