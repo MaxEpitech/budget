@@ -38,7 +38,13 @@ async function requete(chemin, methode = "GET", corps, options = {}) {
     erreur.nonAutorise = reponse.status === 401 || reponse.status === 403;
     throw erreur;
   }
-  return reponse.status === 204 ? null : reponse.json();
+  if (reponse.status === 204) return null;
+  try {
+    return await reponse.json();
+  } catch {
+    // Sans quoi l'utilisateur lirait le message anglais du navigateur (« Unexpected token… »).
+    throw new Error("Réponse du serveur illisible. Réessayez dans un instant.");
+  }
 }
 
 export const api = {
@@ -105,7 +111,8 @@ export const api = {
   banqueConfigurer: (identifiants) => requete("/banque/configuration", "PUT", identifiants),
   banqueDeconfigurer: () => requete("/banque/configuration", "DELETE"),
   // Relevé téléchargé depuis la banque : lu et analysé, jamais enregistré tel quel.
-  banqueReleve: (nom, contenu, pour = "foyer") => requete("/banque/releve", "POST", { nom, contenu, pour }),
+  // Un classeur (.xlsx) voyage en base64 (`encodage`), le reste en texte.
+  banqueReleve: (nom, contenu, pour = "foyer", encodage = "texte") => requete("/banque/releve", "POST", { nom, contenu, pour, encodage }),
   banqueStatut: () => requete("/banque/statut"),
   banqueInstitutions: (pays = "FR") => requete(`/banque/institutions?pays=${encodeURIComponent(pays)}`),
   banqueInitier: (institutionId) => requete("/banque/initiate", "POST", { institutionId }),

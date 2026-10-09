@@ -1,13 +1,17 @@
 // Lecture d'un relevé bancaire téléchargé depuis l'espace client d'une banque.
 //
-// Trois formats : OFX (« Money »), QIF (« Quicken ») et CSV. Les deux premiers
-// sont normalisés ; le CSV ne l'est pas du tout — chaque banque a ses colonnes,
-// son séparateur, son écriture des montants — d'où la part de devinette ici.
+// Quatre formats : OFX (« Money »), QIF (« Quicken »), CSV et classeur Excel
+// (.xlsx). Les deux premiers sont normalisés ; le CSV ne l'est pas du tout —
+// chaque banque a ses colonnes, son séparateur, son écriture des montants —
+// d'où la part de devinette ici. Un classeur n'est qu'un tableau de plus : une
+// fois ses cellules lues (classeur.js), ses colonnes se reconnaissent comme
+// celles d'un CSV.
 //
-// Fonctions pures : du texte en entrée, des opérations en sortie, sous la forme
-// commune qu'attend l'analyse (celle des prestataires bancaires). Rien n'est lu
-// ni écrit ailleurs.
+// Fonctions pures : un fichier en entrée, des opérations en sortie, sous la
+// forme commune qu'attend l'analyse (celle des prestataires bancaires). Rien
+// n'est lu ni écrit ailleurs.
 import { normaliser } from "./analyse.js";
+import { lireClasseur, estArchive, ClasseurIllisible } from "./classeur.js";
 
 /** Le relevé est illisible, et pourquoi : le message est fait pour l'écran. */
 export class ErreurReleve extends Error {
@@ -232,8 +236,9 @@ function colonnesParContenu(lignes) {
   return { premiere: 0, date, montant, debit: -1, credit: -1, libelles: libelle === undefined ? [] : [libelle] };
 }
 
-function lireCsv(texte) {
-  const lignes = decouperCsv(texte, devinerSeparateur(texte));
+/** Lit un tableau de cellules en texte, d'où qu'il vienne : CSV ou onglet de classeur. */
+function lireTableau(lignes, format) {
+  if (lignes.length === 0) return { format, operations: [], ignorees: 0, solde: null };
   const colonnes = colonnesParEntetes(lignes) ?? colonnesParContenu(lignes);
   if (!colonnes) {
     throw new ErreurReleve(
@@ -260,7 +265,37 @@ function lireCsv(texte) {
     }
     operations.push(operation(date, montant, colonnes.libelles.map((r) => ligne[r]).filter(Boolean).join(" ")));
   }
-  return { format: "CSV", operations, ignorees, solde: null };
+  return { format, operations, ignorees, solde: null };
+}
+
+const lireCsv = (texte) => lireTableau(decouperCsv(texte, devinerSeparateur(texte)), "CSV");
+
+/* ─── Classeur Excel ───────────────────────────────────────────────────── */
+
+function lireXlsx(octets) {
+  let feuilles;
+  try {
+    feuilles = lireClasseur(octets);
+  } catch (e) {
+    if (e instanceof ClasseurIllisible) throw new ErreurReleve(e.message);
+    throw e;
+  }
+  // Un classeur peut avoir plusieurs onglets — une page de garde, un
+  // récapitulatif : on retient le premier qui ressemble à un relevé.
+  let vide = null;
+  let erreur = null;
+  for (const feuille of feuilles) {
+    try {
+      const lu = lireTableau(feuille.lignes, "XLSX");
+      if (lu.operations.length > 0) return lu;
+      vide ??= lu;
+    } catch (e) {
+      if (!(e instanceof ErreurReleve)) throw e;
+      erreur ??= e;
+    }
+  }
+  if (vide) return vide;
+  throw erreur;
 }
 
 /* ─── Entrée ───────────────────────────────────────────────────────────── */
@@ -269,27 +304,59 @@ function lireCsv(texte) {
 // toute façon besoin que des trois derniers mois.
 const OPERATIONS_MAXIMUM = 20_000;
 
+// Un ancien classeur .xls, ou un .xlsx protégé par mot de passe : tous deux
+// sont des conteneurs OLE, que l'on reconnaît à leurs huit premiers octets.
+const SIGNATURE_OLE = "d0cf11e0a1b11ae1";
+
+// Le texte d'un fichier arrivé en octets : UTF-8 s'il en est, sinon l'encodage
+// historique des banques françaises.
+function decoder(octets) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(octets);
+  } catch {
+    return new TextDecoder("windows-1252").decode(octets);
+  }
+}
+
 /**
  * Lit un relevé, quel qu'en soit le format.
  *
- * @param texte contenu du fichier, déjà décodé
- * @returns {{ format: "OFX" | "QIF" | "CSV", operations: object[], ignorees: number, solde: string | null }}
+ * @param fichier le contenu du fichier : du texte déjà décodé, ou ses octets —
+ *   un classeur, binaire, n'a pas de texte
+ * @returns {{ format: "OFX" | "QIF" | "CSV" | "XLSX", operations: object[], ignorees: number, solde: string | null }}
  * @throws {ErreurReleve} si rien d'exploitable n'en sort
  */
-export function lireReleve(texte) {
-  // Marque d'ordre des octets que certaines banques laissent en tête de fichier.
-  const contenu = String(texte ?? "").replace(/^﻿/, "");
-  if (!contenu.trim()) throw new ErreurReleve("Le fichier est vide.");
-  if (contenu.startsWith("%PDF")) throw new ErreurReleve("Un relevé PDF ne se lit pas : téléchargez-le au format CSV, OFX ou QIF depuis votre espace bancaire.");
-  if (/^PK\u0003\u0004/.test(contenu)) throw new ErreurReleve("Un classeur Excel ne se lit pas : enregistrez-le au format CSV, ou téléchargez le relevé en CSV, OFX ou QIF.");
-
-  const lu = /<OFX>|OFXHEADER/i.test(contenu) ? lireOfx(contenu)
-    : /^!Type:/im.test(contenu) ? lireQif(contenu)
-    : lireCsv(contenu);
+export function lireReleve(fichier) {
+  let lu;
+  if (fichier instanceof Uint8Array) {
+    const octets = Buffer.from(fichier.buffer, fichier.byteOffset, fichier.byteLength);
+    if (octets.length === 0) throw new ErreurReleve("Le fichier est vide.");
+    if (octets.subarray(0, 8).toString("hex") === SIGNATURE_OLE) {
+      throw new ErreurReleve(
+        "Ancien format Excel (.xls), ou classeur protégé par un mot de passe : ouvrez-le dans Excel et enregistrez-le au format .xlsx, sans mot de passe.",
+      );
+    }
+    lu = estArchive(octets) ? lireXlsx(octets) : lireTexte(decoder(octets));
+  } else {
+    lu = lireTexte(fichier);
+  }
 
   if (lu.operations.length === 0) throw new ErreurReleve("Aucune opération lisible dans ce fichier.");
   if (lu.operations.length > OPERATIONS_MAXIMUM) throw new ErreurReleve("Ce fichier contient trop d'opérations : exportez une période plus courte.");
   return lu;
+}
+
+function lireTexte(texte) {
+  // Marque d'ordre des octets que certaines banques laissent en tête de fichier.
+  const contenu = String(texte ?? "").replace(/^\ufeff/, "");
+  if (!contenu.trim()) throw new ErreurReleve("Le fichier est vide.");
+  if (contenu.startsWith("%PDF")) throw new ErreurReleve("Un relevé PDF ne se lit pas : téléchargez-le au format CSV, Excel (.xlsx), OFX ou QIF depuis votre espace bancaire.");
+  // Un classeur décodé comme du texte est perdu : il doit arriver en octets.
+  if (/^PK\u0003\u0004/.test(contenu)) throw new ErreurReleve("Ce classeur Excel n'a pas été transmis tel quel : rechargez la page, puis réessayez.");
+
+  return /<OFX>|OFXHEADER/i.test(contenu) ? lireOfx(contenu)
+    : /^!Type:/im.test(contenu) ? lireQif(contenu)
+    : lireCsv(contenu);
 }
 
 /**

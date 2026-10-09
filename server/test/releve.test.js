@@ -17,6 +17,7 @@ import {
 import { lireReleve, lireMontant, lireDate, decouperCsv, fenetreRecente, ErreurReleve } from "../src/banque/releve.js";
 import { preparerOperations } from "../src/banque/import.js";
 import { devinerCategorie } from "../src/banque/categories.js";
+import { classeurXlsx, archiveZip } from "./aide/classeur.js";
 
 const montants = (lu) => lu.operations.map((o) => o.transactionAmount.amount);
 
@@ -124,6 +125,93 @@ test("QIF : une opération par bloc, close par un accent circonflexe", () => {
   assert.equal(lu.format, "QIF");
   assert.deepEqual(montants(lu), ["2450.00", "-39.99"]);
   assert.equal(lu.operations[0].remittanceInformationUnstructured, "VIR ACME SAS SALAIRE SEPTEMBRE");
+});
+
+/* ─── Classeur Excel ─── */
+
+test("classeur : textes partagés, dates au format prédéfini, montants en nombres, lignes parasites", () => {
+  const lu = lireReleve(classeurXlsx([{
+    nom: "Relevé",
+    lignes: [
+      ["Compte courant n° 000123"],
+      [],
+      ["Date opération", "Libellé", "Montant"],
+      [{ date: "2026-09-28" }, "VIR SEPA SALAIRE SEPTEMBRE", 2450],
+      [{ date: "2026-09-05" }, "PRLV SEPA FOURNISSEUR & CIE <INTERNET>", -39.99],
+      [{ date: "2026-09-02" }, "CB CARREFOUR MARKET", -62.4],
+      [null, "Total", 2347.61],
+    ],
+  }]));
+  assert.equal(lu.format, "XLSX");
+  assert.deepEqual(montants(lu), ["2450.00", "-39.99", "-62.40"]);
+  assert.deepEqual(lu.operations.map((o) => o.bookingDate), ["2026-09-28", "2026-09-05", "2026-09-02"]);
+  assert.equal(lu.operations[1].remittanceInformationUnstructured, "PRLV SEPA FOURNISSEUR & CIE <INTERNET>", "les entités XML sont décodées");
+  assert.equal(lu.ignorees, 1, "la ligne de total, sans date, est écartée");
+});
+
+test("classeur : débit et crédit, format de date personnalisé, textes en ligne, cellules vides omises, balises préfixées", () => {
+  const lu = lireReleve(classeurXlsx([{
+    nom: "Opérations",
+    lignes: [
+      ["Date", "Libellé", "Débit", "Crédit"],
+      [{ date: "2026-09-28" }, { texte: "VIR SALAIRE" }, null, 2450],
+      [{ date: "2026-09-02" }, { texte: "VIR LOYER" }, 900, null],
+      // Une banque qui écrit le débit en négatif : c'est la colonne qui fait le sens.
+      [{ date: "2026-09-01" }, { texte: "CB BOULANGERIE" }, -4.2, null],
+    ],
+  }], { prefixe: "x", formatDate: '[$-40C]d mmmm yyyy;@' }));
+  assert.deepEqual(montants(lu), ["2450.00", "-900.00", "-4.20"]);
+  assert.deepEqual(lu.operations.map((o) => o.bookingDate), ["2026-09-28", "2026-09-02", "2026-09-01"]);
+  assert.equal(lu.operations[0].remittanceInformationUnstructured, "VIR SALAIRE");
+});
+
+test("classeur : le premier onglet qui ressemble à un relevé est retenu, un onglet masqué est ignoré", () => {
+  const lu = lireReleve(classeurXlsx([
+    { nom: "Garde", lignes: [["Relevé de compte"], ["Édité le", { date: "2026-10-01" }]] },
+    { nom: "Brouillon", masquee: true, lignes: [["Date", "Libellé", "Montant"], [{ date: "2026-09-01" }, "NE DOIT PAS ÊTRE LU", -1]] },
+    { nom: "Opérations", lignes: [["Date", "Libellé", "Montant"], [{ date: "2026-09-02" }, "VIR LOYER", -900]] },
+  ]));
+  assert.deepEqual(montants(lu), ["-900.00"]);
+});
+
+test("classeur : calendrier des anciens Mac, et flottants arrondis au centime", () => {
+  const lu = lireReleve(classeurXlsx([{
+    nom: "Feuil1",
+    lignes: [["Date", "Libellé", "Montant"], [{ date: "2026-09-02" }, "REMBOURSEMENT", 0.1 + 0.2], [{ date: "2026-09-03" }, "FRAIS", -12.004]],
+  }], { date1904: true }));
+  assert.deepEqual(lu.operations.map((o) => o.bookingDate), ["2026-09-02", "2026-09-03"]);
+  assert.deepEqual(montants(lu), ["0.30", "-12.00"], "0.30000000000000004 n'est pas un entier immense");
+});
+
+test("un relevé texte arrivé en octets est décodé, Windows-1252 compris", () => {
+  const texte = "Date;Libellé;Montant\r\n02/09/2026;VIR LOYER;-900,00\r\n";
+  const lu = lireReleve(Buffer.from(texte, "latin1"));
+  assert.equal(lu.format, "CSV");
+  assert.deepEqual(montants(lu), ["-900.00"]);
+});
+
+test("un classeur illisible est refusé avec un message qui dit quoi faire", () => {
+  const ole = Buffer.from("d0cf11e0a1b11ae1" + "00".repeat(504), "hex");
+  assert.throws(() => lireReleve(ole), /\.xls\b.*mot de passe/);
+  assert.throws(() => lireReleve(Buffer.alloc(0)), /vide/);
+  assert.throws(() => lireReleve(archiveZip({ "notes.txt": "bonjour" })), /pas un classeur Excel/);
+  assert.throws(
+    () => lireReleve(archiveZip({ mimetype: "application/vnd.oasis.opendocument.spreadsheet", "content.xml": "<office:document-content/>" })),
+    /OpenDocument/,
+  );
+  assert.throws(() => lireReleve(classeurXlsx([{ nom: "A", lignes: [["Date", "Libellé", "Montant"]] }]).subarray(0, 200)), /endommagé/);
+  assert.throws(() => lireReleve(classeurXlsx([{ nom: "A", lignes: [["Bonjour"], ["rien à voir"]] }])), /Colonnes non reconnues/);
+  assert.throws(() => lireReleve(classeurXlsx([{ nom: "A", lignes: [["Date", "Libellé", "Montant"]] }])), /Aucune opération/);
+});
+
+test("un classeur qui se déplie démesurément est refusé sans être déplié", () => {
+  // Quelques dizaines de Ko compressés, plus de 40 Mo une fois dépliés.
+  const bombe = archiveZip({
+    "_rels/.rels": '<Relationships><Relationship Id="r" Type="x/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml": Buffer.alloc(41_000_000, 0x20),
+  });
+  assert.ok(bombe.length < 200_000);
+  assert.throws(() => lireReleve(bombe), /trop volumineux/);
 });
 
 /* ─── Refus ─── */
@@ -312,6 +400,34 @@ testIntegration("les imports d'un foyer ne se voient ni ne s'annulent depuis un 
       const membre = await voisin.prisma.membre.create({ data: { nom: "Voisin", revenuMensuel: 0, foyerId: voisin.foyer.id } });
       assert.equal((await client.appel("/transactions/import", "POST", { pour: membre.id, operations: aImporter(apercu) })).code, 400);
     });
+  });
+});
+
+testIntegration("un classeur Excel donne le même aperçu que le relevé CSV équivalent", async () => {
+  await avecFoyer(async (contexte) => {
+    const client = await clientConnecte(serveur.base, contexte);
+    // RELEVE, ligne pour ligne, tel qu'un tableur l'enregistrerait.
+    const lignes = RELEVE.split("\n").map((ligne, i) => {
+      if (i === 0) return ligne.split(";");
+      const [date, libelle, montant] = ligne.split(";");
+      const [j, m, a] = date.split("/");
+      return [{ date: `${a}-${m}-${j}` }, libelle, Number(montant.replace(/\s/g, "").replace(",", "."))];
+    });
+    const contenu = classeurXlsx([{ nom: "Relevé", lignes }]).toString("base64");
+
+    const csv = await client.appel("/banque/releve", "POST", { nom: "releve.csv", contenu: RELEVE });
+    const xlsx = await client.appel("/banque/releve", "POST", { nom: "releve.xlsx", contenu, encodage: "base64" });
+    assert.equal(xlsx.code, 200);
+    assert.equal(xlsx.corps.format, "XLSX");
+    assert.deepEqual(xlsx.corps.foyer, csv.corps.foyer);
+    assert.deepEqual(xlsx.corps.periode, csv.corps.periode);
+    assert.deepEqual(xlsx.corps.operations, csv.corps.operations, "même empreinte : réimporter l'un après l'autre n'ajoute rien");
+
+    // Un classeur envoyé comme du texte a été abîmé en route : on le dit.
+    const abime = await client.appel("/banque/releve", "POST", { contenu: "PK\u0003\u0004 abîmé" });
+    assert.equal(abime.code, 400);
+    assert.match(abime.corps.erreur, /Excel/);
+    assert.equal((await client.appel("/banque/releve", "POST", { contenu, encodage: "binaire" })).code, 400);
   });
 });
 

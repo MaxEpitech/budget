@@ -2,6 +2,12 @@
 // directement affichables côté UI.
 import { z } from "zod";
 
+// Filet de sécurité : tout contrôle sans message explicite répond lui aussi en
+// français, plutôt qu'avec le message anglais par défaut de Zod.
+z.config(z.locales.fr());
+
+const DATE_ATTENDUE = "date : format AAAA-MM-JJ attendu";
+
 export const MoisSchema = z
   .string("mois : format YYYY-MM attendu")
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "mois : format YYYY-MM attendu");
@@ -27,7 +33,9 @@ export const TransactionSchema = z
     recurrent: z.boolean("recurrent : booléen attendu").default(false),
     mois: MoisSchema.nullish(),
     // Jour réel de l'opération. Facultatif : le premier du mois fait foi à défaut.
-    date: z.iso.datetime({ offset: true }).or(z.iso.date()).nullish(),
+    date: z
+      .union([z.iso.datetime({ offset: true, error: DATE_ATTENDUE }), z.iso.date(DATE_ATTENDUE)], DATE_ATTENDUE)
+      .nullish(),
     // Rythme d'une ligne récurrente, et sa période de validité.
     periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"], "périodicité inconnue").default("mensuel"),
     debut: MoisSchema.nullish(),
@@ -107,13 +115,18 @@ export const BudgetSchema = z.object({
 
 /* ─── Relevé bancaire importé ─── */
 
-// Le contenu du fichier, déjà décodé en texte par le navigateur.
+const RELEVE_TROP_GROS = "Fichier trop volumineux : exportez une période plus courte.";
+
+// Le contenu du fichier : décodé en texte par le navigateur, sauf un classeur
+// (.xlsx), binaire, qui voyage tel quel en base64.
 export const ReleveSchema = z.object({
-  nom: z.string().trim().max(200).optional(),
+  nom: z.string("nom du fichier : texte attendu").trim().max(200, "nom du fichier trop long").optional(),
   // À qui est le compte : "foyer" pour un compte commun, sinon l'id d'un membre.
   pour: chaine("pour").default("foyer"),
-  contenu: z.string("fichier requis").min(1, "Le fichier est vide.").max(3_000_000, "Fichier trop volumineux : exportez une période plus courte."),
-});
+  encodage: z.enum(["texte", "base64"], "encodage : « texte » ou « base64 » attendu").default("texte"),
+  // 3 Mo de fichier dans les deux cas : en base64, ils occupent 4 millions de caractères.
+  contenu: z.string("fichier requis").min(1, "Le fichier est vide.").max(4_000_000, RELEVE_TROP_GROS),
+}).refine((r) => r.encodage === "base64" || r.contenu.length <= 3_000_000, { message: RELEVE_TROP_GROS, path: ["contenu"] });
 
 // Les opérations retenues dans l'aperçu, renvoyées pour entrer dans le flux.
 export const ImportTransactionsSchema = z.object({
@@ -122,7 +135,7 @@ export const ImportTransactionsSchema = z.object({
     .array(
       z.object({
         cle: z.string("clé requise").regex(/^[0-9a-f]{32}$/, "clé d'opération invalide"),
-        date: z.iso.date("date : format AAAA-MM-JJ attendu"),
+        date: z.iso.date(DATE_ATTENDUE),
         type: z.enum(["revenu", "depense"], "type : « revenu » ou « depense » attendu"),
         libelle: chaine("libellé").max(200, "libellé trop long"),
         montant: montantPositif("montant"),
@@ -213,7 +226,7 @@ export const ConnexionSchema = z.object({
   email: EmailSchema,
   // Pas de contrainte de longueur ici : un mot de passe trop court est
   // simplement faux, l'annoncer autrement renseignerait sur la politique.
-  motDePasse: z.string("mot de passe requis").max(200),
+  motDePasse: z.string("mot de passe requis").max(200, "mot de passe : 200 caractères maximum"),
 });
 
 export const EmailSeulSchema = z.object({ email: EmailSchema });
@@ -223,7 +236,7 @@ export const InvitationSchema = z.object({
   // Membre par défaut : on n'accorde pas les pleins pouvoirs sans le vouloir.
   role: RoleValeur.default("membre"),
   // Le membre du budget que la personne incarnera, si on le désigne d'avance.
-  membreId: z.string().nullish(),
+  membreId: z.string("membre : identifiant attendu").nullish(),
 });
 
 export const AccepterInvitationSchema = z.object({
@@ -239,7 +252,7 @@ export const JetonSchema = z.object({
 // Le mot de passe est redemandé avant de supprimer le compte. Aucune contrainte
 // de longueur : un mot de passe trop court est simplement faux.
 export const SuppressionCompteSchema = z.object({
-  motDePasse: z.string("mot de passe requis").max(200),
+  motDePasse: z.string("mot de passe requis").max(200, "mot de passe : 200 caractères maximum"),
 });
 
 export const ReinitialisationSchema = z.object({

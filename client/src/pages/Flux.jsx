@@ -152,7 +152,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         ouvert={importer}
         onFermer={() => setImporter(false)}
         titre="Importer un relevé bancaire"
-        note="Fichier CSV, OFX ou QIF téléchargé depuis votre espace bancaire"
+        note="Fichier CSV, Excel (.xlsx), OFX ou QIF téléchargé depuis votre espace bancaire"
       >
         <ImportReleve membres={etat.membres} executer={executer} />
       </Dialogue>

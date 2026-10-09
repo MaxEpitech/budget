@@ -148,7 +148,7 @@ routeur.get("/statut", (req, res) => res.json(statutDe(req)));
 /* ─── Relevé téléchargé depuis la banque ───────────────────────────────── */
 
 /**
- * Lit un relevé (CSV, OFX ou QIF) et rend deux choses : les revenus et charges
+ * Lit un relevé (CSV, Excel, OFX ou QIF) et rend deux choses : les revenus et charges
  * mensuels qu'on en tire, et ses opérations prêtes à entrer dans le flux.
  *
  * Aucun prestataire, aucun identifiant : c'est la voie qui marche avec toutes
@@ -165,7 +165,8 @@ routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
 
   let lu;
   try {
-    lu = lireReleve(req.donnees.contenu);
+    const { contenu, encodage } = req.donnees;
+    lu = lireReleve(encodage === "base64" ? Buffer.from(contenu, "base64") : contenu);
   } catch (e) {
     if (!(e instanceof ErreurReleve)) throw e;
     return res.status(400).json({ erreur: e.message, motif: "releve-illisible" });

@@ -292,7 +292,7 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
                 options={Object.entries(TITULAIRES).map(([v, l]) => ({ v, l }))}
               />
               <button className="btn fant" onClick={() => champFichier.current?.click()} disabled={occupe}>
-                Choisir un relevé (CSV, OFX, QIF)
+                Choisir un relevé (CSV, Excel, OFX, QIF)
               </button>
             </div>
             {Object.keys(releves).length > 0 && (

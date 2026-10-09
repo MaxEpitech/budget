@@ -148,7 +148,7 @@ export default function ImportReleve({ membres, executer }) {
           <button className="depot" onClick={() => champFichier.current?.click()} disabled={occupe}>
             <span className="etat-vide-icone"><Icone nom="importer" taille={22} /></span>
             <span className="ligne-lib">{occupe ? "Lecture du relevé…" : "Choisir un fichier"}</span>
-            <span className="ligne-meta">CSV, OFX ou QIF — rien n'est ajouté avant votre validation</span>
+            <span className="ligne-meta">CSV, Excel (.xlsx), OFX ou QIF — rien n'est ajouté avant votre validation</span>
           </button>
           <div className="carte-note" style={{ marginTop: 14 }}>
             Les opérations sont d'abord affichées : vous choisissez celles qui entrent dans le flux, et leur

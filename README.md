@@ -118,7 +118,7 @@ identifiants déjà enregistrés ; les foyers les ressaisissent.
 ### Import d'un relevé
 
 Sans prestataire ni identifiants, un relevé téléchargé depuis l'espace bancaire
-(CSV, OFX ou QIF) fait le même office, avec toutes les banques. Il sert à deux
+(CSV, Excel `.xlsx`, OFX ou QIF) fait le même office, avec toutes les banques. Il sert à deux
 endroits :
 
 - **écran Opérations** — ses opérations sont affichées, puis celles que l'on retient
@@ -143,8 +143,18 @@ réimporter un relevé, ou un relevé qui le chevauche, n'ajoute rien en double.
 
 Le CSV n'étant pas normalisé, `server/src/banque/releve.js` devine séparateur,
 colonnes et écriture des montants ; le navigateur décode le fichier en UTF-8 ou,
-à défaut, en Windows-1252. Un relevé PDF ou Excel est refusé avec un message qui
-dit quoi télécharger à la place.
+à défaut, en Windows-1252.
+
+Un classeur `.xlsx`, binaire, part tel quel en base64 (`encodage: "base64"`).
+`server/src/banque/classeur.js` l'ouvre sans dépendance — une archive ZIP de
+XML — et en tire un tableau de cellules, dates comprises, que la reconnaissance
+des colonnes du CSV traite ensuite : il n'y en a qu'une. Le premier onglet
+visible qui ressemble à un relevé est retenu. Le dépliage est borné, pour
+qu'une archive minuscule ne puisse pas se déplier en gigaoctets.
+
+Sont refusés, avec un message qui dit quoi faire : le PDF, l'ancien format
+Excel `.xls` et le classeur protégé par mot de passe (à réenregistrer en
+`.xlsx`), et le classeur OpenDocument `.ods`.
 
 Les routes sont les mêmes quel que soit le prestataire : elles passent par une
 façade commune (`server/src/banque/fournisseurs.js`). `/api/gocardless/*`,

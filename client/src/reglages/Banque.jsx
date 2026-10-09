@@ -212,7 +212,7 @@ export default function Banque({ naviguer }) {
       <Carte titre="Sans prestataire : le relevé" note="Fonctionne avec toutes les banques, sans aucun réglage">
         <div className="corps">
           <div className="carte-note" style={{ marginBottom: 12 }}>
-            Un relevé CSV, OFX ou QIF téléchargé depuis votre espace bancaire fait le même office : ses
+            Un relevé CSV, Excel (.xlsx), OFX ou QIF téléchargé depuis votre espace bancaire fait le même office : ses
             opérations entrent dans le budget après votre validation, ou servent à estimer revenus et
             charges dans le simulateur.
           </div>
