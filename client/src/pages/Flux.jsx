@@ -37,6 +37,8 @@ const jourMois = (iso) => new Date(iso).toLocaleDateString("fr-FR", { day: "nume
 
 export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }) {
   const [ajout, setAjout] = useState(false);
+  // La ligne en cours de modification, s'il y en a une.
+  const [edition, setEdition] = useState(null);
   const [importer, setImporter] = useState(false);
   const [filtre, setFiltre] = useState("tout");
 
@@ -81,7 +83,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         <Icone nom={t.type === "revenu" ? "entree" : "depense"} taille={16} />
       </span>
       <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-        <div className="ligne-lib">{t.libelle}</div>
+        <button className="ligne-lib ligne-ouvrir" onClick={() => setEdition(t)} title="Modifier">{t.libelle}</button>
         <div className="ligne-meta ligne-etiquettes">
           <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, t.pour) }}>{nomDe(t.pour)}</span>
           {etiquetteCategorie(t)}
@@ -91,6 +93,9 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
       <div className={`pousse chiffre montant${t.type === "revenu" ? " pos" : ""}`}>
         {t.type === "revenu" ? "+" : "−"}{euro(t.montant)}
       </div>
+      <button className="suppr" onClick={() => setEdition(t)} aria-label={`Modifier ${t.libelle}`}>
+        <Icone nom="modifier" taille={16} />
+      </button>
       <button className="suppr" onClick={() => retirer(t)} aria-label={`Supprimer ${t.libelle}`}>
         <Icone nom="corbeille" taille={16} />
       </button>
@@ -204,7 +209,11 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         </>
       )}
 
-      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} calc={calc} mois={mois} executer={executer} />
+      <NouvelleOperation
+        ouvert={ajout || Boolean(edition)} operation={edition}
+        onFermer={() => { setAjout(false); setEdition(null); }}
+        etat={etat} calc={calc} mois={mois} executer={executer}
+      />
 
       <Dialogue
         large

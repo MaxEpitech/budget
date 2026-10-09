@@ -68,6 +68,7 @@ export const api = {
 
   transactions: () => requete("/transactions"),
   creerTransaction: (t) => requete("/transactions", "POST", t),
+  modifierTransaction: (id, t) => requete(`/transactions/${id}`, "PUT", t),
   supprimerTransaction: (id, options) => requete(`/transactions/${id}`, "DELETE", undefined, options),
   // Opérations d'un relevé, validées dans l'aperçu ; `lot` permet d'annuler l'import.
   importerTransactions: (pour, operations) => requete("/transactions/import", "POST", { pour, operations }),
