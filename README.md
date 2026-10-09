@@ -33,7 +33,7 @@ Il crée un compte de démonstration : `demo@budget.local` / `budget-demonstrati
 | Commande | Effet |
 |---|---|
 | `npm run dev` | Client et API ensemble ; les ports occupés sont contournés automatiquement |
-| `npm test` | Tests. Les tests d'intégration sont ignorés faute de `DATABASE_URL_TEST` |
+| `npm test` | Tests du serveur, puis vérification des types et tests du client. Les tests d'intégration sont ignorés faute de `DATABASE_URL_TEST` |
 | `npm run sauvegarder` | Export JSON complet de la base dans `sauvegardes/` (ignoré par Git) |
 | `npm run restaurer -- <fichier> [--essai]` | Recharge un export ; `--essai` le rejoue puis annule tout |
 | `npm run rattacher -- mon@adresse.fr` | Rattache un compte à un foyer contenant déjà des données |
@@ -70,6 +70,111 @@ le comportement :
   leur lien s'affichent dans le journal du serveur, ce qui suffit à essayer tout
   le parcours en local. Avec une clé ([resend.com](https://resend.com)), ils sont
   réellement envoyés.
+
+## Capacité d'emprunt et synchronisation bancaire
+
+L'onglet **Emprunt** estime ce que le foyer peut emprunter et acheter. Le calcul
+vit dans `client/src/moteur/moteurFinancier.ts` — des fonctions pures, testées
+sans navigateur — et le hook `useFinanceEngine` n'en est que la mémoïsation :
+chaque frappe met tous les chiffres à jour, sans appel réseau. Trois étapes
+s'enchaînent : le crédit à la consommation tel qu'il sera au mois cible,
+remboursements anticipés compris ; l'endettement vu par la banque (35 % des
+revenus retenus, loyers décotés) ; puis le capital empruntable sur 20 et 25 ans
+et le prix du bien, apport et frais annexes compris.
+
+Ce module est le seul écrit en TypeScript. Vite le lit tel quel ; `tsc` ne sert
+qu'à vérifier les types, au début de `npm test`.
+
+Revenus et charges se saisissent à la main, ou se lisent sur le compte bancaire
+par l'intermédiaire d'un prestataire agréé — facultatif : chacun peut le
+refuser, et un foyer sans prestataire ne voit simplement pas la bascule.
+
+Deux prestataires sont pris en charge, un seul à la fois par foyer :
+
+- **Enable Banking** — ouvert aux particuliers pour leurs propres comptes, en
+  mode « restreint » : seuls les comptes liés à l'application dans son panneau
+  sont lisibles. Le foyer fournit l'identifiant de son application et sa clé
+  privée (fichier `.pem`), qui signe chaque requête ;
+- **GoCardless Bank Account Data** — n'accepte plus de nouvelles inscriptions ;
+  gardé pour qui y a déjà un compte (`Secret ID` et `Secret key`).
+
+Un propriétaire les saisit dans l'onglet Foyer. Ils sont essayés auprès du
+prestataire avant d'être gardés, puis le secret est chiffré en base
+(AES-256-GCM) avec `CLE_CHIFFREMENT`, qui ne vit que sur l'hébergeur : une copie
+de la base ne suffit pas à le relire. Il n'est plus jamais affiché. À défaut
+d'identifiants propres au foyer, ceux de l'installation servent s'il y en a
+(`GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY`).
+
+Pour Enable Banking, l'adresse de retour `<APP_URL>/banque/retour` doit être
+déclarée dans l'application (« redirect URLs ») ; l'écran de réglage l'affiche,
+et prévient si elle manque. `APP_URL` doit donc porter l'adresse publique
+définitive.
+
+Changer ou retirer les identifiants d'un foyer défait les banques reliées par
+ses comptes : une liaison ouverte sous un compte, ou chez un prestataire, est
+inutilisable depuis un autre. Changer `CLE_CHIFFREMENT` rend illisibles les
+identifiants déjà enregistrés ; les foyers les ressaisissent.
+
+### Import d'un relevé
+
+Sans prestataire ni identifiants, un relevé téléchargé depuis l'espace bancaire
+(CSV, OFX ou QIF) fait le même office, avec toutes les banques. Il sert à deux
+endroits :
+
+- **onglet Flux** — ses opérations sont affichées, puis celles que l'on retient
+  entrent dans le flux comme lignes ponctuelles, à leur date, avec une catégorie
+  proposée d'après le libellé. Les salaires sont décochés par défaut : ils sont
+  déjà comptés dans les revenus des membres ;
+- **onglet Emprunt** — il préremplit le revenu et les charges courantes, qui
+  restent modifiables.
+
+Avec des comptes séparés, on indique à qui est le compte du relevé. Dans le
+flux, ses lignes sont attribuées à ce membre — des dépenses personnelles, qui
+pèsent sur son reste et non sur les charges communes — et le titulaire entre
+dans l'empreinte des opérations : le même abonnement prélevé le même jour chez
+deux personnes donne bien deux lignes. Dans l'onglet Emprunt, chaque relevé
+remplit le revenu de son titulaire, et les charges s'additionnent.
+
+`POST /api/banque/releve` lit et analyse le fichier sans rien enregistrer ;
+`POST /api/transactions/import` fait entrer les opérations validées, et
+`DELETE /api/transactions/import/:lot` annule un import. Chaque opération porte
+une empreinte (date, montant, libellé, rang), unique par foyer en base :
+réimporter un relevé, ou un relevé qui le chevauche, n'ajoute rien en double.
+
+Le CSV n'étant pas normalisé, `server/src/banque/releve.js` devine séparateur,
+colonnes et écriture des montants ; le navigateur décode le fichier en UTF-8 ou,
+à défaut, en Windows-1252. Un relevé PDF ou Excel est refusé avec un message qui
+dit quoi télécharger à la place.
+
+Les routes sont les mêmes quel que soit le prestataire : elles passent par une
+façade commune (`server/src/banque/fournisseurs.js`). `/api/gocardless/*`,
+l'ancien chemin, reste servi.
+
+| Route | Rôle |
+|---|---|
+| `GET /api/banque/configuration` | Prestataire et origine des identifiants du foyer (jamais un secret) |
+| `PUT /api/banque/configuration` | Propriétaire : vérifie puis enregistre `{ fournisseur, … }` |
+| `DELETE /api/banque/configuration` | Propriétaire : retire les identifiants et les liaisons du foyer |
+| `GET /api/banque/statut` | Où en est la liaison du compte connecté |
+| `GET /api/banque/institutions` | Banques proposées (`?pays=FR`) |
+| `POST /api/banque/initiate` | Ouvre le consentement, renvoie `{ link }` vers la banque |
+| `GET /api/banque/callback` | Au retour de la banque (`code`, `state`) : confirme et retient le compte principal |
+| `PUT /api/banque` | Bascule synchronisation / saisie manuelle, sans défaire la liaison |
+| `GET /api/banque/financial-data` | Revenus et charges mensuels tirés des 90 derniers jours |
+| `DELETE /api/banque` | Retire le consentement et efface la liaison |
+
+Trois choix à connaître :
+
+- **Aucune route ne prend d'identifiant de compte.** Le compte est celui de la
+  session : il n'y a rien à falsifier pour lire les données d'un autre.
+- **Aucune opération bancaire n'est stockée**, seulement les totaux de la
+  dernière lecture. Ils sont resservis pendant six heures, les banques plafonnant
+  les lectures par jour ; si la banque ne répond pas, ils le sont aussi, marqués
+  `perime`.
+- **L'analyse est volontairement simple** (`server/src/banque/analyse.js`) : est
+  un revenu ce dont le libellé contient « salaire », « virement reçu », « paye »
+  ou « paie » ; est une charge courante ce qui revient chez le même bénéficiaire
+  sur au moins deux mois. Un ordre de grandeur à corriger, pas une comptabilité.
 
 ## Tests
 
@@ -152,6 +257,8 @@ La commande de build applique les migrations avant de construire le client :
 | `APP_URL` | Adresse publique, base des liens envoyés par email. À défaut, l'adresse du déploiement en cours est utilisée |
 | `CONFIRMATION_EMAIL_REQUISE` | `0` ou `1`, voir plus haut |
 | `RESEND_API_KEY` | Seulement si les emails doivent réellement partir |
+| `CLE_CHIFFREMENT` | Pour que les foyers puissent enregistrer leurs identifiants bancaires depuis l'interface. Au moins 32 caractères, à ne jamais changer ensuite |
+| `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY` | Facultatif : identifiants GoCardless communs aux foyers qui n'ont pas saisi les leurs |
 
 **Ne pas définir `PORT` ni `PORT_CLIENT`** : ces variables ne servent qu'au
 lanceur de développement et n'auraient là-bas que des effets parasites.
@@ -170,7 +277,8 @@ lancer depuis sa machine avec le `DATABASE_URL` de production dans `.env`.
 client/src/
   App.jsx            aiguillage : écrans d'authentification ou budget
   Budget.jsx         l'application, en-tête et onglets
-  onglets/           Flux, Crédits, Projets, Épargne, Foyer
+  onglets/           Flux, Crédits, Emprunt, Projets, Épargne, Foyer
+  moteur/            capacité d'emprunt : calcul pur et hook useFinanceEngine (TypeScript)
   ecrans/            connexion, inscription, confirmation, mot de passe oublié
   composants/        Champ, Carte, Jauge
   api.js             seul point de couplage avec le serveur
@@ -182,7 +290,9 @@ api/index.js         point d'entrée en production (fonction Vercel)
 server/src/
   app.js             construction de l'application Express, sans écoute
   index.js           serveur de développement, met app.js à l'écoute d'un port
-  routes/            etat, transactions, credits, projets, placements, membres, foyer, auth
+  routes/            etat, transactions, credits, projets, placements, membres, foyer, auth, banque
+  banque/            clients Enable Banking et GoCardless, leur façade commune, chiffrement,
+                     lecture des relevés importés, analyse des opérations
   auth/              mot de passe (scrypt), jetons, sessions, cadence, garde
   email/             transport et gabarits
   finance.js         formules financières — la référence

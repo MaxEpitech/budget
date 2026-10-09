@@ -105,6 +105,82 @@ export const BudgetSchema = z.object({
   montant: montantPositif("montant"),
 });
 
+/* ─── Relevé bancaire importé ─── */
+
+// Le contenu du fichier, déjà décodé en texte par le navigateur.
+export const ReleveSchema = z.object({
+  nom: z.string().trim().max(200).optional(),
+  // À qui est le compte : "foyer" pour un compte commun, sinon l'id d'un membre.
+  pour: chaine("pour").default("foyer"),
+  contenu: z.string("fichier requis").min(1, "Le fichier est vide.").max(3_000_000, "Fichier trop volumineux : exportez une période plus courte."),
+});
+
+// Les opérations retenues dans l'aperçu, renvoyées pour entrer dans le flux.
+export const ImportTransactionsSchema = z.object({
+  pour: chaine("pour").default("foyer"),
+  operations: z
+    .array(
+      z.object({
+        cle: z.string("clé requise").regex(/^[0-9a-f]{32}$/, "clé d'opération invalide"),
+        date: z.iso.date("date : format AAAA-MM-JJ attendu"),
+        type: z.enum(["revenu", "depense"], "type : « revenu » ou « depense » attendu"),
+        libelle: chaine("libellé").max(200, "libellé trop long"),
+        montant: montantPositif("montant"),
+        categorie: chaine("catégorie").max(60, "catégorie trop longue"),
+      }),
+      "opérations requises",
+    )
+    .min(1, "Aucune opération à importer.")
+    .max(2000, "Trop d'opérations d'un coup : importez une période plus courte."),
+});
+
+/* ─── Agrégation bancaire ─── */
+
+export const InitierAgregationSchema = z.object({
+  // Identifiant de banque tel que le prestataire le donne : « BNP_PARIBAS_BNPAFRPP »
+  // chez GoCardless, « FR:BNP Paribas » chez Enable Banking.
+  institutionId: chaine("banque").max(200, "banque : identifiant trop long"),
+});
+
+// Ce que la banque ajoute à l'adresse de retour (Enable Banking). Tout est
+// facultatif : GoCardless ne renvoie rien d'utile, on l'interroge directement.
+export const RetourBanqueSchema = z.object({
+  code: z.string().max(2000).optional(),
+  state: z.string().max(500).optional(),
+  error: z.string().max(200).optional(),
+});
+
+// Identifiants GoCardless d'un foyer, tels que le portail les délivre.
+const secret = (champ) =>
+  z.string(`${champ} requis`).trim().min(8, `${champ} : valeur trop courte`).max(300, `${champ} : valeur trop longue`);
+
+// Un jeu d'identifiants par prestataire. Sans `fournisseur`, c'est GoCardless :
+// la forme d'origine de cette route reste acceptée.
+export const IdentifiantsAgregationSchema = z.preprocess(
+  (d) => (d && typeof d === "object" && d.fournisseur === undefined ? { ...d, fournisseur: "gocardless" } : d),
+  z.discriminatedUnion(
+    "fournisseur",
+    [
+      z.object({
+        fournisseur: z.literal("gocardless"),
+        secretId: secret("Secret ID"),
+        secretKey: secret("Secret key"),
+      }),
+      z.object({
+        fournisseur: z.literal("enablebanking"),
+        appId: secret("identifiant d'application").max(100, "identifiant d'application : valeur trop longue"),
+        // Fichier .pem entier ; une clé RSA de 4096 bits tient en 3 300 caractères.
+        clePrivee: z.string("clé privée requise").trim().min(100, "clé privée : contenu trop court").max(10000, "clé privée : contenu trop long"),
+      }),
+    ],
+    "prestataire : « gocardless » ou « enablebanking » attendu",
+  ),
+);
+
+export const ActiverAgregationSchema = z.object({
+  active: z.boolean("active : booléen attendu"),
+});
+
 const RoleValeur = z.enum(["proprietaire", "membre"], "rôle : « proprietaire » ou « membre » attendu");
 
 export const RoleSchema = z.object({ role: RoleValeur });

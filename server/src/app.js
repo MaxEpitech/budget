@@ -20,6 +20,7 @@ import projets from "./routes/projets.js";
 import placements from "./routes/placements.js";
 import budgets from "./routes/budgets.js";
 import foyer from "./routes/foyer.js";
+import banque from "./routes/banque.js";
 
 const app = express();
 
@@ -30,6 +31,10 @@ const app = express();
 app.set("trust proxy", 1);
 
 app.use(journaliserRequetes);
+// Un relevé bancaire pèse plus que les 100 ko admis par défaut : ces deux
+// routes, et elles seules, acceptent davantage. Le lecteur général qui suit ne
+// retraite pas un corps déjà lu.
+app.use(["/api/banque/releve", "/api/transactions/import"], express.json({ limit: "4mb" }));
 app.use(express.json());
 app.use(cookieParser());
 // Renseigne l'utilisateur connecté quand un cookie de session valide est
@@ -60,7 +65,7 @@ app.use("/api/auth", auth);
 // cadence bornée. Chacune lit ensuite son foyer via foyerCourant(req), qui
 // refuse de répondre sans session.
 //
-// Le montage passe par une boucle plutôt que par sept lignes répétées : oublier
+// Le montage passe par une boucle plutôt que par autant de lignes répétées : oublier
 // exigerAuth sur une nouvelle route ouvrirait un foyer à tout le monde, et c'est
 // exactement le genre d'omission qu'une liste rend impossible.
 const ROUTES_METIER = [
@@ -73,6 +78,9 @@ const ROUTES_METIER = [
   ["/api/placements", placements],
   ["/api/budgets", budgets],
   ["/api/foyer", foyer],
+  ["/api/banque", banque],
+  // Ancien chemin, du temps où GoCardless était le seul prestataire.
+  ["/api/gocardless", banque],
 ];
 
 for (const [chemin, routeur] of ROUTES_METIER) {
@@ -88,6 +96,9 @@ app.use("/api", (_req, res) => res.status(404).json({ erreur: "Route inconnue" }
 app.use((err, req, res, _next) => {
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ erreur: "Corps JSON invalide" });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ erreur: "Fichier trop volumineux : exportez une période plus courte." });
   }
   journal.erreur("erreur non rattrapée", {
     identifiant: req.identifiant,

@@ -59,6 +59,20 @@ model Foyer {
   projets      Projet[]
   placements   Placement[]
   budgets      Budget[]
+
+  // Identifiants GoCardless du foyer, saisis par son propriétaire. Facultatifs :
+  // sans eux, ce sont ceux de l'installation qui servent, s'il y en a.
+  // L'identifiant n'est pas un secret à lui seul ; la clé, si. Elle est chiffrée
+  // avec CLE_CHIFFREMENT, qui ne vit pas en base : une copie de celle-ci ne
+  // suffit donc pas à la relire.
+  goCardlessSecretId         String?
+  goCardlessSecretKeyChiffre String?
+
+  // Application Enable Banking du foyer, l'autre prestataire possible — un
+  // foyer n'en a qu'un à la fois. L'identifiant d'application est public ; la
+  // clé privée (PEM) qui signe les requêtes est chiffrée, comme ci-dessus.
+  enableBankingAppId            String?
+  enableBankingClePriveeChiffre String?
 }
 
 // Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
@@ -79,6 +93,31 @@ model Utilisateur {
   // Le membre du budget que ce compte incarne, s'il y en a un : un membre peut
   // rester une personne sans identifiants, un enfant par exemple.
   membre         Membre?
+
+  // ─── Agrégation bancaire (GoCardless), facultative ───────────────────────
+  // Portée par le compte et non par le foyer : chacun relie SA banque, et le
+  // consentement donné à la banque est personnel.
+  //
+  // Aucun secret ici : ces identifiants ne donnent accès à rien sans les clés
+  // du serveur. Aucune opération bancaire non plus — seuls les totaux
+  // de la dernière synchronisation sont gardés, pour ne pas réinterroger la
+  // banque à chaque affichage (GoCardless plafonne les appels par jour).
+  agregationActive        Boolean   @default(false)
+  // Demande de consentement en cours ou aboutie.
+  goCardlessRequisitionId String?
+  // Compte bancaire relié ; null tant que le consentement n'a pas abouti.
+  goCardlessAccountId     String?
+  // Les mêmes repères quand le foyer passe par Enable Banking. `Etat` est la
+  // valeur aléatoire d'une demande en cours : le retour de la banque doit la
+  // présenter, ce qui prouve qu'il répond bien à la demande de CE compte.
+  enableBankingEtat       String?
+  enableBankingSessionId  String?
+  enableBankingAccountId  String?
+  // Synthèse de la dernière synchronisation, en JSON (montants en centimes).
+  // Du texte plutôt qu'une colonne Json : un null y reste un null ordinaire, ce
+  // que la restauration d'une sauvegarde rejoue sans cas particulier.
+  agregationSynthese      String?
+  agregationSynchroLe     DateTime?
 
   @@index([foyerId])
 }
@@ -182,12 +221,25 @@ model Transaction {
   date        DateTime?
   creeLe      DateTime        @default(now())
   modifieLe   DateTime        @updatedAt
+  date      DateTime?
+  // Lignes venues d'un relevé bancaire importé. La clé est l'empreinte de
+  // l'opération (date, montant, libellé, rang) : réimporter le même relevé, ou
+  // un relevé qui le chevauche, ne crée pas de doublon. Le lot réunit les
+  // lignes d'un même import, pour pouvoir l'annuler d'un geste.
+  importCle String?
+  importLot String?
+  creeLe    DateTime        @default(now())
+  modifieLe DateTime        @updatedAt
   // null = charge (ou revenu) du foyer ; sinon ligne personnelle d'un membre.
   membre      Membre?         @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId    String?
   foyer       Foyer           @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId     Int
 
+  // L'unicité est portée par la base : deux imports simultanés du même relevé
+  // ne peuvent pas se doubler. Les lignes saisies à la main n'ont pas de clé,
+  // et ne sont donc pas concernées.
+  @@unique([foyerId, importCle])
   @@index([foyerId])
 }
 

@@ -88,6 +88,27 @@ export function Confidentialite({ allerVers }) {
           recettes, les crédits, les projets d'épargne et leurs versements, les supports d'épargne.
         </p>
         <p style={paragraphe}>
+          <strong>Si vous reliez votre banque</strong> — c'est facultatif — vos opérations des 90
+          derniers jours sont lues pour en tirer un revenu et des charges mensuels. Seuls ces
+          totaux, le solde du compte et la date de la lecture sont conservés : aucune opération
+          n'est enregistrée, et vos identifiants bancaires ne passent jamais par ce service.
+          Dissocier la banque, ou supprimer le compte, retire l'accès et efface ces totaux.
+        </p>
+        <p style={paragraphe}>
+          <strong>Si votre foyer enregistre ses identifiants chez un prestataire bancaire</strong>{" "}
+          — le secret est conservé chiffré, avec une clé de chiffrement tenue hors de la base, et n'est plus
+          jamais affiché.
+        </p>
+        <p style={paragraphe}>
+          <strong>Si vous importez un relevé</strong> — le fichier est lu pour en afficher les
+          opérations, puis oublié : il n'est pas conservé. Seules les opérations que vous choisissez
+          d'ajouter au flux sont enregistrées, comme des lignes saisies à la main.
+        </p>
+        <p style={paragraphe}>
+          <strong>Dans votre navigateur</strong> — ce que vous saisissez dans l'onglet Emprunt
+          reste sur votre appareil et n'est pas envoyé au service.
+        </p>
+        <p style={paragraphe}>
           <strong>Techniquement</strong> — les sessions ouvertes, et des journaux d'accès contenant
           la date, la route appelée et le code de réponse. Ni mot de passe, ni jeton, ni cookie n'y
           figurent : ils en sont retirés avant écriture.
@@ -122,13 +143,18 @@ export function Confidentialite({ allerVers }) {
 
       <Section titre="Qui d'autre y a accès">
         <p style={paragraphe}>
-          Personne d'autre que vous ne consulte le contenu de votre budget. Trois prestataires
+          Personne d'autre que vous ne consulte le contenu de votre budget. Des prestataires
           interviennent techniquement :
         </p>
         <ul style={{ margin: "0 0 10px", paddingLeft: 20 }}>
           <li><strong>Vercel</strong> — hébergement de l'application</li>
           <li><strong>Prisma</strong> — hébergement de la base de données</li>
           <li><strong>Resend</strong> — envoi des emails de confirmation et de réinitialisation</li>
+          <li>
+            <strong>Enable Banking</strong> ou <strong>GoCardless</strong>, selon le réglage de
+            votre foyer — lecture de vos comptes auprès de votre banque, uniquement si vous activez
+            la synchronisation bancaire
+          </li>
         </ul>
         <p style={paragraphe}>
           Transferts hors Union européenne :{" "}

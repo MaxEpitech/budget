@@ -156,3 +156,25 @@ export const budgetVersApi = (b) => ({
   categorie: b.categorie,
   montant: enEuros(b.montant),
 });
+
+/* ─── Synthèse bancaire ───
+   Rangée sous la forme qu'attend le moteur de capacité d'emprunt du client :
+   `foyer` se pose tel quel sur les champs correspondants de son entrée. */
+export const syntheseBancaireVersApi = (s, { synchroniseLe, perime = false }) => ({
+  source: "banque",
+  synchroniseLe,
+  // Vrai quand la banque n'a pas pu être réinterrogée : les chiffres servis
+  // sont ceux de la dernière synchronisation réussie.
+  perime,
+  periode: { du: s.du, au: s.au, jours: s.jours },
+  solde: s.solde == null ? null : enEuros(s.solde),
+  foyer: {
+    emprunteurPrincipalNet: enEuros(s.revenusMensuels),
+    chargesCourantesFixes: enEuros(s.chargesCourantesMensuelles),
+  },
+  detail: {
+    nbOperations: s.nbOperations,
+    nbRevenus: s.nbRevenus,
+    nbChargesRecurrentes: s.nbChargesRecurrentes,
+  },
+});

@@ -11,6 +11,7 @@ import { confirmationEmailRequise } from "../auth/reglages.js";
 import { lireInvitation, consommerInvitation } from "../auth/invitations.js";
 import { cadenceConnexion, cadenceConnexionIp, cadenceEmail, cadenceEmailIp, cadenceJeton } from "../auth/cadence.js";
 import { envoyerEmail } from "../email/envoyer.js";
+import { revoquerPourCompte, LIAISON_VIDE } from "../banque/consentement.js";
 import {
   gabaritValidation,
   gabaritInscriptionExistante,
@@ -310,10 +311,14 @@ routeur.post("/invitation", cadenceJeton, valider(AccepterInvitationSchema), att
     const invitation = await consommerInvitation(req.donnees.jeton);
     if (!invitation) return res.status(400).json({ erreur: "Invitation déjà utilisée." });
 
+    // La liaison bancaire a été ouverte avec les identifiants du foyer quitté :
+    // elle ne vaut plus rien dans le nouveau, autant la défaire proprement.
+    await revoquerPourCompte(compteExistant);
+
     const utilisateur = await prisma.$transaction(async (tx) => {
       const deplace = await tx.utilisateur.update({
         where: { id: compteExistant.id },
-        data: { foyerId: invitation.foyerId, role: invitation.role },
+        data: { ...LIAISON_VIDE, foyerId: invitation.foyerId, role: invitation.role },
       });
       if (invitation.membreId) {
         await tx.membre.update({ where: { id: invitation.membreId }, data: { utilisateurId: deplace.id } });
@@ -426,6 +431,13 @@ routeur.get("/mes-donnees", attraper(async (req, res) => {
   res.json({
     exporteLe: new Date().toISOString(),
     compte: { email: req.utilisateur.email, creeLe: req.utilisateur.creeLe },
+    // Ce qui est conservé de la liaison bancaire : son état, et la date de la
+    // dernière synchronisation. Aucune opération n'est stockée.
+    banque: {
+      reliee: Boolean(req.utilisateur.goCardlessAccountId),
+      synchronisationActive: req.utilisateur.agregationActive,
+      synchroniseLe: req.utilisateur.agregationSynchroLe,
+    },
     foyer: { repartition: foyer.repartition },
     membres: membres.map(membreVersApi),
     transactions: transactions.map(transactionVersApi),
@@ -470,6 +482,7 @@ routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), att
   });
 
   if (autres.length === 0) {
+    await revoquerPourCompte(req.utilisateur);
     await prisma.foyer.delete({ where: { id: foyerId } });
     effacerCookieSession(res);
     return res.status(204).end();
@@ -482,6 +495,7 @@ routeur.delete("/moi", cadenceConnexionIp, valider(SuppressionCompteSchema), att
     });
   }
 
+  await revoquerPourCompte(req.utilisateur);
   await prisma.utilisateur.delete({ where: { id: req.utilisateur.id } });
   effacerCookieSession(res);
   res.status(204).end();

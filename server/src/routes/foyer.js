@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
+import { revoquerPourCompte } from "../banque/consentement.js";
 import { attraper, valider } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { FoyerSchema, InvitationSchema, RoleSchema } from "../schemas.js";
@@ -145,7 +146,8 @@ routeur.delete("/acces/:id", exigerProprietaire, attraper(async (req, res) => {
   if (!cible) return res.status(404).json({ erreur: "Compte introuvable" });
 
   // Retirer un compte ne touche pas au budget : le membre qu'il incarnait reste,
-  // avec son revenu et ses lignes.
+  // avec son revenu et ses lignes. Sa liaison bancaire, elle, part avec lui.
+  await revoquerPourCompte(cible);
   await prisma.utilisateur.delete({ where: { id: cible.id } });
   res.status(204).end();
 }));
