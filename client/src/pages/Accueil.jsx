@@ -104,18 +104,50 @@ export default function Accueil({ etat, calc, mois, executer, naviguer }) {
       <section className="carte resume">
         <div className="resume-haut">
           <div>
-            <div className="resume-lib">Reste à vivre</div>
+            <div className="resume-lib">Reste à vivre prévu</div>
             <div className={`resume-val chiffre${calc.reste < 0 ? " neg" : ""}`}>{euro(calc.reste)}</div>
             <div className="resume-note">
               sur <strong className="chiffre">{euro(calc.revenus)}</strong> de revenus
               {calc.revenus > 0 && <> · {pct(Math.max(0, calc.reste))} % restent disponibles</>}
             </div>
+            {vide && (
+              <button className="btn fant" style={{ marginTop: 14 }} onClick={() => naviguer("foyer")}>
+                <Icone nom="foyer" /> Renseigner les revenus
+              </button>
+            )}
           </div>
-          {vide && (
-            <button className="btn fant" onClick={() => naviguer("foyer")}>
-              <Icone nom="foyer" /> Renseigner les revenus
-            </button>
-          )}
+
+          {/* Le réel : ce qui est vraiment passé sur les comptes, d'après les
+              opérations datées et les mouvements internes enregistrés. */}
+          <div className="resume-reel">
+            <div className="resume-lib">{mois === moisCle() ? "Réel à ce jour" : "Réel du mois"}</div>
+            {calc.reel.operations > 0 ? (
+              <>
+                <div className={`resume-val-reel chiffre${calc.reel.reste < 0 ? " neg" : ""}`}>{euro(calc.reel.reste)}</div>
+                <div className="resume-detail chiffre">
+                  <span>+{euro(calc.reel.entrees)} reçus</span>
+                  <span>−{euro(calc.reel.sorties)} dépensés</span>
+                  {calc.reel.versInterne > 0 && <span>−{euro(calc.reel.versInterne)} épargnés ou remboursés</span>}
+                  {calc.reel.depuisInterne > 0 && <span>+{euro(calc.reel.depuisInterne)} repris à l'épargne</span>}
+                </div>
+                <div className="resume-note">
+                  {Math.abs(calc.reel.reste - calc.reste) < 1
+                    ? "Conforme au prévu."
+                    : `${euro(Math.abs(calc.reel.reste - calc.reste))} ${calc.reel.reste > calc.reste ? "de plus" : "de moins"} que le prévu${mois === moisCle() ? " pour l'instant" : ""}.`}
+                </div>
+              </>
+            ) : (
+              <div className="resume-note" style={{ maxWidth: 300 }}>
+                Aucune opération datée ce mois-ci. Importez un relevé, ou saisissez vos dépenses au fil de
+                l'eau, pour suivre ce qui est vraiment passé sur les comptes.
+                <div style={{ marginTop: 10 }}>
+                  <button className="btn fant mini" onClick={() => naviguer("operations")}>
+                    <Icone nom="importer" taille={16} /> Aller aux opérations
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bande" role="img" aria-label="Répartition des revenus du mois">

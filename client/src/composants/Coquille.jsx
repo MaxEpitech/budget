@@ -46,7 +46,7 @@ function SelecteurMois({ mois, setMois }) {
   );
 }
 
-export default function Coquille({ route, naviguer, compte, mois, setMois, reste, occupe, onDeconnexion, ouvrirPage, children }) {
+export default function Coquille({ route, naviguer, compte, mois, setMois, reste, reel, occupe, onDeconnexion, ouvrirPage, children }) {
   const [tiroir, setTiroir] = useState(false);
 
   // Le titre de l'onglet du navigateur suit l'écran : l'historique et les
@@ -131,9 +131,17 @@ export default function Coquille({ route, naviguer, compte, mois, setMois, reste
                 chiffre qu'on vient chercher. La vue d'ensemble l'affiche déjà
                 en grand. */}
             {route.mensuel && route.id !== "accueil" && reste != null && (
-              <a className={`pilule-reste${reste < 0 ? " neg" : ""}`} {...lienVers("accueil", naviguer)}>
-                <span>Reste à vivre</span>
+              <a className={`pilule-reste${reste < 0 ? " neg" : ""}`} {...lienVers("accueil", naviguer)}
+                title="Reste à vivre prévu par le budget, et réel d'après les opérations enregistrées">
+                <span>Prévu</span>
                 <strong className="chiffre">{euro(reste)}</strong>
+                {reel?.operations > 0 && (
+                  <>
+                    <span className="pilule-sep" aria-hidden="true" />
+                    <span>Réel</span>
+                    <strong className={`chiffre${reel.reste < 0 ? " neg" : ""}`}>{euro(reel.reste)}</strong>
+                  </>
+                )}
               </a>
             )}
             <MenuCompte compte={compte} naviguer={naviguer} onDeconnexion={onDeconnexion} ouvrirPage={ouvrirPage} />

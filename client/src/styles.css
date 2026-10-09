@@ -1179,3 +1179,22 @@ body { background: var(--fond); color: var(--texte); }
 /* Le libellé d'une ligne du flux ouvre sa modification. */
 .bdg .ligne-ouvrir { display: block; max-width: 100%; text-align: left; padding: 0; }
 .bdg .ligne-ouvrir:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Prévu et réel côte à côte dans la barre : un trait les sépare. */
+.bdg .pilule-sep { width: 1px; align-self: stretch; background: color-mix(in srgb, var(--reste) 30%, transparent); margin: 0 2px; }
+.bdg .pilule-reste strong.neg { color: var(--credits); }
+
+/* Le réel, à droite du prévu : même lecture, en plus discret. */
+.bdg .resume-reel {
+  min-width: 240px; padding-left: calc(var(--pas) * 3);
+  border-left: 1px solid var(--bord-fin);
+}
+.bdg .resume-val-reel {
+  font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -0.035em;
+  line-height: 1.1; margin-top: 4px; color: var(--texte);
+}
+.bdg .resume-val-reel.neg { color: var(--credits); }
+.bdg .resume-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13px; color: var(--texte-doux); }
+@media (max-width: 700px) {
+  .bdg .resume-reel { padding-left: 0; border-left: none; border-top: 1px solid var(--bord-fin); padding-top: 14px; width: 100%; }
+}

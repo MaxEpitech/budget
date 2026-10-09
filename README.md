@@ -156,6 +156,17 @@ Sont refusés, avec un message qui dit quoi faire : le PDF, l'ancien format
 Excel `.xls` et le classeur protégé par mot de passe (à réenregistrer en
 `.xlsx`), et le classeur OpenDocument `.ods`.
 
+### Reste à vivre prévu et réel
+
+La vue d'ensemble (et la barre du haut) montre deux chiffres. Le **prévu** est
+le budget du mois : salaires (de référence, ou la paie reçue), lignes
+régulières, opérations ponctuelles, versements prévus et échéances. Le **réel**
+ne compte que ce qui est passé sur les comptes, d'après ce qui a été
+enregistré : les opérations datées du flux (relevés importés, saisies
+ponctuelles) et les mouvements internes (versements d'épargne et de projet,
+échéances prélevées, retraits). Les lignes régulières n'y entrent pas : ce sont
+des prévisions. Le calcul vit côté client, dans `client/src/reel.js`.
+
 ### Salaire de référence et paie reçue
 
 Le salaire saisi pour chaque personne (Réglages › Foyer) n'est qu'une

@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { api } from "./api.js";
 import { mensualite, capitalRestant, cotisationAssurance, repartirParMembre, revenusDuMois } from "./finance.js";
 import { CATEGORIE_SALAIRE } from "./utiles.js";
+import { reelDuMois } from "./reel.js";
 import { moisCle, ecartMois } from "./utiles.js";
 import { useNavigation } from "./navigation.js";
 import Coquille from "./composants/Coquille.jsx";
@@ -276,7 +277,10 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
       reste: { montant: Math.max(0, reste), pct: total ? (Math.max(0, reste) / total) * 100 : 0 },
     };
 
-    return { actifs, revenus, salaires, depenses, credits, creditsActifs, projets, placements, reste, parts, parMembre };
+    // Le réel, face au prévu : ce qui est vraiment passé sur les comptes (reel.js).
+    const reel = reelDuMois(etat, mois);
+
+    return { actifs, revenus, salaires, depenses, credits, creditsActifs, projets, placements, reste, reel, parts, parMembre };
   }, [etat, mois]);
 
   // Les écrans du budget ont tous besoin de l'état du mois ; tant qu'il n'est
@@ -323,7 +327,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
     <div className="bdg">
       <Coquille
         route={route} naviguer={naviguer} compte={compte} mois={mois} setMois={setMois}
-        reste={calc?.reste} occupe={rafraichissement && Boolean(etat)}
+        reste={calc?.reste} reel={calc?.reel} occupe={rafraichissement && Boolean(etat)}
         onDeconnexion={deconnexionApresVidage} ouvrirPage={ouvrirPage}
       >
         {erreur && etat && (
