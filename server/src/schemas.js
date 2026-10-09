@@ -76,10 +76,19 @@ export const ProjetSchema = z.object({
 });
 export const ProjetPartielSchema = ProjetSchema.partial();
 
+// Date et libellé d'un mouvement saisi depuis le flux. Sans date, c'est
+// aujourd'hui : le bouton « Verser » des écrans Projets et Épargne n'en envoie
+// pas, et ne doit pas pouvoir antidater.
+const reperesMouvement = {
+  date: z.iso.date(DATE_ATTENDUE).optional(),
+  libelle: z.string("libellé : texte attendu").trim().max(200, "libellé trop long").optional(),
+};
+
 export const VersementSchema = z.object({
   montant: montantPositif("montant"),
   // Qui a mis au pot : "foyer" par défaut, ou l'id d'un membre.
   pour: chaine("pour").default("foyer"),
+  ...reperesMouvement,
 });
 
 // Un mouvement de support : ce qu'on y verse ou ce qu'on en retire.
@@ -88,6 +97,14 @@ export const MouvementSchema = z.object({
   montant: montantPositif("montant"),
   // Qui a versé : "foyer" par défaut, ou l'id d'un membre.
   pour: chaine("pour").default("foyer"),
+  ...reperesMouvement,
+});
+
+// Une échéance de crédit réellement prélevée.
+export const PaiementCreditSchema = z.object({
+  montant: montantPositif("montant"),
+  pour: chaine("pour").default("foyer"),
+  ...reperesMouvement,
 });
 
 export const PlacementSchema = z.object({
@@ -140,6 +157,14 @@ export const ImportTransactionsSchema = z.object({
         libelle: chaine("libellé").max(200, "libellé trop long"),
         montant: montantPositif("montant"),
         categorie: chaine("catégorie").max(60, "catégorie trop longue"),
+        // Un mouvement interne : l'opération n'entre pas dans le flux, elle
+        // alimente un support d'épargne, un projet ou un crédit.
+        affectation: z
+          .object({
+            nature: z.enum(["epargne", "projet", "credit"], "affectation : « epargne », « projet » ou « credit » attendu"),
+            id: chaine("affectation"),
+          })
+          .optional(),
       }),
       "opérations requises",
     )

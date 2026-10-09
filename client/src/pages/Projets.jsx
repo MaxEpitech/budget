@@ -187,6 +187,7 @@ function Historique({ projet, nomDe, teinteDe, executer }) {
         <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "3px 0" }}>
           <span className="ligne-meta">
             <span className="etiq perso" style={{ "--teinte": teinteDe(v.pour) }}>{nomDe(v.pour)}</span> · {libelleDate(v.date)}
+            {v.libelle && <> · {v.libelle}</>}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span className="chiffre" style={{ fontSize: 13, fontWeight: 600, color: "var(--caisse)" }}>+{euroPrecis(v.montant)}</span>

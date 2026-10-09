@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { attraper, valider, modifierDansFoyer, supprimerDansFoyer, pourValide } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { PlacementSchema, PlacementPartielSchema, MouvementSchema } from "../schemas.js";
-import { placementVersApi, placementVersDb, mouvementVersApi, enCentimes } from "../conversion.js";
+import { placementVersApi, placementVersDb, mouvementVersApi, enCentimes, dateSaisie } from "../conversion.js";
 
 const routeur = Router();
 
@@ -83,6 +83,8 @@ routeur.post("/:id/mouvements", valider(MouvementSchema), attraper(async (req, r
         montant,
         valeurApres,
         membreId: pour === "foyer" ? null : pour,
+        date: dateSaisie(req.donnees.date),
+        libelle: req.donnees.libelle || null,
       },
     }),
     prisma.placement.update({ where: { id: placement.id }, data: { valeur: valeurApres } }),

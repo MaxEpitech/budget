@@ -42,6 +42,14 @@ function constats(etat, calc, mois) {
       cible: "credits",
     });
   }
+  // Une échéance attendue mais pas vue sur le compte — seulement pour les crédits
+  // dont on suit les prélèvements : sans aucun paiement saisi, rien n'est attendu.
+  for (const c of calc.creditsActifs) {
+    if (c.solde || ecartMois(c.debut, mois) < 0 || !(c.paiements ?? []).length) continue;
+    if (!c.paiements.some((p) => moisCle(new Date(p.date)) === mois)) {
+      liste.push({ ton: "info", texte: `Crédit « ${c.libelle} » : aucune échéance vue en ${libelleMois(mois).toLowerCase()}.`, cible: "credits" });
+    }
+  }
   for (const p of etat.projets) {
     const restant = Math.max(0, p.objectif - p.epargne);
     if (restant <= 0) continue;
@@ -229,7 +237,7 @@ export default function Accueil({ etat, calc, mois, executer, naviguer }) {
         </Carte>
       </div>
 
-      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} mois={mois} executer={executer} />
+      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} calc={calc} mois={mois} executer={executer} />
     </>
   );
 }

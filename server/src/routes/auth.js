@@ -423,9 +423,11 @@ routeur.get("/mes-donnees", attraper(async (req, res) => {
     prisma.foyer.findUnique({ where: { id: foyerId } }),
     prisma.membre.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
     prisma.transaction.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
-    prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.credit.findMany({ where: { foyerId }, include: { paiements: { orderBy: { date: "asc" } } }, orderBy: { id: "asc" } }),
     prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "asc" } } }, orderBy: { id: "asc" } }),
-    prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    // Avec leurs mouvements : sans eux, l'export d'un support se réduisait à sa
+    // valeur du jour, sans rien de ce qui y a été versé ou retiré.
+    prisma.placement.findMany({ where: { foyerId }, include: { mouvements: { orderBy: { date: "asc" } } }, orderBy: { id: "asc" } }),
   ]);
 
   res.json({

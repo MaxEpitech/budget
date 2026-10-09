@@ -18,9 +18,11 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { attraper, valider } from "../middleware.js";
 import { InitierAgregationSchema, ActiverAgregationSchema, IdentifiantsAgregationSchema, RetourBanqueSchema, ReleveSchema } from "../schemas.js";
-import { syntheseBancaireVersApi, enEuros } from "../conversion.js";
+import { syntheseBancaireVersApi, enEuros, placementVersApi, projetVersApi, creditVersApi } from "../conversion.js";
 import { lireReleve, fenetreRecente, ErreurReleve } from "../banque/releve.js";
 import { preparerOperations } from "../banque/import.js";
+import { empreintesConnues } from "../banque/empreintes.js";
+import { suggererAffectations } from "../banque/affectations.js";
 import { montantEnCentimes } from "../banque/analyse.js";
 import { journal } from "../journal.js";
 import { urlApplication } from "../email/gabarits.js";
@@ -183,14 +185,21 @@ routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
   };
 
   const lignes = preparerOperations(lu.operations, pour);
-  const connues = new Set(
-    (
-      await prisma.transaction.findMany({
-        where: { foyerId: req.utilisateur.foyerId, importCle: { in: lignes.map((l) => l.cle) } },
-        select: { importCle: true },
-      })
-    ).map((t) => t.importCle),
-  );
+  const foyerId = req.utilisateur.foyerId;
+  const [connues, placements, projets, credits] = await Promise.all([
+    // Déjà importée, comme ligne du flux ou comme mouvement interne.
+    empreintesConnues(foyerId, lignes.map((l) => l.cle)),
+    prisma.placement.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    prisma.projet.findMany({ where: { foyerId }, include: { versements: true }, orderBy: { id: "asc" } }),
+    prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+  ]);
+  // Virements vers l'épargne, échéances de prêt : proposés d'emblée comme
+  // mouvements internes, pour ne pas les compter deux fois.
+  const proposees = suggererAffectations(lignes, {
+    placements: placements.map(placementVersApi),
+    projets: projets.map(projetVersApi),
+    credits: credits.map(creditVersApi),
+  });
 
   const avertissements = [];
   if (recent.jours < 45) {
@@ -210,7 +219,7 @@ routeur.post("/releve", valider(ReleveSchema), attraper(async (req, res) => {
     pour,
     lignesIgnorees: lu.ignorees,
     avertissements,
-    operations: lignes.map((l) => ({ ...l, montant: enEuros(l.montant), dejaImportee: connues.has(l.cle) })),
+    operations: proposees.map((l) => ({ ...l, montant: enEuros(l.montant), dejaImportee: connues.has(l.cle) })),
   });
 }));
 

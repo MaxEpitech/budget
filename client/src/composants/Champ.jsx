@@ -4,7 +4,7 @@
 // dont les formulaires de connexion ont besoin (autocomplete, autofocus…).
 // `classe` s'ajoute au libellé englobant : « plein » lui fait occuper toute la
 // ligne d'une grille de formulaire.
-const CLAVIER_ORDINAIRE = new Set(["text", "email", "password", "month"]);
+const CLAVIER_ORDINAIRE = new Set(["text", "email", "password", "month", "date"]);
 
 export default function Champ({ libelle, valeur, onChange, largeur = 120, type = "text", options, placeholder, onEntree, attributs, disabled, classe }) {
   const commun = {
@@ -20,9 +20,16 @@ export default function Champ({ libelle, valeur, onChange, largeur = 120, type =
       <span className="champ-lib">{libelle}</span>
       {options ? (
         <select {...commun}>
-          {options.map((o) => (
-            <option key={o.v ?? o} value={o.v ?? o}>{o.l ?? o}</option>
-          ))}
+          {/* Une entrée { groupe, options } devient un groupe nommé de la liste. */}
+          {options.map((o) =>
+            o.groupe ? (
+              <optgroup key={o.groupe} label={o.groupe}>
+                {o.options.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}
+              </optgroup>
+            ) : (
+              <option key={o.v ?? o} value={o.v ?? o}>{o.l ?? o}</option>
+            ),
+          )}
         </select>
       ) : (
         <input

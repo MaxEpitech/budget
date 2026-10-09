@@ -156,6 +156,36 @@ Sont refusés, avec un message qui dit quoi faire : le PDF, l'ancien format
 Excel `.xls` et le classeur protégé par mot de passe (à réenregistrer en
 `.xlsx`), et le classeur OpenDocument `.ods`.
 
+### Mouvements internes
+
+Un virement vers l'épargne, un versement sur un projet ou le prélèvement d'un
+prêt ne sont pas des dépenses : le budget compte déjà, chaque mois, le versement
+prévu de chaque support et projet, et l'échéance de chaque crédit. Saisis comme
+dépenses, ils pèseraient deux fois.
+
+Dans « Nouvelle opération » (nature « Interne ») comme dans l'aperçu d'un
+relevé, une opération peut donc être affectée à un support d'épargne (versement,
+ou retrait vers le compte), à un projet ou à un crédit. Elle est enregistrée là
+où elle agit — mouvement d'épargne, versement de projet, paiement de crédit —
+et n'entre pas dans le flux. L'écran Opérations les montre à part, sans les
+compter ; l'écran Crédits dit si l'échéance du mois a été vue sur le compte.
+
+L'aperçu d'un relevé propose d'emblée les évidentes
+(`server/src/banque/affectations.js`) : un prélèvement égal, à un euro près, à
+l'échéance d'un crédit en cours ce mois-là ; un libellé qui nomme un support ou
+un projet en mots entiers. L'utilisateur confirme ou corrige.
+
+Un mouvement importé garde l'empreinte et le lot de son import : la
+réimportation le reconnaît (quelle que soit sa forme, `banque/empreintes.js`), et
+l'annulation de l'import le retire en rendant au support sa valeur d'avant. Un
+retrait plus grand que la valeur enregistrée d'un support, ou un versement qui
+dépasserait son plafond, fait refuser l'import entier : il n'est jamais fait à
+moitié.
+
+Un paiement de crédit ne change rien au calcul du crédit — mensualité et
+capital restant dû découlent du contrat — et ne modélise pas un remboursement
+anticipé : le simulateur de l'écran Crédits reste l'outil pour cela.
+
 Les routes sont les mêmes quel que soit le prestataire : elles passent par une
 façade commune (`server/src/banque/fournisseurs.js`). `/api/gocardless/*`,
 l'ancien chemin, reste servi.

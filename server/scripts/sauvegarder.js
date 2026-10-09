@@ -21,7 +21,9 @@ const horodatage = () => {
 };
 
 async function main() {
-  const [foyers, utilisateurs, membres, transactions, credits, projets, versements, placements] = await Promise.all([
+  // Toutes les tables qui portent des données du foyer. Sessions, jetons et
+  // compteurs de cadence n'en sont pas : ils ne se restaurent pas, ils se refont.
+  const [foyers, utilisateurs, membres, transactions, credits, projets, versements, placements, budgets, mouvementsPlacement, paiementsCredit] = await Promise.all([
     prisma.foyer.findMany(),
     // La table Utilisateur n'existe pas avant le module d'authentification.
     prisma.utilisateur?.findMany().catch(() => null) ?? null,
@@ -31,6 +33,9 @@ async function main() {
     prisma.projet.findMany(),
     prisma.versement.findMany(),
     prisma.placement.findMany(),
+    prisma.budget.findMany(),
+    prisma.mouvementPlacement.findMany(),
+    prisma.paiementCredit.findMany(),
   ]);
 
   const contenu = {
@@ -43,6 +48,9 @@ async function main() {
     projets,
     versements,
     placements,
+    budgets,
+    mouvementsPlacement,
+    paiementsCredit,
   };
 
   const dossier = fileURLToPath(new URL("../../sauvegardes", import.meta.url));
@@ -62,6 +70,9 @@ async function main() {
         compte("projet", projets),
         compte("versement", versements),
         compte("placement", placements),
+        compte("enveloppe", budgets),
+        compte("mouvement d'épargne", mouvementsPlacement),
+        compte("paiement de crédit", paiementsCredit),
       ].join(" · ")
   );
 }

@@ -1,4 +1,5 @@
-// Opérations — les revenus et dépenses du mois, réguliers ou ponctuels.
+// Opérations — les revenus et dépenses du mois, réguliers ou ponctuels, et les
+// mouvements internes : ce qui part vers l'épargne, un projet ou un crédit.
 //
 // L'écran ne montre que les lignes : l'ajout et l'import s'ouvrent à la
 // demande, les enveloppes et la répartition entre membres ont leur propre
@@ -14,6 +15,7 @@ import Dialogue from "../composants/Dialogue.jsx";
 import ImportReleve from "../composants/ImportReleve.jsx";
 import NouvelleOperation, { RYTHMES } from "../composants/NouvelleOperation.jsx";
 import { euro, libelleMois, teinteMembre, couleurBudget } from "../utiles.js";
+import { NATURES, mouvementsInternesDuMois, libelleMouvement } from "../interne.js";
 
 /** « tous les 3 mois · depuis mars 2026 · jusqu'à juin 2027 » */
 function decrireRythme(t) {
@@ -28,7 +30,10 @@ const FILTRES = [
   { v: "tout", l: "Tout" },
   { v: "depense", l: "Dépenses" },
   { v: "revenu", l: "Revenus" },
+  { v: "interne", l: "Internes" },
 ];
+
+const jourMois = (iso) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
 export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }) {
   const [ajout, setAjout] = useState(false);
@@ -58,6 +63,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
   };
 
   const visibles = calc.actifs.filter((t) => filtre === "tout" || t.type === filtre);
+  const internes = mouvementsInternesDuMois(etat, mois);
   const recurrents = visibles.filter((t) => t.recurrent);
   const ponctuels = visibles.filter((t) => !t.recurrent);
   const autresRevenus = calc.revenus - calc.salaires;
@@ -85,6 +91,37 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
     </div>
   );
 
+  // Un mouvement interne n'est ni compté ni signé comme une dépense : la flèche
+  // dit seulement dans quel sens l'argent a circulé.
+  const ligneInterne = (m) => {
+    const nature = NATURES[m.nature];
+    return (
+      <div className="ligne" key={`${m.nature}-${m.id}`}>
+        <span className="ligne-avatar" data-type="interne" style={{ "--teinte": nature.teinte }} aria-hidden="true">
+          <Icone nom={nature.icone} taille={16} />
+        </span>
+        <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+          <div className="ligne-lib">{libelleMouvement(m)}</div>
+          <div className="ligne-meta ligne-etiquettes">
+            <span className="etiq perso" style={{ "--teinte": teinteMembre(etat.membres, m.pour) }}>{nomDe(m.pour)}</span>
+            <button className="etiq perso etiq-lien" style={{ "--teinte": nature.teinte }} onClick={() => naviguer(nature.ecran)}
+              title={`Voir dans ${nature.nom === "Projet" ? "Projets" : nature.nom === "Crédit" ? "Crédits" : nature.nom}`}>
+              {nature.nom} · {m.cible.libelle}
+            </button>
+            <span>le {jourMois(m.date)}</span>
+            {m.importe && <span>· importé</span>}
+          </div>
+        </div>
+        <div className="pousse chiffre montant interne">
+          {m.sortie ? "→ " : "← "}{euro(m.montant)}
+        </div>
+        <button className="suppr" onClick={() => executer(m.supprimer)} aria-label={`Supprimer ${libelleMouvement(m)}`}>
+          <Icone nom="corbeille" taille={16} />
+        </button>
+      </div>
+    );
+  };
+
   const boutonAjout = (
     <button className="btn" onClick={() => setAjout(true)}>
       <Icone nom="plus" /> Nouvelle opération
@@ -95,7 +132,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
     <>
       <EnTetePage
         titre="Opérations"
-        description={`Revenus et dépenses de ${libelleMois(mois).toLowerCase()}`}
+        description={`Revenus, dépenses et mouvements internes de ${libelleMois(mois).toLowerCase()}`}
         actions={
           <>
             <button className="btn fant" onClick={() => setImporter(true)}>
@@ -115,7 +152,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         <Tuile libelle="Dépenses" icone="depense" teinte="var(--depenses)" valeur={euro(calc.depenses)} note={`${nbDepenses} ligne${nbDepenses > 1 ? "s" : ""} ce mois-ci`} />
       </div>
 
-      {calc.actifs.length === 0 ? (
+      {calc.actifs.length === 0 && internes.length === 0 ? (
         <Carte>
           <EtatVide
             icone="operations"
@@ -130,22 +167,38 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
             <Segments libelle="Filtrer les opérations" valeur={filtre} onChange={setFiltre} options={FILTRES} />
           </div>
 
-          <Carte
-            titre="Régulières"
-            note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci · saisies une fois, elles reviennent seules`}
-          >
-            {recurrents.length === 0 && <div className="vide">Aucune ligne régulière{filtre !== "tout" ? " de ce type" : ""}.</div>}
-            {recurrents.map(ligne)}
-          </Carte>
+          {filtre !== "interne" && (
+            <>
+              <Carte
+                titre="Régulières"
+                note={`${recurrents.length} échéance${recurrents.length > 1 ? "s" : ""} ce mois-ci · saisies une fois, elles reviennent seules`}
+              >
+                {recurrents.length === 0 && <div className="vide">Aucune ligne régulière{filtre !== "tout" ? " de ce type" : ""}.</div>}
+                {recurrents.map(ligne)}
+              </Carte>
 
-          <Carte titre="Ponctuelles" note={`Propres à ${libelleMois(mois).toLowerCase()}`}>
-            {ponctuels.length === 0 && <div className="vide">Rien d'exceptionnel ce mois-ci.</div>}
-            {ponctuels.map(ligne)}
-          </Carte>
+              <Carte titre="Ponctuelles" note={`Propres à ${libelleMois(mois).toLowerCase()}`}>
+                {ponctuels.length === 0 && <div className="vide">Rien d'exceptionnel ce mois-ci.</div>}
+                {ponctuels.map(ligne)}
+              </Carte>
+            </>
+          )}
+
+          {(filtre === "tout" || filtre === "interne") && (
+            <Carte
+              titre="Mouvements internes"
+              note="Vers l'épargne, un projet ou un crédit · ils ne comptent pas comme dépenses : le versement prévu ou l'échéance est déjà dans le budget"
+            >
+              {internes.length === 0 && (
+                <div className="vide">Aucun mouvement interne ce mois-ci. Choisissez « Interne » en ajoutant une opération.</div>
+              )}
+              {internes.map(ligneInterne)}
+            </Carte>
+          )}
         </>
       )}
 
-      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} mois={mois} executer={executer} />
+      <NouvelleOperation ouvert={ajout} onFermer={() => setAjout(false)} etat={etat} calc={calc} mois={mois} executer={executer} />
 
       <Dialogue
         large
@@ -154,7 +207,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         titre="Importer un relevé bancaire"
         note="Fichier CSV, Excel (.xlsx), OFX ou QIF téléchargé depuis votre espace bancaire"
       >
-        <ImportReleve membres={etat.membres} executer={executer} />
+        <ImportReleve etat={etat} creditsEnCours={calc.creditsActifs.filter((c) => !c.solde)} executer={executer} />
       </Dialogue>
     </>
   );

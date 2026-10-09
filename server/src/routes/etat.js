@@ -30,7 +30,9 @@ routeur.get("/", attraper(async (req, res) => {
     // Les récurrentes sont filtrées ensuite : leur période de validité et leur
     // rythme se calculent, ils ne s'expriment pas en clause SQL simple.
     prisma.transaction.findMany({ where: { foyerId, OR: [{ recurrent: true }, { mois }] }, orderBy: { id: "desc" } }),
-    prisma.credit.findMany({ where: { foyerId }, orderBy: { id: "asc" } }),
+    // Les paiements viennent avec : ce sont eux qui disent si l'échéance du
+    // mois a été vue sur le compte, et ils figurent parmi les mouvements internes.
+    prisma.credit.findMany({ where: { foyerId }, include: { paiements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
     prisma.projet.findMany({ where: { foyerId }, include: { versements: { orderBy: { date: "desc" } } }, orderBy: { id: "asc" } }),
     // Les mouvements viennent avec : c'est eux qui disent si le versement
     // mensuel annoncé a réellement eu lieu ce mois-ci.

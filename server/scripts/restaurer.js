@@ -26,17 +26,22 @@ const prisma = new PrismaClient();
 const ANNULATION = "annulation volontaire de l'essai";
 
 // Ordre imposé par les dépendances : un enfant ne peut pas précéder son parent.
-const TABLES = ["foyers", "utilisateurs", "membres", "credits", "projets", "placements", "transactions", "versements"];
+const TABLES = [
+  "foyers", "utilisateurs", "membres", "credits", "projets", "placements", "budgets",
+  "transactions", "versements", "mouvementsPlacement", "paiementsCredit",
+];
 
 const compter = (contenu) =>
   TABLES.map((t) => `${(contenu[t] ?? []).length} ${t}`).join(" · ");
 
 async function contenuActuel(client) {
-  const [foyers, utilisateurs, membres, transactions, credits, projets, versements, placements] = await Promise.all([
-    client.foyer.count(), client.utilisateur.count(), client.membre.count(), client.transaction.count(),
-    client.credit.count(), client.projet.count(), client.versement.count(), client.placement.count(),
-  ]);
-  return { foyers, utilisateurs, membres, transactions, credits, projets, versements, placements };
+  const [foyers, utilisateurs, membres, transactions, credits, projets, versements, placements, budgets, mouvementsPlacement, paiementsCredit] =
+    await Promise.all([
+      client.foyer.count(), client.utilisateur.count(), client.membre.count(), client.transaction.count(),
+      client.credit.count(), client.projet.count(), client.versement.count(), client.placement.count(),
+      client.budget.count(), client.mouvementPlacement.count(), client.paiementCredit.count(),
+    ]);
+  return { foyers, utilisateurs, membres, transactions, credits, projets, versements, placements, budgets, mouvementsPlacement, paiementsCredit };
 }
 
 const total = (c) => Object.values(c).reduce((s, n) => s + n, 0);
@@ -44,6 +49,9 @@ const total = (c) => Object.values(c).reduce((s, n) => s + n, 0);
 /** Réécrit la base à l'image de l'export. Le client peut être une transaction. */
 async function restaurer(client, contenu) {
   // Vider dans l'ordre inverse des dépendances.
+  await client.paiementCredit.deleteMany();
+  await client.mouvementPlacement.deleteMany();
+  await client.budget.deleteMany();
   await client.versement.deleteMany();
   await client.transaction.deleteMany();
   await client.projet.deleteMany();
@@ -60,8 +68,9 @@ async function restaurer(client, contenu) {
     if (lignes.length === 0) continue;
     const modele = {
       foyers: client.foyer, utilisateurs: client.utilisateur, membres: client.membre,
-      credits: client.credit, projets: client.projet, placements: client.placement,
+      credits: client.credit, projets: client.projet, placements: client.placement, budgets: client.budget,
       transactions: client.transaction, versements: client.versement,
+      mouvementsPlacement: client.mouvementPlacement, paiementsCredit: client.paiementCredit,
     }[nom];
     await modele.createMany({ data: lignes });
   }

@@ -194,6 +194,7 @@ model Membre {
   mouvementPlacements MouvementPlacement[]
   credits             Credit[]
   placements          Placement[]
+  paiementsCredit     PaiementCredit[]
 
   @@index([foyerId])
 }
@@ -259,7 +260,7 @@ model Budget {
 }
 
 model Credit {
-  id            String   @id @default(cuid())
+  id            String           @id @default(cuid())
   libelle       String
   capital       Int // centimes
   taux          Float // taux annuel, en %
@@ -269,19 +270,45 @@ model Credit {
   // constante, cas le plus répandu), soit sur le capital restant dû (cotisation
   // décroissante) — d'où la base, sans laquelle le même taux donne des montants
   // du simple au double sur vingt-cinq ans.
-  assuranceTaux Float    @default(0) // taux annuel, en %
-  assuranceBase String   @default("initial") // "initial" | "restant"
+  assuranceTaux Float            @default(0) // taux annuel, en %
+  assuranceBase String           @default("initial") // "initial" | "restant"
   // À qui appartient l'emprunt : null = le foyer, sinon la personne qui le
   // porte seule. Sa mensualité pèse alors sur elle et non sur la quote-part.
-  membre        Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membre        Membre?          @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId      String?
-  foyer         Foyer    @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  paiements     PaiementCredit[]
+  foyer         Foyer            @relation(fields: [foyerId], references: [id], onDelete: Cascade)
   foyerId       Int
-  creeLe        DateTime @default(now())
-  modifieLe     DateTime @updatedAt
+  creeLe        DateTime         @default(now())
+  modifieLe     DateTime         @updatedAt
 
   @@index([foyerId])
   @@index([membreId])
+}
+
+// Ce qui a réellement été prélevé pour un crédit : l'échéance vue sur le
+// compte. La mensualité, elle, se calcule ; ce registre ne la remplace pas, il
+// dit seulement si elle est passée. Un paiement n'est donc jamais une dépense
+// du flux : le budget compte déjà l'échéance au titre du crédit.
+model PaiementCredit {
+  id        String   @id @default(cuid())
+  credit    Credit   @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  creditId  String
+  montant   Int // centimes
+  date      DateTime @default(now())
+  // Le libellé lu sur le relevé, quand le paiement en vient.
+  libelle   String?
+  // Qui a payé : null = le foyer, sinon le membre concerné.
+  membre    Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId  String?
+  // Mêmes repères que les lignes importées du flux : l'empreinte évite les
+  // doublons à la réimportation, le lot permet d'annuler l'import d'un geste.
+  importCle String?
+  importLot String?
+  creeLe    DateTime @default(now())
+
+  @@unique([creditId, importCle])
+  @@index([creditId])
 }
 
 model Projet {
@@ -302,15 +329,21 @@ model Projet {
 // Historique des mouvements d'enveloppe : le montant épargné d'un projet
 // est la somme de ses versements, jamais un champ figé.
 model Versement {
-  id       String   @id @default(cuid())
-  projet   Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
-  projetId String
-  montant  Int // centimes
-  date     DateTime @default(now())
+  id        String   @id @default(cuid())
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  projetId  String
+  montant   Int // centimes
+  date      DateTime @default(now())
   // Qui a mis au pot : null = versement du foyer, sinon le membre concerné.
-  membre   Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
-  membreId String?
-  creeLe   DateTime @default(now())
+  membre    Membre?  @relation(fields: [membreId], references: [id], onDelete: SetNull)
+  membreId  String?
+  // Le libellé lu sur le relevé, et les repères de l'import qui l'a créé.
+  libelle   String?
+  importCle String?
+  importLot String?
+  creeLe    DateTime @default(now())
+
+  @@unique([projetId, importCle])
 }
 
 // Compteurs de la limitation de cadence.
@@ -363,7 +396,12 @@ model MouvementPlacement {
   membre      Membre?   @relation(fields: [membreId], references: [id], onDelete: SetNull)
   membreId    String?
   date        DateTime  @default(now())
+  // Le libellé lu sur le relevé, et les repères de l'import qui l'a créé.
+  libelle     String?
+  importCle   String?
+  importLot   String?
   creeLe      DateTime  @default(now())
 
+  @@unique([placementId, importCle])
   @@index([placementId])
 }

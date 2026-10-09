@@ -671,6 +671,16 @@ body { background: var(--fond); color: var(--texte); }
   background: var(--survol); color: var(--texte-doux);
 }
 .bdg .ligne-avatar[data-type="revenu"] { background: var(--ok-fond); color: var(--ok-texte); }
+/* Mouvement interne : la teinte de l'écran qu'il alimente (épargne, projet, crédit). */
+.bdg .ligne-avatar[data-type="interne"] {
+  color: var(--teinte);
+  background: color-mix(in srgb, var(--teinte) 12%, var(--surface));
+}
+/* Ni gagné ni dépensé : le montant reste neutre, la flèche dit le sens. */
+.bdg .montant.interne { color: var(--texte-doux); font-weight: 600; }
+/* Une étiquette qui mène à l'écran qu'elle nomme. */
+.bdg .etiq-lien { cursor: pointer; }
+.bdg .etiq-lien:hover { text-decoration: underline; text-underline-offset: 2px; }
 .bdg .pousse { margin-left: auto; }
 .bdg .montant { font-weight: 650; font-size: 15.5px; white-space: nowrap; }
 .bdg .montant.pos { color: var(--reste); }

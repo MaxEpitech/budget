@@ -47,7 +47,14 @@ test("le mouvement revient en euros, avec le solde qu'il a laissé", () => {
   });
   assert.deepEqual(vers, {
     id: "m1", type: "retrait", montant: 40, valeurApres: 8510, date: "2026-08-12T10:00:00Z", pour: "foyer",
+    libelle: null, importe: false,
   });
+  // Venu d'un relevé : son libellé, et la marque de l'import.
+  const importe = mouvementVersApi({
+    id: "m2", type: "versement", montant: 15000, valeurApres: 866000, date: "2026-09-05T00:00:00Z", membreId: null,
+    libelle: "VIR VERS LIVRET A", importLot: "lot",
+  });
+  assert.deepEqual([importe.libelle, importe.importe], ["VIR VERS LIVRET A", true]);
 });
 
 /* ─── Bout en bout ─── */

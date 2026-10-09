@@ -8,7 +8,7 @@ import Icone from "../composants/Icone.jsx";
 import EtatVide from "../composants/EtatVide.jsx";
 import Dialogue from "../composants/Dialogue.jsx";
 import EnTetePage from "../composants/EnTetePage.jsx";
-import { euro, euroPrecis, num, libelleMois, decalerMois, teinteMembre } from "../utiles.js";
+import { euro, euroPrecis, num, libelleMois, libelleDate, deMois, decalerMois, ecartMois, moisCle, teinteMembre } from "../utiles.js";
 import { capitalRestant, coutTotal, interetsPayes, rembourserParAnticipation, assurancePayee } from "../finance.js";
 
 export default function Credits({ etat, calc, mois, executer, supprimer }) {
@@ -16,7 +16,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   const [ouvert, setOuvert] = useState(null);
   const [ajout, setAjout] = useState(false);
   const nomDe = (cle) => (cle === "foyer" ? "Foyer" : etat.membres.find((m) => m.id === cle)?.nom || "—");
-  // Un seul panneau ouvert à la fois : « amortissement » ou « anticipation ».
+  // Un seul panneau ouvert à la fois : « amortissement », « anticipation » ou « paiements ».
   const [panneau, setPanneau] = useState(null);
 
   const valide = f.libelle.trim() && num(f.capital) > 0 && num(f.duree) > 0;
@@ -135,6 +135,11 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
         {calc.creditsActifs.map((c) => {
           const restants = Math.max(0, c.duree - c.k);
           const fin = decalerMois(c.debut, c.duree);
+          // L'échéance du mois a-t-elle été vue sur le compte ? La question ne se
+          // pose que pour un crédit dont on suit les prélèvements.
+          const paiements = c.paiements ?? [];
+          const vuCeMois = paiements.find((p) => moisCle(new Date(p.date)) === mois);
+          const commence = ecartMois(c.debut, mois) >= 0;
           return (
             <div key={c.id}>
               <div className="ligne">
@@ -151,6 +156,19 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                     {c.assuranceTaux > 0 &&
                       ` · assurance ${c.assuranceTaux}% sur le capital ${c.assuranceBase === "restant" ? "restant dû" : "initial"}`}
                   </div>
+                  {paiements.length > 0 && !c.solde && commence && (
+                    <div className="ligne-meta" style={{ marginTop: 4 }}>
+                      {vuCeMois ? (
+                        <span className="etiq perso" style={{ "--teinte": "var(--caisse)" }}>
+                          Échéance {deMois(mois)} prélevée le {libelleDate(vuCeMois.date)}
+                        </span>
+                      ) : (
+                        <span className="etiq perso" style={{ "--teinte": "var(--ocre)" }}>
+                          Échéance {deMois(mois)} pas encore vue sur le compte
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* Le propriétaire se change après coup : les crédits saisis
                     avant cette possibilité étaient tous communs par défaut. */}
@@ -181,10 +199,19 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
                 >
                   {ouvert === c.id && panneau === "amortissement" ? "Masquer" : "Détail"}
                 </button>
+                {paiements.length > 0 && (
+                  <button
+                    className="btn fant mini"
+                    onClick={() => { const actif = ouvert === c.id && panneau === "paiements"; setOuvert(actif ? null : c.id); setPanneau(actif ? null : "paiements"); }}
+                  >
+                    {ouvert === c.id && panneau === "paiements" ? "Masquer" : `Paiements (${paiements.length})`}
+                  </button>
+                )}
                 <button className="suppr" onClick={() => supprimer("credits", c.id, c.libelle)} aria-label={`Supprimer ${c.libelle}`}><Icone nom="corbeille" taille={16} /></button>
               </div>
               {ouvert === c.id && panneau === "amortissement" && <Amortissement credit={c} mois={mois} />}
               {ouvert === c.id && panneau === "anticipation" && <Anticipation credit={c} />}
+              {ouvert === c.id && panneau === "paiements" && <Paiements credit={c} membres={etat.membres} executer={executer} />}
             </div>
           );
         })}
@@ -302,6 +329,37 @@ function Anticipation({ credit }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Les échéances réellement prélevées, saisies depuis les opérations ou lues sur
+ * un relevé. Elles ne changent rien au calcul du crédit — le contrat le fixe —
+ * mais disent ce qui est passé sur le compte.
+ */
+function Paiements({ credit, membres, executer }) {
+  const nomDe = (cle) => (cle === "foyer" ? "Foyer" : membres.find((m) => m.id === cle)?.nom || "—");
+  return (
+    <div className="corps" style={{ background: "var(--survol)" }}>
+      {credit.paiements.map((p) => (
+        <div key={p.id} className="ligne" style={{ paddingLeft: 0, paddingRight: 0 }}>
+          <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+            <div style={{ fontSize: 14 }}>{p.libelle || `Échéance ${credit.libelle}`}</div>
+            <div className="ligne-meta">
+              <span className="etiq perso" style={{ "--teinte": teinteMembre(membres, p.pour) }}>{nomDe(p.pour)}</span>
+              {" · "}{libelleDate(p.date)}{p.importe && " · importé d'un relevé"}
+            </div>
+          </div>
+          <span className="pousse chiffre" style={{ fontWeight: 600 }}>{euroPrecis(p.montant)}</span>
+          <button className="suppr" onClick={() => executer(() => api.supprimerPaiement(credit.id, p.id))}
+            aria-label={`Supprimer le paiement du ${libelleDate(p.date)}`}><Icone nom="corbeille" taille={16} /></button>
+        </div>
+      ))}
+      <div className="carte-note" style={{ marginTop: 10 }}>
+        Pour enregistrer une échéance, ajoutez une opération « Interne » depuis l'écran Opérations, ou
+        classez le prélèvement du relevé sur ce crédit.
+      </div>
     </div>
   );
 }

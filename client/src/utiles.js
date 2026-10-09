@@ -44,6 +44,12 @@ export const libelleMois = (cle) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+// « d'octobre 2026 », « de septembre 2026 » : avril, août et octobre s'élident.
+export const deMois = (cle) => {
+  const mois = libelleMois(cle).toLowerCase();
+  return /^[aeiou]/.test(mois) ? `d'${mois}` : `de ${mois}`;
+};
+
 // Date d'un versement : « 10 août 2026 ».
 export const libelleDate = (iso) =>
   new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });

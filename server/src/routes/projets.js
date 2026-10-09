@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { attraper, valider, modifierDansFoyer, supprimerDansFoyer } from "../middleware.js";
 import { foyerCourant } from "../foyerCourant.js";
 import { ProjetSchema, ProjetPartielSchema, VersementSchema } from "../schemas.js";
-import { enCentimes, projetVersApi, projetVersDb, versementVersApi } from "../conversion.js";
+import { enCentimes, projetVersApi, projetVersDb, versementVersApi, dateSaisie } from "../conversion.js";
 
 const routeur = Router();
 
@@ -55,6 +55,8 @@ routeur.post("/:id/versements", valider(VersementSchema), attraper(async (req, r
       projetId: projet.id,
       montant: enCentimes(req.donnees.montant),
       membreId: pour === "foyer" ? null : pour,
+      date: dateSaisie(req.donnees.date),
+      libelle: req.donnees.libelle || null,
     },
   });
   res.status(201).json(versementVersApi(versement));

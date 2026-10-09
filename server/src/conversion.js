@@ -68,6 +68,8 @@ export const creditVersApi = (c) => ({
   assuranceTaux: c.assuranceTaux,
   assuranceBase: c.assuranceBase,
   pour: c.membreId ?? "foyer",
+  // Comme les mouvements d'un support : servis avec le crédit quand ils ont été lus.
+  paiements: (c.paiements ?? []).map(paiementVersApi),
 });
 
 export const creditVersDb = (d) => ({
@@ -91,6 +93,22 @@ export const versementVersApi = (v) => ({
   montant: enEuros(v.montant),
   date: v.date,
   pour: v.membreId ?? "foyer",
+  libelle: v.libelle ?? null,
+  importe: Boolean(v.importLot),
+});
+
+// Le jour saisi (AAAA-MM-JJ), à minuit UTC comme les lignes du flux ; absent,
+// la base prend l'instant présent.
+export const dateSaisie = (jour) => (jour ? new Date(`${jour}T00:00:00.000Z`) : undefined);
+
+/* ─── Paiement de crédit — l'échéance vue sur le compte ─── */
+export const paiementVersApi = (p) => ({
+  id: p.id,
+  montant: enEuros(p.montant),
+  date: p.date,
+  pour: p.membreId ?? "foyer",
+  libelle: p.libelle ?? null,
+  importe: Boolean(p.importLot),
 });
 
 export const projetVersApi = (p) => ({
@@ -121,6 +139,8 @@ export const mouvementVersApi = (m) => ({
   valeurApres: enEuros(m.valeurApres),
   date: m.date,
   pour: m.membreId ?? "foyer",
+  libelle: m.libelle ?? null,
+  importe: Boolean(m.importLot),
 });
 
 export const placementVersApi = (p) => ({

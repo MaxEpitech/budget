@@ -279,6 +279,7 @@ function Mouvements({ placement, membres, executer }) {
           <span className="ligne-meta">
             <span className="etiq perso" style={{ "--teinte": teinteMembre(membres, m.pour) }}>{nomDe(m.pour)}</span>
             {" · "}{libelleDate(m.date)}
+            {m.libelle && <> · {m.libelle}</>}
           </span>
           <span className="pousse chiffre" style={{ fontWeight: 600, color: m.type === "retrait" ? "var(--brique)" : "var(--caisse)" }}>
             {m.type === "retrait" ? "−" : "+"}{euroPrecis(m.montant)}
