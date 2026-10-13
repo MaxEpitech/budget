@@ -186,6 +186,10 @@ export const RetourBanqueSchema = z.object({
   code: z.string().max(2000).optional(),
   state: z.string().max(500).optional(),
   error: z.string().max(200).optional(),
+  // Ce que Bridge ajoute à l'adresse de retour.
+  item_id: z.string().regex(/^\d{1,20}$/).optional(),
+  success: z.enum(["true", "false"]).optional(),
+  context: z.string().max(100).optional(),
 });
 
 // Identifiants GoCardless d'un foyer, tels que le portail les délivre.
@@ -210,8 +214,13 @@ export const IdentifiantsAgregationSchema = z.preprocess(
         // Fichier .pem entier ; une clé RSA de 4096 bits tient en 3 300 caractères.
         clePrivee: z.string("clé privée requise").trim().min(100, "clé privée : contenu trop court").max(10000, "clé privée : contenu trop long"),
       }),
+      z.object({
+        fournisseur: z.literal("bridge"),
+        clientId: secret("Client ID"),
+        clientSecret: secret("Client secret"),
+      }),
     ],
-    "prestataire : « gocardless » ou « enablebanking » attendu",
+    "prestataire : « gocardless », « enablebanking » ou « bridge » attendu",
   ),
 );
 

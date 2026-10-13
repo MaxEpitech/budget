@@ -78,7 +78,11 @@ export default function SourceRevenus({ saisie, onChange, signaler }) {
         if (s.disponible && s.enAttente) {
           // Ce que la banque a ajouté à l'adresse de retour, quand il y en a.
           const retour = new URLSearchParams(window.location.search);
-          s = await api.banqueConfirmer({ code: retour.get("code"), state: retour.get("state"), error: retour.get("error") });
+          s = await api.banqueConfirmer({
+            code: retour.get("code"), state: retour.get("state"), error: retour.get("error"),
+            // Retour de Bridge : l'item relié, l'issue et le contexte.
+            item_id: retour.get("item_id"), success: retour.get("success"), context: retour.get("context"),
+          });
           if (s.refusee && vivant.current) setMessage({ ton: "alerte", texte: s.raison ?? REFUS });
         }
         if (!vivant.current) return;

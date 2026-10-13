@@ -1,5 +1,5 @@
 // Synchronisation bancaire facultative (DSP2), via le prestataire du foyer :
-// Enable Banking ou GoCardless Bank Account Data.
+// Enable Banking, Bridge ou GoCardless Bank Account Data.
 //
 // Parcours : le client choisit une banque (`/institutions`), demande un lien de
 // consentement (`/initiate`), part s'authentifier chez sa banque, revient sur
@@ -99,7 +99,10 @@ const configurationDe = (req) => {
     identifiant: duFoyer ? masquer(identifiantPublic(req.identifiantsBanque)) : null,
     peutModifier: req.utilisateur.role === "proprietaire",
     // L'adresse de retour à déclarer chez chaque prestataire qui l'exige.
-    redirections: { enablebanking: FOURNISSEURS.enablebanking.redirection(urlApplication()) },
+    redirections: {
+      enablebanking: FOURNISSEURS.enablebanking.redirection(urlApplication()),
+      bridge: FOURNISSEURS.bridge.redirection(urlApplication()),
+    },
   };
 };
 
@@ -298,7 +301,12 @@ routeur.post("/initiate", exigerConfiguration, valider(InitierAgregationSchema),
 
   let demande;
   try {
-    demande = await req.fournisseur.ouvrir(req.identifiantsBanque, { banque: req.donnees.institutionId, app: urlApplication() });
+    demande = await req.fournisseur.ouvrir(req.identifiantsBanque, {
+      banque: req.donnees.institutionId,
+      app: urlApplication(),
+      // Bridge l'exige pour ouvrir une connexion ; les autres l'ignorent.
+      email: req.utilisateur.email,
+    });
   } catch (e) {
     if (e instanceof ErreurBanque && e.statut === 400) return res.status(400).json({ erreur: "Cette banque n'est pas reconnue par le prestataire." });
     throw e;
@@ -311,6 +319,8 @@ routeur.post("/initiate", exigerConfiguration, valider(InitierAgregationSchema),
 const RAISONS_REFUS = {
   "aucun-compte":
     "La banque a répondu, mais aucun compte n'est accessible. En mode restreint, seuls les comptes que vous avez liés à votre application dans le panneau Enable Banking le sont.",
+  "aucun-compte-courant":
+    "La banque a répondu, mais aucun compte courant n'a été partagé. Relancez la connexion en cochant votre compte courant.",
 };
 
 /**
@@ -334,8 +344,11 @@ routeur.get("/callback", exigerConfiguration, avecBanque(async (req, res) => {
 
   const issue = await f.confirmer(req.identifiantsBanque, u, {
     code: retour.data.code,
-    etat: retour.data.state,
+    // `state` chez Enable Banking, `context` chez Bridge : le même rôle.
+    etat: retour.data.state ?? retour.data.context,
     erreur: retour.data.error,
+    itemId: retour.data.item_id,
+    succes: retour.data.success,
   });
 
   if (issue.etat === "reliee") {

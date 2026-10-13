@@ -120,7 +120,7 @@ export const api = {
   banqueStatut: () => requete("/banque/statut"),
   banqueInstitutions: (pays = "FR") => requete(`/banque/institutions?pays=${encodeURIComponent(pays)}`),
   banqueInitier: (institutionId) => requete("/banque/initiate", "POST", { institutionId }),
-  // `retour` : ce que la banque a ajouté à l'adresse de retour (code, state, error).
+  // `retour` : ce que la banque a ajouté à l'adresse de retour (code, state, error, ou item_id, success, context pour Bridge).
   banqueConfirmer: (retour = {}) => {
     const params = new URLSearchParams(Object.entries(retour).filter(([, v]) => v));
     return requete(`/banque/callback${params.size ? `?${params}` : ""}`);

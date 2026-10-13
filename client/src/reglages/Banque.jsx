@@ -1,9 +1,10 @@
 // Identifiants du foyer chez son prestataire bancaire : de quoi proposer la
 // synchronisation sans toucher à l'hébergement.
 //
-// Deux prestataires possibles, un seul à la fois : Enable Banking, ouvert aux
-// particuliers pour leurs propres comptes, et GoCardless, qui n'accepte plus de
-// nouvelles inscriptions mais sert encore ceux qui y ont déjà un compte.
+// Trois prestataires possibles, un seul à la fois : Enable Banking, ouvert aux
+// particuliers pour leurs propres comptes, Bridge, dont la sandbox est ouverte à
+// tous mais dont la production demande un contrat, et GoCardless, qui n'accepte
+// plus de nouvelles inscriptions mais sert encore ceux qui y ont déjà un compte.
 //
 // Aucun secret n'est relu depuis le serveur : une fois enregistré, l'écran n'en
 // connaît plus que l'existence. Pour le changer, on le ressaisit.
@@ -14,8 +15,18 @@ import Carte from "../composants/Carte.jsx";
 import BoutonConfirme from "../composants/BoutonConfirme.jsx";
 import Icone from "../composants/Icone.jsx";
 
-const NOMS = { enablebanking: "Enable Banking", gocardless: "GoCardless" };
-const VIDE = { fournisseur: "enablebanking", appId: "", clePrivee: "", fichier: "", secretId: "", secretKey: "" };
+const NOMS = { enablebanking: "Enable Banking", bridge: "Bridge", gocardless: "GoCardless" };
+const VIDE = {
+  fournisseur: "enablebanking", appId: "", clePrivee: "", fichier: "",
+  clientId: "", clientSecret: "", secretId: "", secretKey: "",
+};
+
+// Ce que le serveur attend de chaque prestataire, nettoyé des espaces de saisie.
+const IDENTIFIANTS = {
+  enablebanking: (f) => ({ fournisseur: "enablebanking", appId: f.appId.trim(), clePrivee: f.clePrivee.trim() }),
+  bridge: (f) => ({ fournisseur: "bridge", clientId: f.clientId.trim(), clientSecret: f.clientSecret.trim() }),
+  gocardless: (f) => ({ fournisseur: "gocardless", secretId: f.secretId.trim(), secretKey: f.secretKey.trim() }),
+};
 
 function ReglagesBanque() {
   const [config, setConfig] = useState(null); // null : pas encore connu
@@ -64,16 +75,14 @@ function ReglagesBanque() {
   };
 
   const eb = f.fournisseur === "enablebanking";
-  const complet = eb ? f.appId.trim() && f.clePrivee.trim() : f.secretId.trim() && f.secretKey.trim();
+  const bridge = f.fournisseur === "bridge";
+  const identifiants = IDENTIFIANTS[f.fournisseur](f);
+  const complet = Object.entries(identifiants).every(([cle, valeur]) => cle === "fournisseur" || valeur);
 
   const enregistrer = () => {
     if (!complet) return;
     agir(
-      () => api.banqueConfigurer(
-        eb
-          ? { fournisseur: "enablebanking", appId: f.appId.trim(), clePrivee: f.clePrivee.trim() }
-          : { fournisseur: "gocardless", secretId: f.secretId.trim(), secretKey: f.secretKey.trim() },
-      ),
+      () => api.banqueConfigurer(identifiants),
       `Identifiants vérifiés auprès de ${NOMS[f.fournisseur]} et enregistrés. La synchronisation s'active depuis l'écran Capacité d'emprunt.`,
     );
   };
@@ -119,7 +128,7 @@ function ReglagesBanque() {
             <div className="forme" style={{ marginTop: 14 }}>
               <Champ
                 libelle="Prestataire" valeur={f.fournisseur} onChange={(v) => setF({ ...VIDE, fournisseur: v })} largeur={280}
-                options={[{ v: "enablebanking", l: "Enable Banking" }, { v: "gocardless", l: "GoCardless (comptes existants)" }]}
+                options={[{ v: "enablebanking", l: "Enable Banking" }, { v: "bridge", l: "Bridge" }, { v: "gocardless", l: "GoCardless (comptes existants)" }]}
               />
             </div>
 
@@ -145,6 +154,34 @@ function ReglagesBanque() {
                   </label>
                 </div>
                 {f.fichier && <div className="carte-note" style={{ marginTop: 6 }}>Clé chargée depuis {f.fichier}.</div>}
+              </>
+            ) : bridge ? (
+              <>
+                <ol className="carte-note" style={{ margin: "12px 0 0", paddingLeft: 18, lineHeight: 1.6 }}>
+                  <li>
+                    Créez une application dans le tableau de bord Bridge (dashboard.bridgeapi.io) et activez
+                    l'agrégation : la sandbox est ouverte à tous, la production demande un contrat avec Bridge.
+                  </li>
+                  <li>
+                    Ajoutez le domaine de cette adresse de retour aux « Redirections authorized domains » :{" "}
+                    <code style={{ userSelect: "all", wordBreak: "break-all" }}>{config.redirections.bridge}</code>
+                  </li>
+                  <li>
+                    Si le tableau de bord demande des « Authorized IPs », déclarez celles du serveur qui héberge
+                    l'application.
+                  </li>
+                  <li>Indiquez ci-dessous le Client ID et le Client secret (rubrique Settings).</li>
+                </ol>
+                <div className="forme" style={{ marginTop: 14 }}>
+                  <Champ
+                    libelle="Client ID" valeur={f.clientId} onChange={(v) => setF({ ...f, clientId: v })} largeur={280}
+                    onEntree={enregistrer} attributs={{ autoComplete: "off", spellCheck: false }}
+                  />
+                  <Champ
+                    libelle="Client secret" type="password" valeur={f.clientSecret} onChange={(v) => setF({ ...f, clientSecret: v })} largeur={280}
+                    onEntree={enregistrer} attributs={{ autoComplete: "new-password" }}
+                  />
+                </div>
               </>
             ) : (
               <>
