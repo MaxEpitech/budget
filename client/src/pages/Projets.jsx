@@ -55,6 +55,7 @@ export default function Projets({ etat, mois, executer, modifier, supprimer }) {
   return (
     <>
       <EnTetePage
+        tutoriel="page-projets"
         titre="Projets"
         description={
           etat.projets.length

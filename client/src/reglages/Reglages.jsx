@@ -23,7 +23,7 @@ export default function Reglages({ section, naviguer, etat, calc, executer, modi
       <EnTetePage titre="Réglages" description="Le foyer et ses accès, la banque, votre compte et vos données" />
 
       <div className="reglages">
-        <nav className="reglages-nav" aria-label="Sections des réglages">
+        <nav className="reglages-nav" data-tutoriel="reglages-sections" aria-label="Sections des réglages">
           {GROUPES.map((g) => (
             <div className="reglages-groupe" key={g}>
               <div className="nav-titre">{g}</div>

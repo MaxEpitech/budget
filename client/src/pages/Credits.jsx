@@ -102,6 +102,7 @@ export default function Credits({ etat, calc, mois, executer, supprimer }) {
   return (
     <>
       <EnTetePage
+        tutoriel="page-credits"
         titre="Crédits"
         description="Ce que les emprunts pèsent chaque mois, ce qu'il reste à rembourser, et ce qu'ils coûtent vraiment"
         actions={boutonAjout}

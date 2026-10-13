@@ -11,6 +11,8 @@ import { reelDuMois } from "./reel.js";
 import { moisCle, ecartMois } from "./utiles.js";
 import { useNavigation } from "./navigation.js";
 import Coquille from "./composants/Coquille.jsx";
+import Tutoriel from "./composants/Tutoriel.jsx";
+import { visiteAttendue, marquerVisiteVue } from "./tutoriel.js";
 import Icone from "./composants/Icone.jsx";
 import Accueil from "./pages/Accueil.jsx";
 import Flux from "./pages/Flux.jsx";
@@ -50,6 +52,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
   const [erreur, setErreur] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(false);
   const [annulable, setAnnulable] = useState(null); // suppression rétractable en cours
+  const [visite, setVisite] = useState(false); // visite guidée en cours
   const jetonChargement = useRef(0);
   const enAttente = useRef({}); // envois différés des champs éditables, par "type:id"
   const suppressionEnAttente = useRef(null);
@@ -83,6 +86,24 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
   useEffect(() => {
     charger(mois);
   }, [mois]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // La visite guidée se propose une fois, à la première arrivée sur un budget
+  // chargé. Elle est marquée vue dès son lancement : recharger la page en plein
+  // milieu ne doit pas la rejouer. Au retour de la banque, l'utilisateur est au
+  // milieu d'une liaison : ce n'est pas le moment de l'interrompre.
+  const visiteTentee = useRef(retourDeBanque());
+  useEffect(() => {
+    if (!etat || visiteTentee.current) return;
+    visiteTentee.current = true;
+    if (!visiteAttendue(compte.email)) return;
+    marquerVisiteVue(compte.email);
+    setVisite(true);
+  }, [etat, compte.email]);
+
+  const fermerVisite = useCallback(() => {
+    marquerVisiteVue(compte.email);
+    setVisite(false);
+  }, [compte.email]);
 
   // Exécute une écriture puis recharge le mois affiché.
   const executer = async (action) => {
@@ -329,6 +350,7 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
         route={route} naviguer={naviguer} compte={compte} mois={mois} setMois={setMois}
         reste={calc?.reste} reel={calc?.reel} occupe={rafraichissement && Boolean(etat)}
         onDeconnexion={deconnexionApresVidage} ouvrirPage={ouvrirPage}
+        onVisite={() => etat && setVisite(true)}
       >
         {erreur && etat && (
           <div className="avis alerte bandeau" role="alert">
@@ -339,6 +361,8 @@ export default function Budget({ compte, onDeconnexion, onSessionExpiree, ouvrir
         )}
         {ecranCourant}
       </Coquille>
+
+      {visite && etat && <Tutoriel route={route} naviguer={naviguer} onFermer={fermerVisite} />}
 
       {/* La zone d'annonce existe en permanence : un lecteur d'écran ne lit
           que les changements d'une région qu'il connaissait déjà. */}

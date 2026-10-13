@@ -101,7 +101,7 @@ export default function Accueil({ etat, calc, mois, executer, naviguer }) {
       />
 
       {/* ── Le chiffre qu'on vient chercher, et d'où il vient ── */}
-      <section className="carte resume">
+      <section className="carte resume" data-tutoriel="resume">
         <div className="resume-haut">
           <div>
             <div className="resume-lib">Reste à vivre prévu</div>

@@ -29,7 +29,7 @@ const RACCOURCIS = [
 function SelecteurMois({ mois, setMois }) {
   const courant = moisCle();
   return (
-    <div className="mois">
+    <div className="mois" data-tutoriel="mois">
       <div className="mois-nav">
         <button className="fleche" onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">
           <Icone nom="gauche" taille={16} />
@@ -46,7 +46,7 @@ function SelecteurMois({ mois, setMois }) {
   );
 }
 
-export default function Coquille({ route, naviguer, compte, mois, setMois, reste, reel, occupe, onDeconnexion, ouvrirPage, children }) {
+export default function Coquille({ route, naviguer, compte, mois, setMois, reste, reel, occupe, onDeconnexion, ouvrirPage, onVisite, children }) {
   const [tiroir, setTiroir] = useState(false);
 
   // Le titre de l'onglet du navigateur suit l'écran : l'historique et les
@@ -85,7 +85,7 @@ export default function Coquille({ route, naviguer, compte, mois, setMois, reste
     <div className="app">
       <a className="lien-evitement" href="#contenu">Aller au contenu</a>
 
-      <aside className="lateral" data-ouvert={tiroir ? "1" : "0"} aria-label="Navigation principale">
+      <aside className="lateral" data-tutoriel="menu" data-ouvert={tiroir ? "1" : "0"} aria-label="Navigation principale">
         <div className="lateral-tete">
           <a className="marque-app" {...lienVers("accueil", naviguer, fermerTiroir)}>
             <span className="marque-logo" aria-hidden="true">€</span>
@@ -144,7 +144,7 @@ export default function Coquille({ route, naviguer, compte, mois, setMois, reste
                 )}
               </a>
             )}
-            <MenuCompte compte={compte} naviguer={naviguer} onDeconnexion={onDeconnexion} ouvrirPage={ouvrirPage} />
+            <MenuCompte compte={compte} naviguer={naviguer} onDeconnexion={onDeconnexion} ouvrirPage={ouvrirPage} onVisite={onVisite} />
           </div>
           {occupe && <div className="barre-progression" aria-hidden="true" />}
         </header>

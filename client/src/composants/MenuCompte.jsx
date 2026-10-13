@@ -9,7 +9,7 @@ import { lienVers } from "../navigation.js";
  * et aux réglages du foyer, aux pages légales, et à la sortie. Personne ne va
  * chercher où se déconnecter au fond d'un formulaire de réglages.
  */
-export default function MenuCompte({ compte, naviguer, onDeconnexion, ouvrirPage }) {
+export default function MenuCompte({ compte, naviguer, onDeconnexion, ouvrirPage, onVisite }) {
   const [ouvert, setOuvert] = useState(false);
   const boite = useRef(null);
 
@@ -36,6 +36,7 @@ export default function MenuCompte({ compte, naviguer, onDeconnexion, ouvrirPage
     <div className="compte" ref={boite}>
       <button
         className="compte-bouton"
+        data-tutoriel="menu-compte"
         onClick={() => setOuvert(!ouvert)}
         aria-expanded={ouvert}
         aria-haspopup="menu"
@@ -64,6 +65,9 @@ export default function MenuCompte({ compte, naviguer, onDeconnexion, ouvrirPage
           <a className="compte-item" role="menuitem" {...lienVers("donnees", naviguer, fermer)}>
             <Icone nom="donnees" taille={16} /> Mes données
           </a>
+          <button className="compte-item" role="menuitem" onClick={choisir(onVisite)}>
+            <Icone nom="info" taille={16} /> Visite guidée
+          </button>
           <div className="compte-sep" />
           <button className="compte-item" role="menuitem" onClick={choisir(() => ouvrirPage("confidentialite"))}>
             <Icone nom="bouclier" taille={16} /> Confidentialité
