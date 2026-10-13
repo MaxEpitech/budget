@@ -32,7 +32,7 @@ export async function revoquerConsentement(identifiants, utilisateur) {
 
 /** Retire le consentement d'un compte, avec les identifiants de son foyer actuel. */
 export async function revoquerPourCompte(utilisateur) {
-  if (!utilisateur?.goCardlessRequisitionId && !utilisateur?.enableBankingSessionId) return;
+  if (!utilisateur?.goCardlessRequisitionId && !utilisateur?.enableBankingSessionId && !utilisateur?.bridgeUserUuid) return;
   await revoquerConsentement(await identifiantsDuFoyer(utilisateur.foyerId), utilisateur);
 }
 
@@ -46,8 +46,8 @@ export async function revoquerPourCompte(utilisateur) {
 export async function defaireLiaisonsDuFoyer(foyerId) {
   const identifiants = await identifiantsDuFoyer(foyerId);
   const relies = await prisma.utilisateur.findMany({
-    where: { foyerId, OR: [{ goCardlessRequisitionId: { not: null } }, { enableBankingSessionId: { not: null } }] },
-    select: { goCardlessRequisitionId: true, enableBankingSessionId: true },
+    where: { foyerId, OR: [{ goCardlessRequisitionId: { not: null } }, { enableBankingSessionId: { not: null } }, { bridgeUserUuid: { not: null } }] },
+    select: { goCardlessRequisitionId: true, enableBankingSessionId: true, bridgeUserUuid: true },
   });
   await Promise.all(relies.map((u) => revoquerConsentement(identifiants, u)));
   await prisma.utilisateur.updateMany({ where: { foyerId }, data: LIAISON_VIDE });

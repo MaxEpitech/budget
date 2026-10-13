@@ -73,6 +73,11 @@ model Foyer {
   // clé privée (PEM) qui signe les requêtes est chiffrée, comme ci-dessus.
   enableBankingAppId            String?
   enableBankingClePriveeChiffre String?
+
+  // Application Bridge du foyer, troisième prestataire possible. Le Client ID
+  // est public ; le Client secret est chiffré, comme ci-dessus.
+  bridgeClientId            String?
+  bridgeClientSecretChiffre String?
 }
 
 // Un compte appartient à un foyer, et un foyer peut en réunir plusieurs :
@@ -113,6 +118,11 @@ model Utilisateur {
   enableBankingEtat       String?
   enableBankingSessionId  String?
   enableBankingAccountId  String?
+  // Chez Bridge : l'utilisateur Bridge propre à ce compte, la valeur d'état de
+  // la demande en cours (renvoyée dans `context`), puis le compte relié.
+  bridgeUserUuid          String?
+  bridgeEtat              String?
+  bridgeAccountId         String?
   // Synthèse de la dernière synchronisation, en JSON (montants en centimes).
   // Du texte plutôt qu'une colonne Json : un null y reste un null ordinaire, ce
   // que la restauration d'une sauvegarde rejoue sans cas particulier.

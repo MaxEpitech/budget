@@ -1,6 +1,6 @@
 // Les prestataires bancaires, derrière une même façade.
 //
-// GoCardless et Enable Banking rendent le même service — lire un compte après
+// GoCardless, Enable Banking et Bridge rendent le même service — lire un compte après
 // accord donné chez la banque — avec des parcours différents. Les routes ne
 // veulent pas le savoir : elles choisissent la façade d'après les identifiants
 // du foyer (`identifiants.fournisseur`), puis appellent toujours les mêmes
@@ -11,14 +11,15 @@
 //   redirection(app)             adresse de retour après le passage chez la banque
 //   verifier(ident, app)         lève ErreurBanque si refusés ; renvoie un avertissement ou null
 //   listerBanques(ident, pays)   → [{ id, nom }]
-//   ouvrir(ident, { banque, app }) → { lien, colonnes } — colonnes à poser sur le compte
+//   ouvrir(ident, { banque, app, email }) → { lien, colonnes } — colonnes à poser sur le compte
 //   confirmer(ident, u, retour)  → { etat: "reliee" | "attente" | "refusee", colonnes?, raison? }
 //   revoquer(ident, u)           retire le consentement chez le prestataire
 //   lire(ident, u, du, au)       → { operations, soldes } sous la forme commune
 //   reliee(u) / enAttente(u)     où en est la liaison d'un compte
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import * as gc from "./gocardless.js";
 import * as eb from "./enablebanking.js";
+import * as br from "./bridge.js";
 import { ErreurBanque } from "./erreurs.js";
 import { fabriquerSecret } from "../auth/secrets.js";
 
@@ -30,6 +31,9 @@ export const LIAISON_VIDE = {
   enableBankingEtat: null,
   enableBankingSessionId: null,
   enableBankingAccountId: null,
+  bridgeEtat: null,
+  bridgeUserUuid: null,
+  bridgeAccountId: null,
   agregationSynthese: null,
   agregationSynchroLe: null,
 };
@@ -166,7 +170,72 @@ const enablebanking = {
   enAttente: (u) => Boolean(u.enableBankingEtat && !u.enableBankingAccountId),
 };
 
-export const FOURNISSEURS = { gocardless, enablebanking };
+/* ─── Bridge ───────────────────────────────────────────────────────────── */
+
+const bridge = {
+  nom: "Bridge",
+  // Même chemin que pour Enable Banking : Bridge y ajoute `item_id`, `success`,
+  // `context`… et le domaine doit figurer parmi ceux autorisés dans son tableau de bord.
+  redirection: (app) => `${app}/banque/retour`,
+
+  async verifier(identifiants, app) {
+    await br.verifierIdentifiants(identifiants);
+    let domaine = app;
+    try {
+      domaine = new URL(app).host;
+    } catch {
+      // adresse mal formée : on la montre telle quelle
+    }
+    // Rien dans l'API ne permet de vérifier ce réglage : on le rappelle.
+    return `Identifiants valides. Vérifiez que le domaine ${domaine} figure parmi les « Redirections authorized domains » de votre application Bridge, sinon le retour de la banque échouera.`;
+  },
+
+  listerBanques: (identifiants, pays) => br.listerBanques(identifiants, pays),
+
+  async ouvrir(identifiants, { banque, app, email }) {
+    // Un utilisateur Bridge par demande : le retirer (`revoquer`) emporte tout
+    // ce qui a été relié sous lui, sans rien laisser derrière.
+    const userUuid = await br.creerUtilisateur(identifiants);
+    // Bridge n'accepte dans `context` que lettres, chiffres et tirets.
+    const etat = randomBytes(24).toString("hex");
+    try {
+      const { lien } = await br.ouvrirSession(identifiants, { userUuid, email, banque, redirection: this.redirection(app), contexte: etat });
+      return { lien, colonnes: { bridgeUserUuid: userUuid, bridgeEtat: etat } };
+    } catch (e) {
+      await br.supprimerUtilisateur(identifiants, userUuid).catch(() => {});
+      throw e;
+    }
+  },
+
+  async confirmer(identifiants, u, retour) {
+    // Ni connexion ni contexte : l'utilisateur a quitté Bridge Connect en chemin.
+    if (!retour.itemId && !retour.etat) return { etat: "attente" };
+    // Le retour doit répondre à la demande ouverte par CE compte.
+    if (!retour.etat || retour.etat !== u.bridgeEtat) return { etat: "attente", raison: "retour-inattendu" };
+    if (retour.succes !== "true" || !retour.itemId) return { etat: "refusee" };
+
+    const compte = await br.choisirCompte(identifiants, u.bridgeUserUuid, retour.itemId);
+    if (!compte) return { etat: "refusee", raison: "aucun-compte-courant" };
+    return { etat: "reliee", colonnes: { bridgeEtat: null, bridgeAccountId: compte } };
+  },
+
+  async revoquer(identifiants, u) {
+    if (u.bridgeUserUuid) await br.supprimerUtilisateur(identifiants, u.bridgeUserUuid);
+  },
+
+  async lire(identifiants, u, du, au) {
+    const [operations, soldes] = await Promise.all([
+      br.lireTransactions(identifiants, u.bridgeUserUuid, u.bridgeAccountId, du, au),
+      br.lireSoldes(identifiants, u.bridgeUserUuid, u.bridgeAccountId),
+    ]);
+    return { operations, soldes };
+  },
+
+  reliee: (u) => Boolean(u.bridgeUserUuid && u.bridgeAccountId),
+  enAttente: (u) => Boolean(u.bridgeUserUuid && u.bridgeEtat && !u.bridgeAccountId),
+};
+
+export const FOURNISSEURS = { gocardless, enablebanking, bridge };
 
 /** La façade correspondant à des identifiants, ou null s'il n'y en a pas. */
 export const fournisseurDe = (identifiants) => (identifiants ? FOURNISSEURS[identifiants.fournisseur] ?? null : null);
