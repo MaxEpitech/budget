@@ -134,7 +134,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
   };
 
   const boutonAjout = (
-    <button className="btn" onClick={() => setAjout(true)}>
+    <button className="btn" data-tutoriel="ajout-operation" onClick={() => setAjout(true)}>
       <Icone nom="plus" /> Nouvelle opération
     </button>
   );
@@ -146,7 +146,7 @@ export default function Flux({ etat, calc, mois, executer, supprimer, naviguer }
         description={`Revenus, dépenses et mouvements internes de ${libelleMois(mois).toLowerCase()}`}
         actions={
           <>
-            <button className="btn fant" onClick={() => setImporter(true)}>
+            <button className="btn fant" data-tutoriel="import-releve" onClick={() => setImporter(true)}>
               <Icone nom="importer" /> Importer un relevé
             </button>
             {boutonAjout}

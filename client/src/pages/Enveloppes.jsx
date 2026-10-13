@@ -70,6 +70,7 @@ export default function Enveloppes({ budgets, executer }) {
   return (
     <>
       <EnTetePage
+        tutoriel="page-enveloppes"
         titre="Enveloppes"
         description={
           budgets.length === 0

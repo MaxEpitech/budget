@@ -149,6 +149,7 @@ export default function Emprunt({ etat, calc, compte, signaler }) {
   return (
     <>
       <EnTetePage
+        tutoriel="page-emprunt"
         titre="Capacité d'emprunt"
         description="Ce que le foyer peut emprunter et acheter. Tout se recalcule à la frappe ; rien n'est envoyé au serveur."
       />
